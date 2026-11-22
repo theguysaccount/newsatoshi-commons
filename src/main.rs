@@ -1,11 +1,11 @@
 use newsatoshi_commons::server::{run_server_blocking, ServerConfig};
-use newsatoshi_commons::storage::{load_or_init_state, CommonsEngine};
+use newsatoshi_commons::storage::{load_or_init_state, CommonsEngine, ExternalPublicKeysConfig};
 use newsatoshi_commons::{
     prove_covenant_transition, sha256, AnchorCommitment, CheckedWorkProof, CommonsLedger,
     CovenantPublicInputs, CovenantRule, CovenantTxKind, HardwareDeviceConfig,
     HardwareTelemetrySigner, Hash32, JsonRpcAnchorClient, MerkleLamportKeypair, SeedStatusClient,
-    SlhDsaKeypair, StreamingChannel, DEFAULT_SEED_STATUS_URL, DEFAULT_TREE_HEIGHT,
-    PROTOCOL_VERSION,
+    SlhDsaKeypair, StreamingChannel, DEFAULT_MAINNET_SEED_STATUS_URL, DEFAULT_SEED_STATUS_URL,
+    DEFAULT_TREE_HEIGHT, PROTOCOL_VERSION,
 };
 use serde::Serialize;
 use std::env;
@@ -53,11 +53,18 @@ USAGE:
 
 SUBCOMMANDS:
   serve            Start the live Commons Engine HTTP API server & optional static Web Cockpit
-                     --port <u16>        HTTP port (default: 8787)
-                     --host <addr>       Bind address (default: 127.0.0.1)
-                     --state-file <path> Persistent JSON ledger path (default: ./data/commons-ledger.json)
-                     --seed-url <url>    Live newsatoshi-seed /status URL (default: {DEFAULT_SEED_STATUS_URL})
-                     --static-dir <dir>  Optional directory to serve compiled web UI (e.g. ./web/dist)
+                     --port <u16>                 HTTP port (default: 8787)
+                     --host <addr>                Bind address (default: 127.0.0.1)
+                     --state-file <path>          Persistent JSON ledger path (default: ./data/commons-ledger.json)
+                     --seed-url <url>             Live testnet /status URL (default: {DEFAULT_SEED_STATUS_URL})
+                     --mainnet-seed-url <url>     Live mainnet /status URL (default: {DEFAULT_MAINNET_SEED_STATUS_URL})
+                     --static-dir <dir>           Optional directory to serve compiled web UI (e.g. ./web/dist)
+                     --admin-token <token>        Optional Bearer token (or COMMONS_ADMIN_TOKEN env var)
+                     --verify-only                Strict Mainnet key-isolation mode (or COMMONS_VERIFY_ONLY=1): zero private keys in RAM/disk
+                     --deed-oracle-root <64hex>   External Deed Oracle XMSS Merkle root (or COMMONS_DEED_ORACLE_ROOT)
+                     --hardware-root <64hex>      External Hardware TEE XMSS Merkle root (or COMMONS_HARDWARE_ROOT)
+                     --deed-oracle-slh-pk <64hex> External Deed Oracle FIPS 205 SLH-DSA pubkey (or COMMONS_DEED_ORACLE_SLH_PK)
+                     --hardware-slh-pk <64hex>    External Hardware TEE FIPS 205 SLH-DSA pubkey (or COMMONS_HARDWARE_SLH_PK)
 
   export-legal-schedule
                    Export deterministic JSON schedule binding covenant_rule_hash, XMSS roots,
@@ -178,20 +185,73 @@ fn run_serve(args: &[String]) -> Result<(), String> {
             .unwrap_or_else(|| "./data/commons-ledger.json".to_string()),
     );
     let seed_url = find_flag_value(args, "--seed-url")
+        .or_else(|| env::var("COMMONS_SEED_URL").ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
         .unwrap_or_else(|| DEFAULT_SEED_STATUS_URL.to_string());
+    let mainnet_seed_url = find_flag_value(args, "--mainnet-seed-url")
+        .or_else(|| env::var("COMMONS_MAINNET_SEED_URL").ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("none"))
+        .or_else(|| Some(DEFAULT_MAINNET_SEED_STATUS_URL.to_string()));
     let static_dir = find_flag_value(args, "--static-dir").map(PathBuf::from);
     let admin_token = find_flag_value(args, "--admin-token")
         .or_else(|| env::var("COMMONS_ADMIN_TOKEN").ok())
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
 
+    let verify_only_env = env::var("COMMONS_VERIFY_ONLY")
+        .ok()
+        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
+        .unwrap_or(false);
+    let verify_only = has_flag(args, "--verify-only") || verify_only_env;
+
+    let deed_root = find_flag_value(args, "--deed-oracle-root")
+        .or_else(|| env::var("COMMONS_DEED_ORACLE_ROOT").ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    let hw_root = find_flag_value(args, "--hardware-root")
+        .or_else(|| env::var("COMMONS_HARDWARE_ROOT").ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    let deed_slh_pk = find_flag_value(args, "--deed-oracle-slh-pk")
+        .or_else(|| env::var("COMMONS_DEED_ORACLE_SLH_PK").ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    let hw_slh_pk = find_flag_value(args, "--hardware-slh-pk")
+        .or_else(|| env::var("COMMONS_HARDWARE_SLH_PK").ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    let external_public_keys = match (deed_root, hw_root) {
+        (Some(d), Some(h)) => Some(ExternalPublicKeysConfig {
+            deed_oracle_merkle_root: d,
+            hardware_merkle_root: h,
+            deed_oracle_slh_dsa_pk_hex: deed_slh_pk,
+            hardware_slh_dsa_pk_hex: hw_slh_pk,
+            max_bounty_payout: None,
+            reinvest_bps: None,
+            min_soil_health_score: None,
+        }),
+        (None, None) => None,
+        _ => {
+            return Err(
+                "Both --deed-oracle-root and --hardware-root must be provided together"
+                    .to_string(),
+            );
+        }
+    };
+
     run_server_blocking(ServerConfig {
         host,
         port,
         state_file,
         seed_url,
+        mainnet_seed_url,
         static_dir,
         admin_token,
+        verify_only: verify_only || external_public_keys.is_some(),
+        external_public_keys,
     })
 }
 

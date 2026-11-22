@@ -40,6 +40,7 @@ interface CockpitTabProps {
   onSettleStream: (payload: StreamSettlePayload) => Promise<void>;
   onAnchorL1: (network: 'testnet' | 'mainnet') => Promise<void>;
   onConfirmAnchor: (payload: ConfirmAnchorPayload) => Promise<void>;
+  onVerifyAnchor: (anchorHash: string) => Promise<void>;
   onVerifyStark: (proofId: string) => Promise<VerifyStarkResponse | null>;
 }
 
@@ -62,6 +63,7 @@ export function CockpitTab({
   onSettleStream,
   onAnchorL1,
   onConfirmAnchor,
+  onVerifyAnchor,
   onVerifyStark,
 }: CockpitTabProps) {
   const { ledger_summary: summary, covenant_rule: rule, keys } = state;
@@ -739,17 +741,41 @@ export function CockpitTab({
                   <span className="font-mono text-[11px] font-semibold text-emerald-300">
                     Nonce #{latestAnchor.tx_nonce} ({latestAnchor.network})
                   </span>
-                  <span
-                    className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase ${
-                      latestAnchor.broadcast_status === 'broadcast'
-                        ? 'bg-emerald-500/20 text-emerald-300'
-                        : 'bg-amber-500/20 text-amber-300'
-                    }`}
-                  >
-                    {latestAnchor.broadcast_status === 'broadcast'
-                      ? 'BROADCAST CONFIRMED'
-                      : 'UNBROADCAST — CLI READY'}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {latestAnchor.verified_on_l1 ? (
+                      <span className="inline-flex items-center gap-1 rounded bg-emerald-500/25 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase text-emerald-200 border border-emerald-500/40">
+                        <ShieldCheck className="h-3 w-3" />
+                        L1 VERIFIED · BLOCK #{latestAnchor.l1_confirmed_height?.toLocaleString() ?? '?'} (
+                        {latestAnchor.l1_confirmations ?? 0} CONFS)
+                      </span>
+                    ) : (
+                      <span
+                        className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase ${
+                          latestAnchor.broadcast_status === 'broadcast'
+                            ? 'bg-emerald-500/20 text-emerald-300'
+                            : 'bg-amber-500/20 text-amber-300'
+                        }`}
+                      >
+                        {latestAnchor.broadcast_status === 'broadcast'
+                          ? 'BROADCAST CONFIRMED'
+                          : 'UNBROADCAST — CLI READY'}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      disabled={busyAction !== null}
+                      onClick={() => void onVerifyAnchor(latestAnchor.anchor_hash)}
+                      className="inline-flex items-center gap-1 rounded border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-sky-300 hover:bg-sky-500/20 cursor-pointer disabled:opacity-50"
+                      title="Public live cross-check against Newsatoshi L1 /api/lock?hash=..."
+                    >
+                      {busyAction === 'verify-anchor' ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="h-3 w-3" />
+                      )}
+                      Verify On-Chain
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
@@ -772,6 +798,14 @@ export function CockpitTab({
                       <span className="font-mono text-[11px] text-amber-300">Unbroadcast</span>
                     )}
                   </div>
+                  {latestAnchor.l1_lock_id && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-slate-400">
+                        L1 On-Chain Lock ({latestAnchor.l1_lock_state || 'open'})
+                      </span>
+                      <HashPill hash={latestAnchor.l1_lock_id} head={12} tail={10} />
+                    </div>
+                  )}
                 </div>
                 <div className="rounded border border-emerald-500/25 bg-[#04070d] p-2">
                   <div className="mb-1 flex items-center justify-between">

@@ -270,6 +270,19 @@ pub struct AnchorReceipt {
     pub total_kwh_verified: u64,
     #[serde(default)]
     pub created_at_unix: u64,
+    /// True only when independently verified via live Newsatoshi L1 `/api/lock?hash=<anchor_hash>`.
+    #[serde(default)]
+    pub verified_on_l1: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub l1_lock_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub l1_confirmed_height: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub l1_confirmations: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub l1_lock_state: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub l1_verified_at_unix: Option<u64>,
 }
 
 fn default_unbroadcast() -> String {
@@ -396,6 +409,12 @@ impl JsonRpcAnchorClient {
             parcels_acquired: commitment.parcels_acquired,
             total_kwh_verified: commitment.total_kwh_verified,
             created_at_unix: unix_now(),
+            verified_on_l1: false,
+            l1_lock_id: None,
+            l1_confirmed_height: None,
+            l1_confirmations: None,
+            l1_lock_state: None,
+            l1_verified_at_unix: None,
         }
     }
 

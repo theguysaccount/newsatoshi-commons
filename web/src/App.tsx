@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Scale,
   Server,
+  ShieldCheck,
   Terminal,
   Unlock,
   WifiOff,
@@ -24,6 +25,7 @@ import {
   actionResetLedger,
   actionSettleStream,
   actionSubmitTelemetry,
+  actionVerifyAnchor,
   actionVerifyStark,
   getCommonsState,
   getOperatorToken,
@@ -218,6 +220,26 @@ export default function App() {
     }
   };
 
+  const handleVerifyAnchor = async (anchorHash: string) => {
+    setBusyAction('verify-anchor');
+    try {
+      const res = await actionVerifyAnchor(anchorHash);
+      if (res.state) setState(res.state);
+      if (res.verified_on_l1 && res.receipt) {
+        showToast(
+          'success',
+          `Verified on-chain on Newsatoshi L1! Block #${res.receipt.l1_confirmed_height ?? '?'} (${res.receipt.l1_confirmations ?? 0} confirmations)`
+        );
+      } else {
+        showToast('error', res.error || 'Anchor hash not yet confirmed on L1');
+      }
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'On-chain L1 verification failed');
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
   const handleVerifyStark = async (proofId: string): Promise<VerifyStarkResponse | null> => {
     try {
       const res = await actionVerifyStark(proofId);
@@ -301,6 +323,16 @@ export default function App() {
                 <span className="font-mono text-[11px] font-semibold">Node Disconnected</span>
                 <RefreshCw className="h-3 w-3" />
               </button>
+            )}
+
+            {connected && (health?.verify_only || state?.verify_only) && (
+              <div
+                className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 font-mono text-[11px] font-semibold text-sky-200"
+                title="Mainnet key-isolation mode: zero private signing keys exist on this server. Only offline-signed XMSS/SLH-DSA hardware & deed packets are accepted."
+              >
+                <ShieldCheck className="h-3.5 w-3.5 text-sky-300" />
+                Verify-Only · 0 Server Keys
+              </div>
             )}
 
             {connected && health?.auth_required && (
@@ -485,6 +517,7 @@ export default function App() {
             onSettleStream={handleSettleStream}
             onAnchorL1={handleAnchorL1}
             onConfirmAnchor={handleConfirmAnchor}
+            onVerifyAnchor={handleVerifyAnchor}
             onVerifyStark={handleVerifyStark}
           />
         ) : (

@@ -1,6 +1,6 @@
 use crate::crypto::{
-    sha256_concat, Hash32, MerkleLamportKeypair, MerkleLamportSig, MerkleSignError, SlhDsaKeypair,
-    SlhDsaPubKey, SlhDsaSig, SLH_DSA_PARAM_SET,
+    hash32_from_hex, sha256_concat, Hash32, MerkleLamportKeypair, MerkleLamportSig,
+    MerkleSignError, SlhDsaKeypair, SlhDsaPubKey, SlhDsaSig, SLH_DSA_PARAM_SET,
 };
 use crate::CheckedWorkProof;
 use serde::{Deserialize, Serialize};
@@ -331,5 +331,127 @@ impl HardwareTelemetrySigner {
             msg_hash,
             signature,
         })
+    }
+}
+
+/// Externally signed land deed packet submitted by an offline Perpetual Purpose Trust / Deed Oracle
+/// directly to `POST /api/deeds` (works in `--verify-only` mode with zero server-side private keys).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ExternalDeedPacket {
+    pub protocol: String,
+    /// `"xmss"` or `"slh_dsa"`.
+    pub signature_scheme: String,
+    pub parcel_id: u64,
+    pub acres: f64,
+    pub price_love: u64,
+    pub deed_label: String,
+    pub deed_document_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merkle_sig: Option<MerkleLamportSig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slh_dsa_pk_hex: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slh_dsa_nonce: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slh_dsa_sig_hex: Option<String>,
+}
+
+impl ExternalDeedPacket {
+    /// Signs a land deed packet offline using NIST FIPS 205 SLH-DSA-SHA2-128f.
+    #[allow(clippy::too_many_arguments)]
+    pub fn sign_slh_dsa(
+        kp: &SlhDsaKeypair,
+        parcel_id: u64,
+        acres: f64,
+        price_love: u64,
+        deed_label: impl Into<String>,
+        deed_document_hash: Hash32,
+        nonce: u64,
+    ) -> Self {
+        let msg = CheckedWorkProof::deed_msg_with_nonce(parcel_id, deed_document_hash, nonce);
+        let sig = kp.sign_hash(msg);
+        Self {
+            protocol: "NEWSATOSHI/2.1-DEED-ORACLE".to_string(),
+            signature_scheme: "slh_dsa".to_string(),
+            parcel_id,
+            acres,
+            price_love,
+            deed_label: deed_label.into(),
+            deed_document_hash: hex::encode(deed_document_hash),
+            merkle_sig: None,
+            slh_dsa_pk_hex: Some(kp.pk.to_hex()),
+            slh_dsa_nonce: Some(nonce),
+            slh_dsa_sig_hex: Some(sig.to_hex()),
+        }
+    }
+
+    /// Signs a land deed packet offline using stateful XMSS Merkle-Lamport.
+    pub fn sign_xmss(
+        kp: &mut MerkleLamportKeypair,
+        parcel_id: u64,
+        acres: f64,
+        price_love: u64,
+        deed_label: impl Into<String>,
+        deed_document_hash: Hash32,
+    ) -> Result<Self, MerkleSignError> {
+        let msg = CheckedWorkProof::deed_msg(parcel_id, deed_document_hash);
+        let sig = kp.sign_next(msg)?;
+        Ok(Self {
+            protocol: "NEWSATOSHI/2.1-DEED-ORACLE".to_string(),
+            signature_scheme: "xmss".to_string(),
+            parcel_id,
+            acres,
+            price_love,
+            deed_label: deed_label.into(),
+            deed_document_hash: hex::encode(deed_document_hash),
+            merkle_sig: Some(sig),
+            slh_dsa_pk_hex: None,
+            slh_dsa_nonce: None,
+            slh_dsa_sig_hex: None,
+        })
+    }
+
+    /// Converts this external deed attestation into a verifiable `CheckedWorkProof`.
+    pub fn to_checked_work_proof(&self) -> Result<(Hash32, CheckedWorkProof), String> {
+        let doc_hash = hash32_from_hex(&self.deed_document_hash)
+            .map_err(|e| format!("invalid deed_document_hash: {e}"))?;
+        match self.signature_scheme.as_str() {
+            "xmss" => {
+                let sig = self
+                    .merkle_sig
+                    .clone()
+                    .ok_or_else(|| "missing merkle_sig in xmss deed packet".to_string())?;
+                Ok((
+                    doc_hash,
+                    CheckedWorkProof::merkle_land_deed(self.parcel_id, doc_hash, sig),
+                ))
+            }
+            "slh_dsa" => {
+                let pk_hex = self
+                    .slh_dsa_pk_hex
+                    .as_deref()
+                    .ok_or_else(|| "missing slh_dsa_pk_hex in slh_dsa deed packet".to_string())?;
+                let sig_hex = self
+                    .slh_dsa_sig_hex
+                    .as_deref()
+                    .ok_or_else(|| "missing slh_dsa_sig_hex in slh_dsa deed packet".to_string())?;
+                let nonce = self
+                    .slh_dsa_nonce
+                    .ok_or_else(|| "missing slh_dsa_nonce in slh_dsa deed packet".to_string())?;
+                let oracle_pk = SlhDsaPubKey::from_hex(pk_hex)?;
+                let oracle_sig = SlhDsaSig::from_hex(sig_hex)?;
+                Ok((
+                    doc_hash,
+                    CheckedWorkProof::slh_dsa_land_deed(
+                        self.parcel_id,
+                        doc_hash,
+                        nonce,
+                        oracle_pk,
+                        oracle_sig,
+                    ),
+                ))
+            }
+            other => Err(format!("unsupported deed signature_scheme '{other}'")),
+        }
     }
 }

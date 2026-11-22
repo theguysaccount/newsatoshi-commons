@@ -1,5 +1,6 @@
 use crate::crypto::{
-    hash32_from_hex, sha256, Hash32, MerkleLamportKeypair, SlhDsaKeypair, DEFAULT_TREE_HEIGHT,
+    hash32_from_hex, sha256, Hash32, MerkleLamportKeypair, SlhDsaKeypair, SlhDsaPubKey,
+    DEFAULT_TREE_HEIGHT,
 };
 use crate::rpc::{AnchorReceipt, PROTOCOL_VERSION};
 use crate::seed::{AUXPOW_CHAIN_ID, MAINNET_GENESIS_HASH, TESTNET_GENESIS_HASH};
@@ -352,14 +353,52 @@ pub struct TelemetrySeriesPoint {
     pub verified_love_per_kwh: Option<f64>,
 }
 
+/// External public-key configuration for `--verify-only` / Mainnet deployments.
+/// Holds ONLY public roots and public keys (zero private signing keys on the server).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExternalPublicKeysConfig {
+    pub deed_oracle_merkle_root: String,
+    pub hardware_merkle_root: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deed_oracle_slh_dsa_pk_hex: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hardware_slh_dsa_pk_hex: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_bounty_payout: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reinvest_bps: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_soil_health_score: Option<u16>,
+}
+
+/// Optional in-process signing keypairs (loaded ONLY in local/testnet development mode;
+/// strictly `None` in `--verify-only` / Mainnet deployments).
+pub struct InProcessSigningKeys {
+    pub deed_oracle_xmss: MerkleLamportKeypair,
+    pub hardware_xmss: MerkleLamportKeypair,
+    pub deed_oracle_slh: SlhDsaKeypair,
+    pub deed_oracle_slh_seed: Hash32,
+    pub deed_oracle_slh_next_nonce: u64,
+    pub hardware_slh: SlhDsaKeypair,
+    pub hardware_slh_seed: Hash32,
+    pub hardware_slh_next_nonce: u64,
+}
+
 /// On-disk atomic JSON representation of the entire Commons Engine state.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PersistedEngineState {
     pub version: String,
     pub protocol_version: String,
+    #[serde(default)]
+    pub verify_only: bool,
     pub covenant_rule: CovenantRuleJson,
     pub ledger: LedgerSnapshot,
-    pub keys_state: PersistedKeysState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keys_state: Option<PersistedKeysState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deed_oracle_slh_pk_hex: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hardware_slh_pk_hex: Option<String>,
     #[serde(default)]
     pub funding_records: Vec<FundingRecord>,
     pub parcels: Vec<ParcelRecord>,
@@ -409,6 +448,10 @@ pub struct PublicKeysView {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ApiStateView {
     pub protocol_version: String,
+    #[serde(default)]
+    pub verify_only: bool,
+    #[serde(default)]
+    pub signing_keys_loaded: bool,
     pub covenant_rule: CovenantRuleJson,
     pub covenant_rule_hash: String,
     pub ledger_summary: LedgerSummaryView,
@@ -455,19 +498,15 @@ pub struct LegalScheduleL1Anchors {
     pub auxpow_chainid: u32,
 }
 
-/// Live in-memory Commons Engine combining `CommonsLedger`, XMSS + SLH-DSA signers,
-/// STARK proofs, audit history, and atomic disk persistence.
+/// Live in-memory Commons Engine combining `CommonsLedger`, optional in-process XMSS + SLH-DSA signers
+/// (strictly `None` in `--verify-only` / Mainnet mode), STARK proofs, audit history, and atomic persistence.
 pub struct CommonsEngine {
+    pub verify_only: bool,
     pub rule: CovenantRule,
     pub ledger: CommonsLedger,
-    pub deed_oracle_xmss: MerkleLamportKeypair,
-    pub hardware_xmss: MerkleLamportKeypair,
-    pub deed_oracle_slh: SlhDsaKeypair,
-    pub deed_oracle_slh_seed: Hash32,
-    pub deed_oracle_slh_next_nonce: u64,
-    pub hardware_slh: SlhDsaKeypair,
-    pub hardware_slh_seed: Hash32,
-    pub hardware_slh_next_nonce: u64,
+    pub signing_keys: Option<InProcessSigningKeys>,
+    pub deed_oracle_slh_pk_hex: Option<String>,
+    pub hardware_slh_pk_hex: Option<String>,
     pub funding_records: Vec<FundingRecord>,
     pub parcels: Vec<ParcelRecord>,
     pub telemetry_history: Vec<TelemetryRecord>,
@@ -481,7 +520,8 @@ pub struct CommonsEngine {
 }
 
 impl CommonsEngine {
-    /// Initializes an honest empty Commons Engine (`0 LOVE`, `0` UTXOs, `0` parcels, `0` kWh, `0` proofs).
+    /// Initializes an honest empty Commons Engine (`0 LOVE`, `0` UTXOs, `0` parcels, `0` kWh, `0` proofs)
+    /// with local testnet/development signing keys.
     /// Balance remains `0` until real L1 funding deposits or PayWord settlements are recorded.
     pub fn new_empty() -> Self {
         let deed_xmss_seed = default_deed_oracle_xmss_seed();
@@ -496,6 +536,9 @@ impl CommonsEngine {
         let deed_oracle_slh = SlhDsaKeypair::from_seed(deed_slh_seed);
         let hardware_slh = SlhDsaKeypair::from_seed(hw_slh_seed);
 
+        let deed_slh_pk_hex = deed_oracle_slh.pk.to_hex();
+        let hw_slh_pk_hex = hardware_slh.pk.to_hex();
+
         let rule = CovenantRule {
             max_bounty_payout: 25_000,
             reinvest_bps: 1_500, // 15% autonomous land reinvestment spread
@@ -509,16 +552,21 @@ impl CommonsEngine {
         let ledger = CommonsLedger::new();
 
         Self {
+            verify_only: false,
             rule,
             ledger,
-            deed_oracle_xmss,
-            hardware_xmss,
-            deed_oracle_slh,
-            deed_oracle_slh_seed: deed_slh_seed,
-            deed_oracle_slh_next_nonce: 0,
-            hardware_slh,
-            hardware_slh_seed: hw_slh_seed,
-            hardware_slh_next_nonce: 0,
+            signing_keys: Some(InProcessSigningKeys {
+                deed_oracle_xmss,
+                hardware_xmss,
+                deed_oracle_slh,
+                deed_oracle_slh_seed: deed_slh_seed,
+                deed_oracle_slh_next_nonce: 0,
+                hardware_slh,
+                hardware_slh_seed: hw_slh_seed,
+                hardware_slh_next_nonce: 0,
+            }),
+            deed_oracle_slh_pk_hex: Some(deed_slh_pk_hex),
+            hardware_slh_pk_hex: Some(hw_slh_pk_hex),
             funding_records: Vec::new(),
             parcels: Vec::new(),
             telemetry_history: Vec::new(),
@@ -530,6 +578,91 @@ impl CommonsEngine {
             total_streaming_gross_love: 0,
             total_streaming_reinvested_love: 0,
         }
+    }
+
+    /// Initializes a strict Mainnet-ready `--verify-only` engine from external public roots/keys only.
+    /// Zero private keys or seeds are ever generated, held in memory, or written to disk.
+    pub fn new_verify_only(ext: &ExternalPublicKeysConfig) -> Result<Self, String> {
+        let authorized_deed_oracle_pk = hash32_from_hex(&ext.deed_oracle_merkle_root)
+            .map_err(|e| format!("invalid deed_oracle_merkle_root: {e}"))?;
+        let authorized_hardware_pk = hash32_from_hex(&ext.hardware_merkle_root)
+            .map_err(|e| format!("invalid hardware_merkle_root: {e}"))?;
+
+        let (deed_slh_commit, deed_slh_pk_hex) = match &ext.deed_oracle_slh_dsa_pk_hex {
+            Some(h) if !h.trim().is_empty() => {
+                let pk = SlhDsaPubKey::from_hex(h.trim())
+                    .map_err(|e| format!("invalid deed_oracle_slh_dsa_pk_hex: {e}"))?;
+                (Some(pk.commitment()), Some(pk.to_hex()))
+            }
+            _ => (None, None),
+        };
+        let (hw_slh_commit, hw_slh_pk_hex) = match &ext.hardware_slh_dsa_pk_hex {
+            Some(h) if !h.trim().is_empty() => {
+                let pk = SlhDsaPubKey::from_hex(h.trim())
+                    .map_err(|e| format!("invalid hardware_slh_dsa_pk_hex: {e}"))?;
+                (Some(pk.commitment()), Some(pk.to_hex()))
+            }
+            _ => (None, None),
+        };
+
+        let reinvest_bps = ext.reinvest_bps.unwrap_or(1_500);
+        if reinvest_bps > 10_000 {
+            return Err(format!("reinvest_bps ({reinvest_bps}) must be <= 10000"));
+        }
+        let min_soil_health_score = ext.min_soil_health_score.unwrap_or(80);
+        if min_soil_health_score > 100 {
+            return Err(format!(
+                "min_soil_health_score ({min_soil_health_score}) must be <= 100"
+            ));
+        }
+
+        let rule = CovenantRule {
+            max_bounty_payout: ext.max_bounty_payout.unwrap_or(25_000),
+            reinvest_bps,
+            min_soil_health_score,
+            authorized_deed_oracle_pk,
+            authorized_hardware_pk,
+            authorized_deed_oracle_slh_pk: deed_slh_commit,
+            authorized_hardware_slh_pk: hw_slh_commit,
+        };
+
+        Ok(Self {
+            verify_only: true,
+            rule,
+            ledger: CommonsLedger::new(),
+            signing_keys: None,
+            deed_oracle_slh_pk_hex: deed_slh_pk_hex,
+            hardware_slh_pk_hex: hw_slh_pk_hex,
+            funding_records: Vec::new(),
+            parcels: Vec::new(),
+            telemetry_history: Vec::new(),
+            streaming_history: Vec::new(),
+            stark_proofs: Vec::new(),
+            anchor_receipts: Vec::new(),
+            telemetry_series: Vec::new(),
+            total_energy_bounty_love: 0,
+            total_streaming_gross_love: 0,
+            total_streaming_reinvested_love: 0,
+        })
+    }
+
+    /// Strips any in-process private signing keys from memory while preserving all public roots,
+    /// covenant rules, UTXOs, proofs, and anchor receipts.
+    pub fn enable_verify_only_strip_keys(&mut self) {
+        if let Some(ref keys) = self.signing_keys {
+            if self.deed_oracle_slh_pk_hex.is_none() {
+                self.deed_oracle_slh_pk_hex = Some(keys.deed_oracle_slh.pk.to_hex());
+            }
+            if self.hardware_slh_pk_hex.is_none() {
+                self.hardware_slh_pk_hex = Some(keys.hardware_slh.pk.to_hex());
+            }
+        }
+        self.signing_keys = None;
+        self.verify_only = true;
+    }
+
+    pub fn has_signing_keys(&self) -> bool {
+        self.signing_keys.is_some()
     }
 
     /// Records a real L1 funding deposit referencing an actual 32-byte L1 txid / lock hash.
@@ -607,39 +740,66 @@ impl CommonsEngine {
         let rule = CovenantRule::try_from(&p.covenant_rule)?;
         let ledger = CommonsLedger::try_from(&p.ledger)?;
 
-        let deed_xmss_seed = hash32_from_hex(&p.keys_state.deed_oracle_xmss_seed_hex)?;
-        let hw_xmss_seed = hash32_from_hex(&p.keys_state.hardware_xmss_seed_hex)?;
-        let deed_slh_seed = hash32_from_hex(&p.keys_state.deed_oracle_slh_seed_hex)?;
-        let hw_slh_seed = hash32_from_hex(&p.keys_state.hardware_slh_seed_hex)?;
+        let (signing_keys, mut deed_slh_pk_hex, mut hw_slh_pk_hex) = match (&p.keys_state, p.verify_only) {
+            (Some(ks), false) => {
+                let deed_xmss_seed = hash32_from_hex(&ks.deed_oracle_xmss_seed_hex)?;
+                let hw_xmss_seed = hash32_from_hex(&ks.hardware_xmss_seed_hex)?;
+                let deed_slh_seed = hash32_from_hex(&ks.deed_oracle_slh_seed_hex)?;
+                let hw_slh_seed = hash32_from_hex(&ks.hardware_slh_seed_hex)?;
 
-        let deed_oracle_xmss = MerkleLamportKeypair::from_seed_at_index(
-            deed_xmss_seed,
-            p.keys_state.tree_height,
-            p.keys_state.deed_oracle_xmss_next_leaf,
-        )
-        .map_err(|e| format!("failed to restore deed oracle XMSS keypair: {e}"))?;
+                let deed_oracle_xmss = MerkleLamportKeypair::from_seed_at_index(
+                    deed_xmss_seed,
+                    ks.tree_height,
+                    ks.deed_oracle_xmss_next_leaf,
+                )
+                .map_err(|e| format!("failed to restore deed oracle XMSS keypair: {e}"))?;
 
-        let hardware_xmss = MerkleLamportKeypair::from_seed_at_index(
-            hw_xmss_seed,
-            p.keys_state.tree_height,
-            p.keys_state.hardware_xmss_next_leaf,
-        )
-        .map_err(|e| format!("failed to restore hardware XMSS keypair: {e}"))?;
+                let hardware_xmss = MerkleLamportKeypair::from_seed_at_index(
+                    hw_xmss_seed,
+                    ks.tree_height,
+                    ks.hardware_xmss_next_leaf,
+                )
+                .map_err(|e| format!("failed to restore hardware XMSS keypair: {e}"))?;
 
-        let deed_oracle_slh = SlhDsaKeypair::from_seed(deed_slh_seed);
-        let hardware_slh = SlhDsaKeypair::from_seed(hw_slh_seed);
+                let deed_oracle_slh = SlhDsaKeypair::from_seed(deed_slh_seed);
+                let hardware_slh = SlhDsaKeypair::from_seed(hw_slh_seed);
+                let d_hex = deed_oracle_slh.pk.to_hex();
+                let h_hex = hardware_slh.pk.to_hex();
+
+                (
+                    Some(InProcessSigningKeys {
+                        deed_oracle_xmss,
+                        hardware_xmss,
+                        deed_oracle_slh,
+                        deed_oracle_slh_seed: deed_slh_seed,
+                        deed_oracle_slh_next_nonce: ks.deed_oracle_slh_next_nonce,
+                        hardware_slh,
+                        hardware_slh_seed: hw_slh_seed,
+                        hardware_slh_next_nonce: ks.hardware_slh_next_nonce,
+                    }),
+                    Some(d_hex),
+                    Some(h_hex),
+                )
+            }
+            _ => (None, p.deed_oracle_slh_pk_hex.clone(), p.hardware_slh_pk_hex.clone()),
+        };
+
+        if deed_slh_pk_hex.is_none() {
+            deed_slh_pk_hex = p.deed_oracle_slh_pk_hex.clone();
+        }
+        if hw_slh_pk_hex.is_none() {
+            hw_slh_pk_hex = p.hardware_slh_pk_hex.clone();
+        }
+
+        let verify_only = p.verify_only || signing_keys.is_none();
 
         Ok(Self {
+            verify_only,
             rule,
             ledger,
-            deed_oracle_xmss,
-            hardware_xmss,
-            deed_oracle_slh,
-            deed_oracle_slh_seed: deed_slh_seed,
-            deed_oracle_slh_next_nonce: p.keys_state.deed_oracle_slh_next_nonce,
-            hardware_slh,
-            hardware_slh_seed: hw_slh_seed,
-            hardware_slh_next_nonce: p.keys_state.hardware_slh_next_nonce,
+            signing_keys,
+            deed_oracle_slh_pk_hex: deed_slh_pk_hex,
+            hardware_slh_pk_hex: hw_slh_pk_hex,
             funding_records: p.funding_records.clone(),
             parcels: p.parcels.clone(),
             telemetry_history: p.telemetry_history.clone(),
@@ -653,24 +813,34 @@ impl CommonsEngine {
         })
     }
 
-    /// Exports the full state (including key seeds and cursors) for atomic persistence on disk.
+    /// Exports the full state for atomic persistence on disk.
+    /// In `--verify-only` mode, `keys_state` is strictly `None` (zero private seeds persisted).
     pub fn to_persisted(&self) -> PersistedEngineState {
+        let keys_state = if self.verify_only {
+            None
+        } else {
+            self.signing_keys.as_ref().map(|k| PersistedKeysState {
+                tree_height: k.hardware_xmss.height(),
+                deed_oracle_xmss_seed_hex: hex::encode(k.deed_oracle_xmss.master_seed()),
+                deed_oracle_xmss_next_leaf: k.deed_oracle_xmss.next_index(),
+                hardware_xmss_seed_hex: hex::encode(k.hardware_xmss.master_seed()),
+                hardware_xmss_next_leaf: k.hardware_xmss.next_index(),
+                deed_oracle_slh_seed_hex: hex::encode(k.deed_oracle_slh_seed),
+                deed_oracle_slh_next_nonce: k.deed_oracle_slh_next_nonce,
+                hardware_slh_seed_hex: hex::encode(k.hardware_slh_seed),
+                hardware_slh_next_nonce: k.hardware_slh_next_nonce,
+            })
+        };
+
         PersistedEngineState {
             version: env!("CARGO_PKG_VERSION").to_string(),
             protocol_version: PROTOCOL_VERSION.to_string(),
+            verify_only: self.verify_only,
             covenant_rule: CovenantRuleJson::from(&self.rule),
             ledger: LedgerSnapshot::from(&self.ledger),
-            keys_state: PersistedKeysState {
-                tree_height: self.hardware_xmss.height(),
-                deed_oracle_xmss_seed_hex: hex::encode(self.deed_oracle_xmss.master_seed()),
-                deed_oracle_xmss_next_leaf: self.deed_oracle_xmss.next_index(),
-                hardware_xmss_seed_hex: hex::encode(self.hardware_xmss.master_seed()),
-                hardware_xmss_next_leaf: self.hardware_xmss.next_index(),
-                deed_oracle_slh_seed_hex: hex::encode(self.deed_oracle_slh_seed),
-                deed_oracle_slh_next_nonce: self.deed_oracle_slh_next_nonce,
-                hardware_slh_seed_hex: hex::encode(self.hardware_slh_seed),
-                hardware_slh_next_nonce: self.hardware_slh_next_nonce,
-            },
+            keys_state,
+            deed_oracle_slh_pk_hex: self.deed_oracle_slh_pk_hex.clone(),
+            hardware_slh_pk_hex: self.hardware_slh_pk_hex.clone(),
             funding_records: self.funding_records.clone(),
             parcels: self.parcels.clone(),
             telemetry_history: self.telemetry_history.clone(),
@@ -729,8 +899,23 @@ impl CommonsEngine {
         let mut utxos: Vec<UtxoJson> = self.ledger.utxos.values().map(UtxoJson::from).collect();
         utxos.sort_by(|a, b| a.txid.cmp(&b.txid).then(a.vout.cmp(&b.vout)));
 
+        let deed_oracle_slh_dsa_pk_hex = self
+            .deed_oracle_slh_pk_hex
+            .clone()
+            .or_else(|| self.signing_keys.as_ref().map(|k| k.deed_oracle_slh.pk.to_hex()))
+            .or_else(|| self.rule.authorized_deed_oracle_slh_pk.map(hex::encode))
+            .unwrap_or_default();
+        let hardware_slh_dsa_pk_hex = self
+            .hardware_slh_pk_hex
+            .clone()
+            .or_else(|| self.signing_keys.as_ref().map(|k| k.hardware_slh.pk.to_hex()))
+            .or_else(|| self.rule.authorized_hardware_slh_pk.map(hex::encode))
+            .unwrap_or_default();
+
         ApiStateView {
             protocol_version: PROTOCOL_VERSION.to_string(),
+            verify_only: self.verify_only,
+            signing_keys_loaded: self.signing_keys.is_some(),
             covenant_rule: CovenantRuleJson::from(&self.rule),
             covenant_rule_hash: hex::encode(self.rule.rule_hash()),
             ledger_summary: LedgerSummaryView {
@@ -758,18 +943,39 @@ impl CommonsEngine {
             anchor_receipts: self.anchor_receipts.clone(),
             telemetry_series: self.telemetry_series.clone(),
             keys: PublicKeysView {
-                deed_oracle_merkle_root: hex::encode(self.deed_oracle_xmss.root()),
-                hardware_merkle_root: hex::encode(self.hardware_xmss.root()),
-                deed_oracle_slh_dsa_pk_hex: self.deed_oracle_slh.pk.to_hex(),
-                hardware_slh_dsa_pk_hex: self.hardware_slh.pk.to_hex(),
-                hardware_remaining_leaves: self.hardware_xmss.remaining_signatures(),
-                deed_oracle_remaining_leaves: self.deed_oracle_xmss.remaining_signatures(),
+                deed_oracle_merkle_root: hex::encode(self.rule.authorized_deed_oracle_pk),
+                hardware_merkle_root: hex::encode(self.rule.authorized_hardware_pk),
+                deed_oracle_slh_dsa_pk_hex,
+                hardware_slh_dsa_pk_hex,
+                hardware_remaining_leaves: self
+                    .signing_keys
+                    .as_ref()
+                    .map(|k| k.hardware_xmss.remaining_signatures())
+                    .unwrap_or(0),
+                deed_oracle_remaining_leaves: self
+                    .signing_keys
+                    .as_ref()
+                    .map(|k| k.deed_oracle_xmss.remaining_signatures())
+                    .unwrap_or(0),
             },
         }
     }
 
     /// Exports the deterministic JSON schedule consumed by `legal/render_airlock.py`.
     pub fn export_legal_schedule(&self) -> LegalScheduleExport {
+        let deed_oracle_slh_dsa_pk_hex = self
+            .deed_oracle_slh_pk_hex
+            .clone()
+            .or_else(|| self.signing_keys.as_ref().map(|k| k.deed_oracle_slh.pk.to_hex()))
+            .or_else(|| self.rule.authorized_deed_oracle_slh_pk.map(hex::encode))
+            .unwrap_or_default();
+        let hardware_slh_dsa_pk_hex = self
+            .hardware_slh_pk_hex
+            .clone()
+            .or_else(|| self.signing_keys.as_ref().map(|k| k.hardware_slh.pk.to_hex()))
+            .or_else(|| self.rule.authorized_hardware_slh_pk.map(hex::encode))
+            .unwrap_or_default();
+
         LegalScheduleExport {
             protocol_version: PROTOCOL_VERSION.to_string(),
             covenant_rule_hash: hex::encode(self.rule.rule_hash()),
@@ -779,10 +985,10 @@ impl CommonsEngine {
                 min_soil_health_score: self.rule.min_soil_health_score,
             },
             keys: LegalScheduleKeys {
-                deed_oracle_merkle_root: hex::encode(self.deed_oracle_xmss.root()),
-                hardware_merkle_root: hex::encode(self.hardware_xmss.root()),
-                deed_oracle_slh_dsa_pk_hex: self.deed_oracle_slh.pk.to_hex(),
-                hardware_slh_dsa_pk_hex: self.hardware_slh.pk.to_hex(),
+                deed_oracle_merkle_root: hex::encode(self.rule.authorized_deed_oracle_pk),
+                hardware_merkle_root: hex::encode(self.rule.authorized_hardware_pk),
+                deed_oracle_slh_dsa_pk_hex,
+                hardware_slh_dsa_pk_hex,
             },
             l1_anchors: LegalScheduleL1Anchors {
                 mainnet_genesis: MAINNET_GENESIS_HASH.to_string(),
@@ -848,11 +1054,36 @@ pub fn load_state(path: &Path) -> Result<PersistedEngineState, String> {
 
 /// Loads an existing `CommonsEngine` from `path`, or creates and persists an honest empty state (`0 LOVE`).
 pub fn load_or_init_state(path: &Path) -> Result<CommonsEngine, String> {
+    load_or_init_state_with_mode(path, false, None)
+}
+
+/// Loads or initializes a `CommonsEngine` with optional strict `--verify-only` key-isolation mode.
+/// When `verify_only` is true, any private signing seeds are stripped immediately from memory and
+/// omitted from disk persistence so the server strictly verifies external hardware/oracle signatures.
+pub fn load_or_init_state_with_mode(
+    path: &Path,
+    verify_only: bool,
+    external_keys: Option<&ExternalPublicKeysConfig>,
+) -> Result<CommonsEngine, String> {
     if path.exists() {
         let persisted = load_state(path)?;
-        CommonsEngine::from_persisted(&persisted)
+        let had_keys = persisted.keys_state.is_some();
+        let mut engine = CommonsEngine::from_persisted(&persisted)?;
+        if verify_only {
+            engine.enable_verify_only_strip_keys();
+            if had_keys || !persisted.verify_only {
+                save_state_atomic(path, &engine.to_persisted())?;
+            }
+        }
+        Ok(engine)
     } else {
-        let engine = CommonsEngine::new_empty();
+        let mut engine = match external_keys {
+            Some(ext) => CommonsEngine::new_verify_only(ext)?,
+            None => CommonsEngine::new_empty(),
+        };
+        if verify_only {
+            engine.enable_verify_only_strip_keys();
+        }
         save_state_atomic(path, &engine.to_persisted())?;
         Ok(engine)
     }

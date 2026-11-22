@@ -13,6 +13,7 @@ import type {
   StreamSettleResponse,
   TelemetryPayload,
   TelemetryResponse,
+  VerifyAnchorResponse,
   VerifyStarkResponse,
 } from '../types';
 import {
@@ -80,7 +81,7 @@ async function fetchJson<T>(
       throw new Error(`Non-JSON response (${res.status}) from ${path}`);
     }
 
-    if (res.status === 401 || res.status === 404 || res.status >= 500) {
+    if (res.status === 401 || res.status === 403 || res.status === 404 || res.status >= 500) {
       const msg =
         data && typeof data === 'object' && 'error' in data && typeof (data as Record<string, unknown>).error === 'string'
           ? String((data as Record<string, unknown>).error)
@@ -170,6 +171,9 @@ export async function getSeedStatus(forceRefresh = false): Promise<SeedStatusRes
       fetched_at_unix: Math.floor(Date.now() / 1000),
       status: null,
       mainnet_info: null,
+      mainnet_live: false,
+      mainnet_endpoint: null,
+      mainnet_status: null,
       error: err instanceof Error ? err.message : 'Seed status endpoint unreachable.',
     };
   }
@@ -269,6 +273,24 @@ export async function actionAnchorL1(network: 'testnet' | 'mainnet'): Promise<An
     error: typeof raw.error === 'string' ? raw.error : undefined,
     receipt: raw.receipt ? normalizeAnchorReceipt(raw.receipt, 0) : undefined,
     state: raw.state ? normalizeCommonsState(raw.state) : undefined,
+  };
+}
+
+export async function actionVerifyAnchor(anchorHash?: string): Promise<VerifyAnchorResponse> {
+  const { data: raw } = await fetchJson<Record<string, unknown>>(
+    '/api/actions/verify-anchor',
+    {
+      method: 'POST',
+      body: JSON.stringify(anchorHash ? { anchor_hash: anchorHash } : {}),
+    },
+    12000
+  );
+  return {
+    ok: Boolean(raw.ok),
+    verified_on_l1: Boolean(raw.verified_on_l1),
+    receipt: raw.receipt ? normalizeAnchorReceipt(raw.receipt, 0) : undefined,
+    state: raw.state ? normalizeCommonsState(raw.state) : undefined,
+    error: typeof raw.error === 'string' ? raw.error : undefined,
   };
 }
 

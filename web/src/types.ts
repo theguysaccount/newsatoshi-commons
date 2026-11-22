@@ -8,6 +8,9 @@ export interface HealthResponse {
   protocol_version: string;
   uptime_secs: number;
   auth_required?: boolean;
+  verify_only?: boolean;
+  signing_keys_loaded?: boolean;
+  mainnet_seed_url?: string | null;
 }
 
 export interface CovenantRule {
@@ -132,6 +135,12 @@ export interface AnchorReceiptRecord {
   cli_lock_command: string;
   cli_memo_command: string;
   timestamp_unix: number;
+  verified_on_l1: boolean;
+  l1_lock_id: string | null;
+  l1_confirmed_height: number | null;
+  l1_confirmations: number | null;
+  l1_lock_state: string | null;
+  l1_verified_at_unix: number | null;
 }
 
 export interface TelemetrySeriesPoint {
@@ -154,6 +163,8 @@ export interface KeysSummary {
 
 export interface CommonsState {
   protocol_version: string;
+  verify_only: boolean;
+  signing_keys_loaded: boolean;
   covenant_rule: CovenantRule;
   covenant_rule_hash: string;
   ledger_summary: LedgerSummary;
@@ -179,6 +190,8 @@ export interface SeedRecentBlock {
 
 export interface SeedChainStatus {
   network: string;
+  proofs?: string;
+  bits?: string;
   version: string;
   height: number;
   tip: string;
@@ -210,7 +223,19 @@ export interface SeedStatusResponse {
   fetched_at_unix: number;
   status: SeedChainStatus | null;
   mainnet_info: MainnetInfo | null;
+  mainnet_live: boolean;
+  mainnet_endpoint: string | null;
+  mainnet_status: SeedChainStatus | null;
+  mainnet_error?: string | null;
   error?: string | null;
+}
+
+export interface VerifyAnchorResponse {
+  ok: boolean;
+  verified_on_l1: boolean;
+  receipt?: AnchorReceiptRecord;
+  state?: CommonsState;
+  error?: string;
 }
 
 export interface RecordFundingPayload {

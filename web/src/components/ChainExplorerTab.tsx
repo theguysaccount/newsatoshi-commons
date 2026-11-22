@@ -71,6 +71,7 @@ export function ChainExplorerTab({
   onRefresh,
 }: ChainExplorerTabProps) {
   const s = seed?.live ? seed.status : null;
+  const ms = seed?.mainnet_live ? seed.mainnet_status : null;
   const m = seed?.mainnet_info ?? null;
 
   const anchoredHeights = new Set(
@@ -200,14 +201,18 @@ export function ChainExplorerTab({
           )}
         </Panel>
 
-        {/* Verified Mainnet Genesis Card */}
+        {/* Live Mainnet Card */}
         <Panel
-          title="Newsatoshi L1 Mainnet — Verified Genesis"
-          subtitle="Blind SHA-256 AuxPoW issuance floor (50 LOVE / block, P2P port 8444)"
+          title="Newsatoshi L1 Mainnet — Live Node Telemetry"
+          subtitle={seed?.mainnet_endpoint || 'https://newsatoshi.org/mainnet/status'}
           icon={<Lock className="h-4 w-4 text-amber-400" />}
           accent="amber"
           badge={
-            m ? (
+            ms ? (
+              <span className="rounded-full border border-amber-500/45 bg-amber-500/15 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase text-amber-200">
+                LIVE · HEIGHT #{ms.height.toLocaleString()}
+              </span>
+            ) : m ? (
               <span className="rounded-full border border-amber-500/40 bg-amber-500/15 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase text-amber-300">
                 HEIGHT {m.height} · GENESIS
               </span>
@@ -218,7 +223,92 @@ export function ChainExplorerTab({
             )
           }
         >
-          {m ? (
+          {ms ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-lg border border-slate-800 bg-slate-950/75 p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Height</div>
+                  <div className="mt-1 font-mono text-lg font-bold text-amber-300 tabular-nums">
+                    #{ms.height.toLocaleString()}
+                  </div>
+                  <div className="font-mono text-[9.5px] text-slate-500">
+                    {ms.height === 0 ? 'awaiting block #1' : 'active chain'}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-slate-800 bg-slate-950/75 p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Issued</div>
+                  <div className="mt-1 font-mono text-lg font-bold text-slate-100 tabular-nums">
+                    {formatL1IssuedLove(ms.issued)}
+                  </div>
+                  <div className="font-mono text-[9.5px] text-slate-500">LOVE (no premine)</div>
+                </div>
+                <div className="rounded-lg border border-slate-800 bg-slate-950/75 p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                    Proof Profile
+                  </div>
+                  <div className="mt-1 font-mono text-lg font-bold text-emerald-300 uppercase">
+                    {ms.proofs || 'main'}
+                  </div>
+                  <div className="font-mono text-[9.5px] text-slate-500">
+                    bits {ms.bits || '1d00ffff'}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-slate-800 bg-slate-950/75 p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                    Peers / Locks
+                  </div>
+                  <div className="mt-1 font-mono text-lg font-bold text-sky-300 tabular-nums">
+                    {ms.peers} <span className="text-sm text-slate-500">/ {ms.locks}</span>
+                  </div>
+                  <div className="font-mono text-[9.5px] text-slate-500">
+                    {ms.conditions} conds · v{ms.version}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2 rounded-lg border border-slate-800/80 bg-slate-950/60 p-3 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-slate-400">Mainnet Genesis / Tip</span>
+                  <HashPill hash={ms.tip} head={14} tail={12} />
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[11px]">
+                  <span className="font-sans text-slate-400">AuxPoW Chain ID / Difficulty</span>
+                  <span className="text-slate-200">
+                    <strong className="text-sky-300">{ms.auxpow_chainid}</strong> · diff{' '}
+                    {ms.difficulty.toFixed(6)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between font-mono text-[11px]">
+                  <span className="font-sans text-slate-400">Consensus Invariant</span>
+                  <span className="text-emerald-300">L1 Never Mints for Physical Work</span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-100/95">
+                <Shield className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+                <p className="leading-relaxed">
+                  {ms.height === 0
+                    ? 'Mainnet genesis is open with zero premine and seeds intentionally do not self-mine. External SHA-256 miners or Bitcoin AuxPoW pools (`--rpc` createauxblock/submitauxblock, chainid 20051) can mine Block #1+ at difficulty 1.'
+                    : `Mainnet is actively producing blocks (#${ms.height.toLocaleString()}). Ready for verified on-chain L1 hash-lock anchoring.`}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-slate-400">
+                <span className="inline-flex items-center gap-1.5 font-mono">
+                  <Clock className="h-3.5 w-3.5 text-slate-500" />
+                  Polled {formatBlockTime(seed?.fetched_at_unix ?? 0)}
+                </span>
+                <a
+                  href={seed?.mainnet_endpoint || 'https://newsatoshi.org/mainnet/status'}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 font-mono text-amber-300 hover:text-amber-200"
+                >
+                  Raw Mainnet JSON <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            </div>
+          ) : m ? (
             <div className="space-y-4">
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs leading-relaxed text-amber-100/95">
                 {m.note}
@@ -242,20 +332,11 @@ export function ChainExplorerTab({
                   <span className="text-slate-200">SHA-256 · Winterfell STARK · FIPS 205 SLH-DSA</span>
                 </div>
               </div>
-
-              <div className="flex items-start gap-2.5 rounded-lg border border-slate-800/90 bg-slate-950/50 p-3 text-xs text-slate-300">
-                <Shield className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                <p className="leading-relaxed">
-                  Keeping Newsatoshi L1 blind and ossified prevents Sybil wash-farming and
-                  rented-hashpower attacks (Budish 2018). Physical deeds, hardware telemetry, and
-                  PayWord settlements execute client-side and anchor to L1.
-                </p>
-              </div>
             </div>
           ) : (
             <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/50 p-4 text-xs text-slate-400">
               <AlertTriangle className="h-4 w-4 text-amber-400" />
-              Connect to the Rust Commons node to inspect mainnet genesis constants.
+              Connect to the Rust Commons node to inspect live mainnet telemetry.
             </div>
           )}
         </Panel>

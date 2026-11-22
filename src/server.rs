@@ -1,14 +1,17 @@
 use crate::crypto::{sha256, sha256_concat};
-use crate::hardware::ExternalTelemetryPacket;
+use crate::hardware::{ExternalDeedPacket, ExternalTelemetryPacket};
 use crate::rpc::{AnchorReceipt, JsonRpcAnchorClient, PROTOCOL_VERSION};
-use crate::seed::{SeedSnapshot, SeedStatusClient, DEFAULT_SEED_STATUS_URL};
+use crate::seed::{
+    L1LockRecord, SeedSnapshot, SeedStatusClient, DEFAULT_MAINNET_SEED_STATUS_URL,
+    DEFAULT_SEED_STATUS_URL,
+};
 use crate::stark::{
     prove_covenant_transition, verify_covenant_stark, CovenantPublicInputs, CovenantTxKind,
     StarkProofArtifact,
 };
 use crate::storage::{
-    load_or_init_state, save_state_atomic, ApiStateView, CommonsEngine, FundingRecord,
-    ParcelRecord, StreamingRecord, TelemetryRecord,
+    load_or_init_state_with_mode, save_state_atomic, ApiStateView, CommonsEngine,
+    ExternalPublicKeysConfig, FundingRecord, ParcelRecord, StreamingRecord, TelemetryRecord,
 };
 use crate::{CheckedWorkProof, StreamingChannel};
 use serde::{Deserialize, Serialize};
@@ -29,9 +32,15 @@ pub struct ServerConfig {
     pub port: u16,
     pub state_file: PathBuf,
     pub seed_url: String,
+    /// Optional live Newsatoshi L1 mainnet `/status` URL (default: `https://newsatoshi.org/mainnet/status`).
+    pub mainnet_seed_url: Option<String>,
     pub static_dir: Option<PathBuf>,
     /// Optional bearer token protecting operator write endpoints on public deployments.
     pub admin_token: Option<String>,
+    /// Strict Mainnet key-isolation mode: strips all private signing keys from server memory & disk.
+    pub verify_only: bool,
+    /// Optional external public-key roots used when initializing a fresh `--verify-only` ledger.
+    pub external_public_keys: Option<ExternalPublicKeysConfig>,
 }
 
 impl Default for ServerConfig {
@@ -41,8 +50,11 @@ impl Default for ServerConfig {
             port: 8787,
             state_file: PathBuf::from("./data/commons-ledger.json"),
             seed_url: DEFAULT_SEED_STATUS_URL.to_string(),
+            mainnet_seed_url: Some(DEFAULT_MAINNET_SEED_STATUS_URL.to_string()),
             static_dir: None,
             admin_token: None,
+            verify_only: false,
+            external_public_keys: None,
         }
     }
 }
@@ -56,9 +68,12 @@ struct AppState {
     engine: Mutex<CommonsEngine>,
     state_file: PathBuf,
     seed_client: SeedStatusClient,
+    mainnet_seed_client: Option<SeedStatusClient>,
     seed_cache: Mutex<Option<CachedSeed>>,
     static_dir: Option<PathBuf>,
     admin_token_digest: Option<[u8; 32]>,
+    verify_only: bool,
+    external_public_keys: Option<ExternalPublicKeysConfig>,
     started_at: Instant,
 }
 
@@ -72,12 +87,22 @@ impl AppState {
                 }
             }
         }
-        let snapshot = self.seed_client.fetch_snapshot();
+        let snapshot = self
+            .seed_client
+            .fetch_dual_snapshot(self.mainnet_seed_client.as_ref());
         *cache = Some(CachedSeed {
             fetched_at: Instant::now(),
             snapshot: snapshot.clone(),
         });
         snapshot
+    }
+
+    fn client_for_network(&self, network: &str) -> Option<&SeedStatusClient> {
+        if network.eq_ignore_ascii_case("mainnet") {
+            self.mainnet_seed_client.as_ref()
+        } else {
+            Some(&self.seed_client)
+        }
     }
 }
 
@@ -121,20 +146,34 @@ pub fn spawn_server(config: ServerConfig) -> Result<RunningServer, String> {
         .map(|ip| ip.to_string())
         .unwrap_or_else(|| bind_addr.clone());
 
-    let engine = load_or_init_state(&config.state_file)?;
+    let engine = load_or_init_state_with_mode(
+        &config.state_file,
+        config.verify_only,
+        config.external_public_keys.as_ref(),
+    )?;
     let admin_token_digest = config
         .admin_token
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .map(|s| sha256(s.as_bytes()));
+    let mainnet_seed_client = config
+        .mainnet_seed_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|u| SeedStatusClient::new(u, Duration::from_secs(5)));
+    let verify_only = engine.verify_only || config.verify_only;
     let state = Arc::new(AppState {
         engine: Mutex::new(engine),
         state_file: config.state_file,
         seed_client: SeedStatusClient::new(config.seed_url, Duration::from_secs(5)),
+        mainnet_seed_client,
         seed_cache: Mutex::new(None),
         static_dir: config.static_dir,
         admin_token_digest,
+        verify_only,
+        external_public_keys: config.external_public_keys,
         started_at: Instant::now(),
     });
 
@@ -164,18 +203,33 @@ pub fn run_server_blocking(config: ServerConfig) -> Result<(), String> {
     let bind_addr = format!("{}:{}", config.host, config.port);
     let server = Server::http(&bind_addr)
         .map_err(|e| format!("failed to bind HTTP server on {bind_addr}: {e}"))?;
-    let engine = load_or_init_state(&config.state_file)?;
+    let engine = load_or_init_state_with_mode(
+        &config.state_file,
+        config.verify_only,
+        config.external_public_keys.as_ref(),
+    )?;
 
     println!("=== NEWSATOSHI 2.1 COMMONS ENGINE HTTP SERVER ===");
     println!("Listening    : http://{bind_addr}");
     println!("State file   : {}", config.state_file.display());
     println!("Seed URL     : {}", config.seed_url);
+    if let Some(ref m_url) = config.mainnet_seed_url {
+        println!("Mainnet URL  : {m_url}");
+    }
     if let Some(ref dir) = config.static_dir {
         println!("Static UI    : {}", dir.display());
     }
     println!(
         "Rule Hash    : {}",
         hex::encode(engine.rule.rule_hash())
+    );
+    println!(
+        "Key Mode     : {}",
+        if engine.verify_only || !engine.has_signing_keys() {
+            "VERIFY-ONLY (zero private signing keys loaded)"
+        } else {
+            "local/testnet signing keys enabled"
+        }
     );
     println!(
         "Treasury     : {} LOVE | Nonce {}",
@@ -198,13 +252,23 @@ pub fn run_server_blocking(config: ServerConfig) -> Result<(), String> {
         }
     );
 
+    let mainnet_seed_client = config
+        .mainnet_seed_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|u| SeedStatusClient::new(u, Duration::from_secs(5)));
+    let verify_only = engine.verify_only || config.verify_only;
     let state = Arc::new(AppState {
         engine: Mutex::new(engine),
         state_file: config.state_file,
         seed_client: SeedStatusClient::new(config.seed_url, Duration::from_secs(5)),
+        mainnet_seed_client,
         seed_cache: Mutex::new(None),
         static_dir: config.static_dir,
         admin_token_digest,
+        verify_only,
+        external_public_keys: config.external_public_keys,
         started_at: Instant::now(),
     });
 
@@ -299,6 +363,10 @@ fn handle_request(mut req: Request, state: &AppState) {
     match (method, path.as_str()) {
         (Method::Get, "/api/health") => {
             let uptime_secs = state.started_at.elapsed().as_secs();
+            let signing_keys_loaded = {
+                let engine = state.engine.lock().unwrap();
+                engine.has_signing_keys()
+            };
             respond_json(
                 req,
                 200,
@@ -308,6 +376,9 @@ fn handle_request(mut req: Request, state: &AppState) {
                     "protocol_version": PROTOCOL_VERSION,
                     "uptime_secs": uptime_secs,
                     "auth_required": state.admin_token_digest.is_some(),
+                    "verify_only": state.verify_only || !signing_keys_loaded,
+                    "signing_keys_loaded": signing_keys_loaded,
+                    "mainnet_seed_url": state.mainnet_seed_client.as_ref().map(|c| c.endpoint_url.as_str()),
                 }),
             );
         }
@@ -380,6 +451,17 @@ fn handle_request(mut req: Request, state: &AppState) {
                 respond_unauthorized(req);
                 return;
             }
+            if state.verify_only {
+                respond_json(
+                    req,
+                    403,
+                    &json!({
+                        "ok": false,
+                        "error": "Server is running in --verify-only mode (zero private signing keys loaded); submit an offline-signed ExternalDeedPacket to POST /api/deeds"
+                    }),
+                );
+                return;
+            }
             let body = match read_body_string(&mut req) {
                 Ok(b) => b,
                 Err(e) => {
@@ -399,6 +481,50 @@ fn handle_request(mut req: Request, state: &AppState) {
                 }
             };
             let resp = handle_acquire_parcel(state, parsed);
+            respond_json(req, 200, &resp);
+        }
+        (Method::Post, "/api/deeds") => {
+            // Cryptographically self-authenticating offline-signed land deed packets (XMSS / SLH-DSA)
+            let body = match read_body_string(&mut req) {
+                Ok(b) => b,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": e }));
+                    return;
+                }
+            };
+            let parsed: ExternalDeedPacket = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(e) => {
+                    respond_json(
+                        req,
+                        400,
+                        &json!({ "ok": false, "error": format!("invalid external deed packet: {e}") }),
+                    );
+                    return;
+                }
+            };
+            let resp = handle_external_deed(state, parsed);
+            respond_json(req, 200, &resp);
+        }
+        (Method::Post, "/api/actions/verify-anchor") => {
+            // Public on-chain L1 cross-check against live Newsatoshi /api/lock?hash=<anchor_hash>
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let parsed: VerifyAnchorRequest = if body.trim().is_empty() {
+                VerifyAnchorRequest::default()
+            } else {
+                match serde_json::from_str(&body) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        respond_json(
+                            req,
+                            400,
+                            &json!({ "ok": false, "error": format!("invalid JSON: {e}") }),
+                        );
+                        return;
+                    }
+                }
+            };
+            let resp = handle_verify_anchor(state, parsed);
             respond_json(req, 200, &resp);
         }
         (Method::Post, "/api/actions/telemetry") | (Method::Post, "/api/telemetry") => {
@@ -438,6 +564,17 @@ fn handle_request(mut req: Request, state: &AppState) {
             } else {
                 if !authorized {
                     respond_unauthorized(req);
+                    return;
+                }
+                if state.verify_only {
+                    respond_json(
+                        req,
+                        403,
+                        &json!({
+                            "ok": false,
+                            "error": "Server is running in --verify-only mode (zero private signing keys loaded); submit cryptographically signed telemetry packets from newsatoshi-hw-signer to POST /api/telemetry"
+                        }),
+                    );
                     return;
                 }
                 match serde_json::from_value::<TelemetryActionRequest>(value) {
@@ -617,11 +754,31 @@ struct ConfirmAnchorResponse {
     state: ApiStateView,
 }
 
+fn apply_l1_lock_verification(receipt: &mut AnchorReceipt, locks: &[L1LockRecord]) -> Option<L1LockRecord> {
+    let matching = locks
+        .iter()
+        .filter(|l| l.found && l.hash.eq_ignore_ascii_case(&receipt.anchor_hash))
+        .max_by_key(|l| (l.confirmed as u8, l.confirmations, l.at))
+        .cloned()?;
+
+    receipt.l1_lock_id = Some(matching.id.clone());
+    receipt.l1_confirmed_height = Some(matching.at);
+    receipt.l1_confirmations = Some(matching.confirmations);
+    receipt.l1_lock_state = Some(matching.state.clone());
+    receipt.l1_verified_at_unix = Some(unix_now());
+    if matching.confirmed {
+        receipt.verified_on_l1 = true;
+        receipt.broadcast_status = "broadcast".to_string();
+        receipt.mode = "l1-verified-on-chain".to_string();
+    }
+    Some(matching)
+}
+
 fn handle_confirm_anchor(state: &AppState, req: ConfirmAnchorRequest) -> ConfirmAnchorResponse {
-    let mut engine = state.engine.lock().unwrap();
     let txid_bytes = match crate::crypto::hash32_from_hex(&req.l1_txid) {
         Ok(b) => b,
         Err(e) => {
+            let engine = state.engine.lock().unwrap();
             return ConfirmAnchorResponse {
                 ok: false,
                 receipt: None,
@@ -632,6 +789,31 @@ fn handle_confirm_anchor(state: &AppState, req: ConfirmAnchorRequest) -> Confirm
     };
     let normalized_txid = hex::encode(txid_bytes);
     let target = req.anchor_hash.trim().to_ascii_lowercase();
+
+    let receipt_network = {
+        let engine = state.engine.lock().unwrap();
+        engine
+            .anchor_receipts
+            .iter()
+            .find(|r| r.anchor_hash.eq_ignore_ascii_case(&target))
+            .map(|r| r.network.clone())
+    };
+    let Some(network) = receipt_network else {
+        let engine = state.engine.lock().unwrap();
+        return ConfirmAnchorResponse {
+            ok: false,
+            receipt: None,
+            error: Some(format!("anchor_hash '{target}' not found")),
+            state: engine.to_api_state(),
+        };
+    };
+
+    // Best-effort live L1 lock verification outside the engine mutex
+    let live_locks = state
+        .client_for_network(&network)
+        .and_then(|c| c.fetch_locks_for_hash(&target).ok());
+
+    let mut engine = state.engine.lock().unwrap();
     let Some(receipt) = engine
         .anchor_receipts
         .iter_mut()
@@ -648,6 +830,9 @@ fn handle_confirm_anchor(state: &AppState, req: ConfirmAnchorRequest) -> Confirm
     receipt.l1_txid = Some(normalized_txid);
     receipt.broadcast_status = "broadcast".to_string();
     receipt.mode = "l1-broadcast-confirmed".to_string();
+    if let Some(ref locks) = live_locks {
+        let _ = apply_l1_lock_verification(receipt, locks);
+    }
     let updated = receipt.clone();
     if let Err(e) = save_state_atomic(&state.state_file, &engine.to_persisted()) {
         return ConfirmAnchorResponse {
@@ -662,6 +847,117 @@ fn handle_confirm_anchor(state: &AppState, req: ConfirmAnchorRequest) -> Confirm
         ok: true,
         receipt: Some(updated),
         error: None,
+        state: engine.to_api_state(),
+    }
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct VerifyAnchorRequest {
+    anchor_hash: Option<String>,
+}
+
+#[derive(Serialize)]
+struct VerifyAnchorResponse {
+    ok: bool,
+    verified_on_l1: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lock: Option<L1LockRecord>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    receipt: Option<AnchorReceipt>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+    state: ApiStateView,
+}
+
+fn handle_verify_anchor(state: &AppState, req: VerifyAnchorRequest) -> VerifyAnchorResponse {
+    let target_info = {
+        let engine = state.engine.lock().unwrap();
+        let found = match req.anchor_hash.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            Some(h) => engine
+                .anchor_receipts
+                .iter()
+                .find(|r| r.anchor_hash.eq_ignore_ascii_case(h)),
+            None => engine.anchor_receipts.last(),
+        };
+        found.map(|r| (r.anchor_hash.clone(), r.network.clone()))
+    };
+
+    let Some((anchor_hash, network)) = target_info else {
+        let engine = state.engine.lock().unwrap();
+        return VerifyAnchorResponse {
+            ok: false,
+            verified_on_l1: false,
+            lock: None,
+            receipt: None,
+            error: Some("No matching anchor receipt found to verify".to_string()),
+            state: engine.to_api_state(),
+        };
+    };
+
+    let Some(client) = state.client_for_network(&network) else {
+        let engine = state.engine.lock().unwrap();
+        return VerifyAnchorResponse {
+            ok: false,
+            verified_on_l1: false,
+            lock: None,
+            receipt: None,
+            error: Some(format!("No live L1 seed endpoint configured for '{network}'")),
+            state: engine.to_api_state(),
+        };
+    };
+
+    let locks = match client.fetch_locks_for_hash(&anchor_hash) {
+        Ok(l) => l,
+        Err(e) => {
+            let engine = state.engine.lock().unwrap();
+            return VerifyAnchorResponse {
+                ok: false,
+                verified_on_l1: false,
+                lock: None,
+                receipt: None,
+                error: Some(e),
+                state: engine.to_api_state(),
+            };
+        }
+    };
+
+    let mut engine = state.engine.lock().unwrap();
+    let Some(receipt) = engine
+        .anchor_receipts
+        .iter_mut()
+        .find(|r| r.anchor_hash.eq_ignore_ascii_case(&anchor_hash))
+    else {
+        return VerifyAnchorResponse {
+            ok: false,
+            verified_on_l1: false,
+            lock: None,
+            receipt: None,
+            error: Some("Anchor receipt disappeared during verification".to_string()),
+            state: engine.to_api_state(),
+        };
+    };
+
+    let matched_lock = apply_l1_lock_verification(receipt, &locks);
+    let verified_on_l1 = receipt.verified_on_l1;
+    let updated_receipt = receipt.clone();
+    if matched_lock.is_some() {
+        let _ = save_state_atomic(&state.state_file, &engine.to_persisted());
+    }
+
+    let err = if matched_lock.is_none() {
+        Some(format!(
+            "No on-chain hash-lock found yet on {network} for anchor_hash {anchor_hash}"
+        ))
+    } else {
+        None
+    };
+
+    VerifyAnchorResponse {
+        ok: true,
+        verified_on_l1,
+        lock: matched_lock,
+        receipt: Some(updated_receipt),
+        error: err,
         state: engine.to_api_state(),
     }
 }
@@ -768,44 +1064,59 @@ fn handle_acquire_parcel(state: &AppState, req: AcquireParcelRequest) -> Acquire
         &engine.ledger.tx_nonce.to_be_bytes(),
     ]);
 
-    let (proof, leaf_index, slh_nonce) = match scheme.as_str() {
-        "slh_dsa" => {
-            let nonce = engine.deed_oracle_slh_next_nonce;
-            let msg = CheckedWorkProof::deed_msg_with_nonce(parcel_id, deed_doc_hash, nonce);
-            let sig = engine.deed_oracle_slh.sign_hash(msg);
-            (
-                CheckedWorkProof::slh_dsa_land_deed(
-                    parcel_id,
-                    deed_doc_hash,
-                    nonce,
-                    engine.deed_oracle_slh.pk.clone(),
-                    sig,
+    let (proof, leaf_index, slh_nonce) = {
+        let Some(keys) = engine.signing_keys.as_mut() else {
+            return AcquireParcelResponse {
+                ok: false,
+                txid: None,
+                parcel: None,
+                stark_proof: None,
+                error: Some(
+                    "Server is in --verify-only mode (no private deed oracle keys loaded); submit offline-signed packets to POST /api/deeds"
+                        .to_string(),
                 ),
-                None,
-                Some(nonce),
-            )
-        }
-        _ => {
-            let msg = CheckedWorkProof::deed_msg(parcel_id, deed_doc_hash);
-            let sig = match engine.deed_oracle_xmss.sign_next(msg) {
-                Ok(s) => s,
-                Err(e) => {
-                    return AcquireParcelResponse {
-                        ok: false,
-                        txid: None,
-                        parcel: None,
-                        stark_proof: None,
-                        error: Some(e.to_string()),
-                        state: engine.to_api_state(),
-                    };
-                }
+                state: engine.to_api_state(),
             };
-            let idx = sig.leaf_index;
-            (
-                CheckedWorkProof::merkle_land_deed(parcel_id, deed_doc_hash, sig),
-                Some(idx),
-                None,
-            )
+        };
+        match scheme.as_str() {
+            "slh_dsa" => {
+                let nonce = keys.deed_oracle_slh_next_nonce;
+                let msg = CheckedWorkProof::deed_msg_with_nonce(parcel_id, deed_doc_hash, nonce);
+                let sig = keys.deed_oracle_slh.sign_hash(msg);
+                (
+                    CheckedWorkProof::slh_dsa_land_deed(
+                        parcel_id,
+                        deed_doc_hash,
+                        nonce,
+                        keys.deed_oracle_slh.pk.clone(),
+                        sig,
+                    ),
+                    None,
+                    Some(nonce),
+                )
+            }
+            _ => {
+                let msg = CheckedWorkProof::deed_msg(parcel_id, deed_doc_hash);
+                let sig = match keys.deed_oracle_xmss.sign_next(msg) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        return AcquireParcelResponse {
+                            ok: false,
+                            txid: None,
+                            parcel: None,
+                            stark_proof: None,
+                            error: Some(e.to_string()),
+                            state: engine.to_api_state(),
+                        };
+                    }
+                };
+                let idx = sig.leaf_index;
+                (
+                    CheckedWorkProof::merkle_land_deed(parcel_id, deed_doc_hash, sig),
+                    Some(idx),
+                    None,
+                )
+            }
         }
     };
 
@@ -835,7 +1146,9 @@ fn handle_acquire_parcel(state: &AppState, req: AcquireParcelRequest) -> Acquire
     };
 
     if scheme == "slh_dsa" {
-        engine.deed_oracle_slh_next_nonce += 1;
+        if let Some(ref mut keys) = engine.signing_keys {
+            keys.deed_oracle_slh_next_nonce += 1;
+        }
     }
 
     let change_amount = input_amount - price_love;
@@ -899,6 +1212,193 @@ fn handle_acquire_parcel(state: &AppState, req: AcquireParcelRequest) -> Acquire
             state: engine.to_api_state(),
         };
     }
+
+    AcquireParcelResponse {
+        ok: true,
+        txid: Some(hex::encode(txid)),
+        parcel: Some(parcel),
+        stark_proof: Some(stark_proof),
+        error: None,
+        state: engine.to_api_state(),
+    }
+}
+
+fn handle_external_deed(state: &AppState, pkt: ExternalDeedPacket) -> AcquireParcelResponse {
+    let mut engine = state.engine.lock().unwrap();
+    if pkt.parcel_id == 0 {
+        return AcquireParcelResponse {
+            ok: false,
+            txid: None,
+            parcel: None,
+            stark_proof: None,
+            error: Some("parcel_id must be greater than 0".to_string()),
+            state: engine.to_api_state(),
+        };
+    }
+    if !pkt.acres.is_finite() || pkt.acres <= 0.0 {
+        return AcquireParcelResponse {
+            ok: false,
+            txid: None,
+            parcel: None,
+            stark_proof: None,
+            error: Some("acres must be greater than 0".to_string()),
+            state: engine.to_api_state(),
+        };
+    }
+    let deed_label = pkt.deed_label.trim().to_string();
+    if deed_label.is_empty() {
+        return AcquireParcelResponse {
+            ok: false,
+            txid: None,
+            parcel: None,
+            stark_proof: None,
+            error: Some("deed_label is required".to_string()),
+            state: engine.to_api_state(),
+        };
+    }
+    let (deed_doc_hash, proof) = match pkt.to_checked_work_proof() {
+        Ok(v) => v,
+        Err(e) => {
+            return AcquireParcelResponse {
+                ok: false,
+                txid: None,
+                parcel: None,
+                stark_proof: None,
+                error: Some(e),
+                state: engine.to_api_state(),
+            };
+        }
+    };
+
+    let input_ref = match engine.ensure_single_covenant_utxo() {
+        Ok(r) => r,
+        Err(e) => {
+            return AcquireParcelResponse {
+                ok: false,
+                txid: None,
+                parcel: None,
+                stark_proof: None,
+                error: Some(e),
+                state: engine.to_api_state(),
+            };
+        }
+    };
+    let input_amount = engine
+        .ledger
+        .utxos
+        .get(&input_ref)
+        .map(|u| u.amount)
+        .unwrap_or(0);
+    if pkt.price_love == 0 || pkt.price_love > input_amount {
+        return AcquireParcelResponse {
+            ok: false,
+            txid: None,
+            parcel: None,
+            stark_proof: None,
+            error: Some(format!(
+                "Invalid parcel price {} LOVE (available treasury: {input_amount} LOVE)",
+                pkt.price_love
+            )),
+            state: engine.to_api_state(),
+        };
+    }
+
+    let prev_state_root_hex = hex::encode(engine.ledger.state_root);
+    let rule_clone = engine.rule.clone();
+    let recipient_tag = format!("PARCEL_{}_SELLER", pkt.parcel_id);
+    let (txid, _) = match engine.ledger.spend_covenant(
+        input_ref,
+        &rule_clone,
+        pkt.price_love,
+        &recipient_tag,
+        Some(rule_clone.rule_hash()),
+        proof,
+    ) {
+        Ok(res) => res,
+        Err(e) => {
+            return AcquireParcelResponse {
+                ok: false,
+                txid: None,
+                parcel: None,
+                stark_proof: None,
+                error: Some(e.to_string()),
+                state: engine.to_api_state(),
+            };
+        }
+    };
+
+    let leaf_index = pkt.merkle_sig.as_ref().map(|s| s.leaf_index);
+    let slh_nonce = pkt.slh_dsa_nonce;
+    if let Some(ref mut keys) = engine.signing_keys {
+        if let Some(idx) = leaf_index {
+            let target_next = idx.saturating_add(1);
+            if keys.deed_oracle_xmss.next_index() < target_next {
+                let delta = target_next - keys.deed_oracle_xmss.next_index();
+                let _ = keys.deed_oracle_xmss.skip_leaves(delta);
+            }
+        }
+        if let Some(n) = slh_nonce {
+            let target_next = n.saturating_add(1);
+            if keys.deed_oracle_slh_next_nonce < target_next {
+                keys.deed_oracle_slh_next_nonce = target_next;
+            }
+        }
+    }
+
+    let change_amount = input_amount - pkt.price_love;
+    let rule_hash_hex = hex::encode(rule_clone.rule_hash());
+    let stark_inputs = CovenantPublicInputs {
+        tx_kind: CovenantTxKind::LandDeed,
+        label: format!(
+            "External Deed Parcel #{} ({} LOVE, {})",
+            pkt.parcel_id, pkt.price_love, pkt.signature_scheme
+        ),
+        tx_nonce: engine.ledger.tx_nonce,
+        covenant_rule_hash: rule_hash_hex.clone(),
+        change_covenant_rule_hash: rule_hash_hex,
+        prev_state_root: prev_state_root_hex,
+        new_state_root: hex::encode(engine.ledger.state_root),
+        input_amount,
+        payout_amount: pkt.price_love,
+        change_amount,
+        max_bounty_payout: rule_clone.max_bounty_payout,
+        reinvest_bps: rule_clone.reinvest_bps,
+        min_soil_health_score: rule_clone.min_soil_health_score,
+        soil_health_score: 0,
+    };
+
+    let stark_proof = match prove_covenant_transition(stark_inputs) {
+        Ok(p) => p,
+        Err(e) => {
+            return AcquireParcelResponse {
+                ok: false,
+                txid: Some(hex::encode(txid)),
+                parcel: None,
+                stark_proof: None,
+                error: Some(format!("STARK proof generation failed: {e}")),
+                state: engine.to_api_state(),
+            };
+        }
+    };
+
+    let parcel = ParcelRecord {
+        parcel_id: pkt.parcel_id,
+        acres: pkt.acres,
+        price_love: pkt.price_love,
+        deed_label,
+        deed_document_hash: hex::encode(deed_doc_hash),
+        txid: hex::encode(txid),
+        signature_scheme: pkt.signature_scheme,
+        leaf_index,
+        slh_nonce,
+        stark_proof_id: stark_proof.proof_id.clone(),
+        acquired_at_unix: unix_now(),
+    };
+
+    engine.parcels.push(parcel.clone());
+    engine.stark_proofs.push(stark_proof.clone());
+    engine.record_telemetry_series_point(format!("External Deed Parcel #{}", pkt.parcel_id));
+    let _ = save_state_atomic(&state.state_file, &engine.to_persisted());
 
     AcquireParcelResponse {
         ok: true,
@@ -1009,27 +1509,45 @@ fn handle_simulated_telemetry(
         .map(|u| u.amount)
         .unwrap_or(0);
 
+    if engine.signing_keys.is_none() {
+        return TelemetryActionResponse {
+            ok: false,
+            blocked: true,
+            error: Some(
+                "Server is in --verify-only mode (no private hardware keys loaded); submit signed packets from newsatoshi-hw-signer to POST /api/telemetry"
+                    .to_string(),
+            ),
+            packet: None,
+            stark_proof: None,
+            state: engine.to_api_state(),
+        };
+    }
+
     // Handle explicit replay attack cleanly without corrupting live signer cursors
     if attack == "replay_leaf" {
         let err_msg = match scheme.as_str() {
             "slh_dsa" => {
-                let commit = engine.hardware_slh.pk.commitment();
-                let replay_nonce = 0u64;
-                let msg = CheckedWorkProof::energy_msg_with_nonce(
-                    parcel_id,
-                    kwh_delivered.max(1),
-                    soil_health_score.max(rule_clone.min_soil_health_score),
-                    replay_nonce,
-                );
-                let sig = engine.hardware_slh.sign_hash(msg);
-                let proof = CheckedWorkProof::slh_dsa_energy_deployment(
-                    parcel_id,
-                    kwh_delivered.max(1),
-                    soil_health_score.max(rule_clone.min_soil_health_score),
-                    replay_nonce,
-                    engine.hardware_slh.pk.clone(),
-                    sig,
-                );
+                let (commit, proof) = {
+                    let keys = engine.signing_keys.as_ref().unwrap();
+                    let commit = keys.hardware_slh.pk.commitment();
+                    let replay_nonce = 0u64;
+                    let msg = CheckedWorkProof::energy_msg_with_nonce(
+                        parcel_id,
+                        kwh_delivered.max(1),
+                        soil_health_score.max(rule_clone.min_soil_health_score),
+                        replay_nonce,
+                    );
+                    let sig = keys.hardware_slh.sign_hash(msg);
+                    let proof = CheckedWorkProof::slh_dsa_energy_deployment(
+                        parcel_id,
+                        kwh_delivered.max(1),
+                        soil_health_score.max(rule_clone.min_soil_health_score),
+                        replay_nonce,
+                        keys.hardware_slh.pk.clone(),
+                        sig,
+                    );
+                    (commit, proof)
+                };
                 let safe_payout = payout_love.min(rule_clone.max_bounty_payout).min(input_amount).max(1);
                 if engine.ledger.next_slh_nonce_watermark(commit) > 0 {
                     engine
@@ -1071,22 +1589,26 @@ fn handle_simulated_telemetry(
                 }
             }
             _ => {
-                let root = engine.hardware_xmss.root();
-                let msg = CheckedWorkProof::energy_msg(
-                    parcel_id,
-                    kwh_delivered.max(1),
-                    soil_health_score.max(rule_clone.min_soil_health_score),
-                );
-                let replay_sig = engine
-                    .hardware_xmss
-                    .sign_at_index_unchecked(0, msg)
-                    .expect("leaf 0 exists");
-                let proof = CheckedWorkProof::merkle_energy_deployment(
-                    parcel_id,
-                    kwh_delivered.max(1),
-                    soil_health_score.max(rule_clone.min_soil_health_score),
-                    replay_sig,
-                );
+                let (root, proof) = {
+                    let keys = engine.signing_keys.as_ref().unwrap();
+                    let root = keys.hardware_xmss.root();
+                    let msg = CheckedWorkProof::energy_msg(
+                        parcel_id,
+                        kwh_delivered.max(1),
+                        soil_health_score.max(rule_clone.min_soil_health_score),
+                    );
+                    let replay_sig = keys
+                        .hardware_xmss
+                        .sign_at_index_unchecked(0, msg)
+                        .expect("leaf 0 exists");
+                    let proof = CheckedWorkProof::merkle_energy_deployment(
+                        parcel_id,
+                        kwh_delivered.max(1),
+                        soil_health_score.max(rule_clone.min_soil_health_score),
+                        replay_sig,
+                    );
+                    (root, proof)
+                };
                 let safe_payout = payout_love.min(rule_clone.max_bounty_payout).min(input_amount).max(1);
                 if engine.ledger.next_merkle_leaf_watermark(root) > 0 {
                     engine
@@ -1159,55 +1681,58 @@ fn handle_simulated_telemetry(
     }
 
     // Build proof without prematurely advancing XMSS leaf cursor if the transaction rejects
-    let (proof, leaf_index, slh_nonce) = match scheme.as_str() {
-        "slh_dsa" => {
-            let nonce = engine.hardware_slh_next_nonce;
-            let msg = CheckedWorkProof::energy_msg_with_nonce(
-                parcel_id,
-                kwh_delivered,
-                soil_health_score,
-                nonce,
-            );
-            let sig = engine.hardware_slh.sign_hash(msg);
-            (
-                CheckedWorkProof::slh_dsa_energy_deployment(
+    let (proof, leaf_index, slh_nonce) = {
+        let keys = engine.signing_keys.as_ref().unwrap();
+        match scheme.as_str() {
+            "slh_dsa" => {
+                let nonce = keys.hardware_slh_next_nonce;
+                let msg = CheckedWorkProof::energy_msg_with_nonce(
                     parcel_id,
                     kwh_delivered,
                     soil_health_score,
                     nonce,
-                    engine.hardware_slh.pk.clone(),
-                    sig,
-                ),
-                None,
-                Some(nonce),
-            )
-        }
-        _ => {
-            let idx = engine.hardware_xmss.next_index();
-            let msg = CheckedWorkProof::energy_msg(parcel_id, kwh_delivered, soil_health_score);
-            let sig = match engine.hardware_xmss.sign_at_index_unchecked(idx, msg) {
-                Ok(s) => s,
-                Err(e) => {
-                    return TelemetryActionResponse {
-                        ok: false,
-                        blocked: true,
-                        error: Some(e.to_string()),
-                        packet: None,
-                        stark_proof: None,
-                        state: engine.to_api_state(),
-                    };
-                }
-            };
-            (
-                CheckedWorkProof::merkle_energy_deployment(
-                    parcel_id,
-                    kwh_delivered,
-                    soil_health_score,
-                    sig,
-                ),
-                Some(idx),
-                None,
-            )
+                );
+                let sig = keys.hardware_slh.sign_hash(msg);
+                (
+                    CheckedWorkProof::slh_dsa_energy_deployment(
+                        parcel_id,
+                        kwh_delivered,
+                        soil_health_score,
+                        nonce,
+                        keys.hardware_slh.pk.clone(),
+                        sig,
+                    ),
+                    None,
+                    Some(nonce),
+                )
+            }
+            _ => {
+                let idx = keys.hardware_xmss.next_index();
+                let msg = CheckedWorkProof::energy_msg(parcel_id, kwh_delivered, soil_health_score);
+                let sig = match keys.hardware_xmss.sign_at_index_unchecked(idx, msg) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        return TelemetryActionResponse {
+                            ok: false,
+                            blocked: true,
+                            error: Some(e.to_string()),
+                            packet: None,
+                            stark_proof: None,
+                            state: engine.to_api_state(),
+                        };
+                    }
+                };
+                (
+                    CheckedWorkProof::merkle_energy_deployment(
+                        parcel_id,
+                        kwh_delivered,
+                        soil_health_score,
+                        sig,
+                    ),
+                    Some(idx),
+                    None,
+                )
+            }
         }
     };
 
@@ -1268,10 +1793,12 @@ fn handle_simulated_telemetry(
         }
         Ok((txid, _)) => {
             // Advance local signer cursor now that ledger committed the spend
-            if scheme == "slh_dsa" {
-                engine.hardware_slh_next_nonce += 1;
-            } else {
-                let _ = engine.hardware_xmss.skip_leaves(1);
+            if let Some(ref mut keys) = engine.signing_keys {
+                if scheme == "slh_dsa" {
+                    keys.hardware_slh_next_nonce += 1;
+                } else {
+                    let _ = keys.hardware_xmss.skip_leaves(1);
+                }
             }
 
             let change_amount = input_amount - payout_love;
@@ -1428,18 +1955,20 @@ fn handle_external_telemetry(
             }
         }
         Ok((txid, _)) => {
-            // Keep internal simulator cursors monotonically synchronized with external device
-            if let Some(idx) = leaf_index {
-                let target_next = idx.saturating_add(1);
-                if engine.hardware_xmss.next_index() < target_next {
-                    let delta = target_next - engine.hardware_xmss.next_index();
-                    let _ = engine.hardware_xmss.skip_leaves(delta);
+            // Keep internal simulator cursors monotonically synchronized with external device (if loaded)
+            if let Some(ref mut keys) = engine.signing_keys {
+                if let Some(idx) = leaf_index {
+                    let target_next = idx.saturating_add(1);
+                    if keys.hardware_xmss.next_index() < target_next {
+                        let delta = target_next - keys.hardware_xmss.next_index();
+                        let _ = keys.hardware_xmss.skip_leaves(delta);
+                    }
                 }
-            }
-            if let Some(n) = slh_nonce {
-                let target_next = n.saturating_add(1);
-                if engine.hardware_slh_next_nonce < target_next {
-                    engine.hardware_slh_next_nonce = target_next;
+                if let Some(n) = slh_nonce {
+                    let target_next = n.saturating_add(1);
+                    if keys.hardware_slh_next_nonce < target_next {
+                        keys.hardware_slh_next_nonce = target_next;
+                    }
                 }
             }
 
@@ -1700,17 +2229,16 @@ fn handle_anchor(state: &AppState, req: AnchorActionRequest) -> AnchorActionResp
         .filter(|s| s == "mainnet" || s == "testnet")
         .unwrap_or_else(|| "testnet".to_string());
 
-    let seed_snapshot = if network == "testnet" {
-        Some(state.get_seed_snapshot(true))
-    } else {
-        None
-    };
+    let seed_snapshot = state.get_seed_snapshot(true);
 
     let mut engine = state.engine.lock().unwrap();
     let base_commitment = engine.ledger.build_anchor_commitment(&engine.rule);
-    let bound_commitment = match (&network[..], seed_snapshot.as_ref()) {
-        ("mainnet", _) => base_commitment.with_mainnet_genesis(),
-        (_, Some(snap)) => match snap.status.as_ref() {
+    let bound_commitment = match network.as_str() {
+        "mainnet" => match seed_snapshot.mainnet_status.as_ref() {
+            Some(ms) => base_commitment.with_seed_status(ms),
+            None => base_commitment.with_mainnet_genesis(),
+        },
+        _ => match seed_snapshot.status.as_ref() {
             Some(status) => base_commitment.with_seed_status(status),
             None => {
                 return AnchorActionResponse {
@@ -1718,17 +2246,20 @@ fn handle_anchor(state: &AppState, req: AnchorActionRequest) -> AnchorActionResp
                     receipt: None,
                     error: Some(format!(
                         "Cannot bind live testnet L1 tip — seed unreachable ({})",
-                        snap.error.as_deref().unwrap_or("connection failed")
+                        seed_snapshot.error.as_deref().unwrap_or("connection failed")
                     )),
                     state: engine.to_api_state(),
                 };
             }
         },
-        _ => base_commitment,
     };
 
     let rpc_endpoint = if network == "mainnet" {
-        "http://127.0.0.1:8332/".to_string()
+        state
+            .mainnet_seed_client
+            .as_ref()
+            .map(|c| c.endpoint_url.clone())
+            .unwrap_or_else(|| "http://127.0.0.1:8332/".to_string())
     } else {
         state.seed_client.endpoint_url.clone()
     };
@@ -1816,7 +2347,14 @@ struct ResetResponse {
 
 fn handle_reset(state: &AppState) -> ResetResponse {
     let mut engine = state.engine.lock().unwrap();
-    *engine = CommonsEngine::new_empty();
+    let fresh = match &state.external_public_keys {
+        Some(ext) => CommonsEngine::new_verify_only(ext).unwrap_or_else(|_| CommonsEngine::new_empty()),
+        None => CommonsEngine::new_empty(),
+    };
+    *engine = fresh;
+    if state.verify_only {
+        engine.enable_verify_only_strip_keys();
+    }
     let _ = save_state_atomic(&state.state_file, &engine.to_persisted());
     ResetResponse {
         ok: true,

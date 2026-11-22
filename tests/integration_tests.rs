@@ -887,10 +887,13 @@ fn persistent_storage_atomic_roundtrip_and_legal_schedule_export() {
     assert_eq!(restored.rule.rule_hash(), engine.rule.rule_hash());
     assert_eq!(restored.ledger.state_root, engine.ledger.state_root);
     assert_eq!(
-        restored.hardware_xmss.root(),
-        engine.hardware_xmss.root()
+        restored.signing_keys.as_ref().unwrap().hardware_xmss.root(),
+        engine.signing_keys.as_ref().unwrap().hardware_xmss.root()
     );
-    assert_eq!(restored.hardware_slh.pk, engine.hardware_slh.pk);
+    assert_eq!(
+        restored.signing_keys.as_ref().unwrap().hardware_slh.pk,
+        engine.signing_keys.as_ref().unwrap().hardware_slh.pk
+    );
 
     let _ = std::fs::remove_dir_all(&tmp_dir);
 }
@@ -1001,8 +1004,11 @@ fn http_api_server_full_abundance_loop_red_team_external_hw_and_persistence() {
         port: 0,
         state_file: state_file.clone(),
         seed_url: format!("http://{seed_addr}/status"),
+        mainnet_seed_url: None,
         static_dir: None,
         admin_token: None,
+        verify_only: false,
+        external_public_keys: None,
     };
 
     let srv = spawn_server(cfg.clone()).expect("server must start");
@@ -1401,8 +1407,11 @@ fn hw_signer_binary_provision_sign_stdin_and_daemon_end_to_end() {
         port: 0,
         state_file,
         seed_url: "http://127.0.0.1:1/status".to_string(),
+        mainnet_seed_url: None,
         static_dir: None,
         admin_token: None,
+        verify_only: false,
+        external_public_keys: None,
     })
     .unwrap();
     let fund_txid = hex::encode(sha256(b"hw_signer_test_funding"));
@@ -1480,8 +1489,11 @@ fn http_api_admin_token_protects_operator_writes_while_keeping_reads_public() {
         port: 0,
         state_file,
         seed_url: "http://127.0.0.1:1/status".to_string(),
+        mainnet_seed_url: None,
         static_dir: None,
         admin_token: Some("super-secret-operator-token".to_string()),
+        verify_only: false,
+        external_public_keys: None,
     })
     .unwrap();
     let base = srv.base_url();
@@ -1524,5 +1536,291 @@ fn http_api_admin_token_protects_operator_writes_while_keeping_reads_public() {
     assert_eq!(authed_val["state"]["ledger_summary"]["balance_love"], 1_000);
 
     srv.stop();
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+}
+
+#[test]
+fn verify_only_mode_holds_zero_private_keys_rejects_server_signing_and_accepts_offline_deeds_and_telemetry() {
+    use newsatoshi_commons::server::{spawn_server, ServerConfig};
+    use newsatoshi_commons::{
+        ExternalDeedPacket, ExternalPublicKeysConfig, ExternalTelemetryPacket, SlhDsaKeypair,
+    };
+    use serde_json::{json, Value};
+
+    // Generate completely isolated offline keypairs (NEVER passed into the server!)
+    let offline_deed_xmss = MerkleLamportKeypair::new_64(sha256(b"OFFLINE_TRUSTEE_HSM_XMSS"));
+    let offline_hw_xmss = MerkleLamportKeypair::new_64(sha256(b"OFFLINE_SOLAR_GATEWAY_XMSS"));
+    let offline_deed_slh = SlhDsaKeypair::from_seed(sha256(b"OFFLINE_TRUSTEE_HSM_SLH"));
+    let offline_hw_slh = SlhDsaKeypair::from_seed(sha256(b"OFFLINE_SOLAR_GATEWAY_SLH"));
+    let rogue_slh = SlhDsaKeypair::from_seed(sha256(b"ROGUE_ATTACKER_SLH"));
+
+    let ext_keys = ExternalPublicKeysConfig {
+        deed_oracle_merkle_root: hex::encode(offline_deed_xmss.root()),
+        hardware_merkle_root: hex::encode(offline_hw_xmss.root()),
+        deed_oracle_slh_dsa_pk_hex: Some(offline_deed_slh.pk.to_hex()),
+        hardware_slh_dsa_pk_hex: Some(offline_hw_slh.pk.to_hex()),
+        max_bounty_payout: Some(25_000),
+        reinvest_bps: Some(1_500),
+        min_soil_health_score: Some(80),
+    };
+
+    let tmp_dir = std::env::temp_dir().join(format!(
+        "newsatoshi_commons_verify_only_{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+    let state_file = tmp_dir.join("commons-ledger.json");
+
+    let srv = spawn_server(ServerConfig {
+        host: "127.0.0.1".to_string(),
+        port: 0,
+        state_file: state_file.clone(),
+        seed_url: "http://127.0.0.1:1/status".to_string(),
+        mainnet_seed_url: None,
+        static_dir: None,
+        admin_token: None,
+        verify_only: true,
+        external_public_keys: Some(ext_keys),
+    })
+    .unwrap();
+    let base = srv.base_url();
+
+    // 1. Health & state explicitly report verify_only: true and signing_keys_loaded: false
+    let mut h_resp = ureq::get(&format!("{base}/api/health")).call().unwrap();
+    let health: Value =
+        serde_json::from_str(&h_resp.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(health["verify_only"], true);
+    assert_eq!(health["signing_keys_loaded"], false);
+
+    // 2. Verify on-disk state file contains ZERO private seeds
+    let disk_json = std::fs::read_to_string(&state_file).unwrap();
+    assert!(
+        !disk_json.contains("deed_oracle_xmss_seed_hex"),
+        "verify-only disk ledger MUST NOT contain any private seed fields"
+    );
+    assert!(
+        !disk_json.contains("hardware_slh_seed_hex"),
+        "verify-only disk ledger MUST NOT contain any private SLH-DSA seeds"
+    );
+
+    // 3. Fund treasury via record-funding
+    let mut f_resp = ureq::post(&format!("{base}/api/actions/record-funding"))
+        .header("Content-Type", "application/json")
+        .send(
+            json!({
+                "l1_network": "mainnet",
+                "l1_txid": hex::encode(sha256(b"mainnet_real_funding_lock")),
+                "amount_love": 100_000,
+                "note": "Parcel #1 Trust Treasury"
+            })
+            .to_string()
+            .as_str(),
+        )
+        .unwrap();
+    let f_val: Value = serde_json::from_str(&f_resp.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(f_val["ok"], true);
+
+    // 4. Server-side signing endpoints MUST return 403 in verify-only mode
+    let server_deed = ureq::post(&format!("{base}/api/actions/acquire-parcel"))
+        .header("Content-Type", "application/json")
+        .send(
+            json!({
+                "parcel_id": 1,
+                "acres": 10.0,
+                "price_love": 40_000,
+                "deed_label": "Blocked Server Sign"
+            })
+            .to_string()
+            .as_str(),
+        );
+    assert!(server_deed.is_err(), "server-side acquire-parcel must fail with 403");
+
+    let server_tel = ureq::post(&format!("{base}/api/actions/telemetry"))
+        .header("Content-Type", "application/json")
+        .send(
+            json!({
+                "parcel_id": 1,
+                "device_id": "unsigned-attempt",
+                "kwh_delivered": 5_000,
+                "soil_health_score": 92,
+                "payout_love": 5_000
+            })
+            .to_string()
+            .as_str(),
+        );
+    assert!(server_tel.is_err(), "unsigned telemetry action must fail with 403");
+
+    // 5. Offline-signed ExternalDeedPacket from rogue key MUST be rejected
+    let deed_hash = sha256(b"REAL_COUNTY_DEED_PARCEL_1");
+    let rogue_deed = ExternalDeedPacket::sign_slh_dsa(
+        &rogue_slh,
+        1,
+        10.0,
+        40_000,
+        "Rogue Forgery",
+        deed_hash,
+        0,
+    );
+    let mut r_rogue = ureq::post(&format!("{base}/api/deeds"))
+        .header("Content-Type", "application/json")
+        .send(serde_json::to_string(&rogue_deed).unwrap().as_str())
+        .unwrap();
+    let rogue_val: Value =
+        serde_json::from_str(&r_rogue.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(rogue_val["ok"], false, "unauthorized deed signer must be rejected");
+
+    // 6. Legitimate offline-signed ExternalDeedPacket succeeds & proves STARK
+    let valid_deed = ExternalDeedPacket::sign_slh_dsa(
+        &offline_deed_slh,
+        1,
+        10.0,
+        40_000,
+        "Parcel #1 Perpetual Purpose Trust Deed",
+        deed_hash,
+        0,
+    );
+    let mut r_deed = ureq::post(&format!("{base}/api/deeds"))
+        .header("Content-Type", "application/json")
+        .send(serde_json::to_string(&valid_deed).unwrap().as_str())
+        .unwrap();
+    let deed_val: Value =
+        serde_json::from_str(&r_deed.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(deed_val["ok"], true);
+    assert_eq!(deed_val["state"]["ledger_summary"]["balance_love"], 60_000);
+    assert_eq!(deed_val["state"]["ledger_summary"]["parcels_acquired_count"], 1);
+    assert_eq!(deed_val["stark_proof"]["verified"], true);
+
+    // 7. Legitimate offline-signed ExternalTelemetryPacket succeeds in verify-only mode
+    let hw_pkt = ExternalTelemetryPacket::sign_slh_dsa(
+        &offline_hw_slh,
+        "field-solar-gateway-01",
+        1,
+        9_500,
+        93,
+        5_000,
+        0,
+        1_795_380_000,
+    );
+    let mut r_hw = ureq::post(&format!("{base}/api/telemetry"))
+        .header("Content-Type", "application/json")
+        .send(serde_json::to_string(&hw_pkt).unwrap().as_str())
+        .unwrap();
+    let hw_val: Value = serde_json::from_str(&r_hw.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(hw_val["ok"], true);
+    assert_eq!(hw_val["state"]["ledger_summary"]["balance_love"], 55_000);
+    assert_eq!(hw_val["state"]["ledger_summary"]["total_kwh_verified"], 9_500);
+    assert_eq!(hw_val["stark_proof"]["verified"], true);
+
+    srv.stop();
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+}
+
+#[test]
+fn live_l1_anchor_verification_and_dual_chain_seed_polling() {
+    use newsatoshi_commons::server::{spawn_server, ServerConfig};
+    use serde_json::{json, Value};
+
+    // Mock L1 node serving /status (testnet), /mainnet/status (mainnet), and /api/lock?hash=...
+    let mock_l1 = tiny_http::Server::http("127.0.0.1:0").unwrap();
+    let l1_addr = mock_l1.server_addr().to_ip().unwrap().to_string();
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let stop_clone = std::sync::Arc::clone(&stop);
+    let l1_thread = thread::spawn(move || {
+        let testnet_status = r#"{"network":"testnet","proofs":"test","fee":300000,"version":"0.1.0","genesis":"00000fd814d823a0bc64a84135868402998cff81e28a85b2bede5f1125d0a394","height":22137,"tip":"0000007e7c70f28b037204ae836e9818c8e785a4eda3e3641b1c00267b1da201","tip_time":1795380010,"now":1795380090,"bits":"1e00aec5","difficulty":0.0057,"chainwork":"0000","peers":4,"known_peers":1,"best_header":22137,"mempool":0,"issued":110685000000000,"notes":22156,"nullifiers":14,"locks":1,"conditions":0,"auxpow_chainid":20051,"recent":[{"height":22137,"hash":"0000007e7c70f28b037204ae836e9818c8e785a4eda3e3641b1c00267b1da201","time":1795380010,"txs":1,"bytes":207,"merge_mined":false}]}"#;
+        let mainnet_status = r#"{"network":"mainnet","proofs":"main","fee":600000,"version":"0.1.0","genesis":"000000006ba30cc3c86ecaabcb962287e9d5fd0877c27f4b33661b4d1d3033f7","height":0,"tip":"000000006ba30cc3c86ecaabcb962287e9d5fd0877c27f4b33661b4d1d3033f7","tip_time":1794325578,"now":1795380119,"bits":"1d00ffff","difficulty":1,"chainwork":"0000000000000000000000000000000000000000000000000000000100010001","peers":4,"known_peers":1,"best_header":0,"mempool":0,"issued":0,"notes":0,"nullifiers":0,"locks":0,"conditions":0,"auxpow_chainid":20051,"recent":[{"height":0,"hash":"000000006ba30cc3c86ecaabcb962287e9d5fd0877c27f4b33661b4d1d3033f7","time":1794325578,"txs":0,"bytes":0,"merge_mined":false}]}"#;
+
+        while !stop_clone.load(std::sync::atomic::Ordering::SeqCst) {
+            if let Ok(Some(req)) = mock_l1.recv_timeout(Duration::from_millis(50)) {
+                let url = req.url().to_string();
+                let body = if url.starts_with("/mainnet/status") {
+                    mainnet_status.to_string()
+                } else if let Some(hash) = url.strip_prefix("/api/lock?hash=") {
+                    json!({
+                        "locks": [{
+                            "found": true,
+                            "id": "d42929062155a119894219b36e312eb58dc14c0c1e763c2fb0072b1b6edd1c45",
+                            "state": "open",
+                            "confirmed": true,
+                            "amount": 1000000,
+                            "hash": hash,
+                            "timeout": 23117,
+                            "claim": "ns1bc03485c35c661a5f6685a52f19351a143b44994df2943c20285b2e9876f68fa10452da1",
+                            "refund": "ns1bc03485c35c661a5f6685a52f19351a143b44994df2943c20285b2e9876f68fa10452da1",
+                            "at": 22118,
+                            "confirmations": 20,
+                            "height": 22137
+                        }]
+                    })
+                    .to_string()
+                } else {
+                    testnet_status.to_string()
+                };
+                let _ = req.respond(tiny_http::Response::from_string(body));
+            }
+        }
+    });
+
+    let tmp_dir = std::env::temp_dir().join(format!(
+        "newsatoshi_commons_dual_seed_{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+    let state_file = tmp_dir.join("commons-ledger.json");
+
+    let srv = spawn_server(ServerConfig {
+        host: "127.0.0.1".to_string(),
+        port: 0,
+        state_file,
+        seed_url: format!("http://{l1_addr}/status"),
+        mainnet_seed_url: Some(format!("http://{l1_addr}/mainnet/status")),
+        static_dir: None,
+        admin_token: Some("op-tok".to_string()),
+        verify_only: true,
+        external_public_keys: None,
+    })
+    .unwrap();
+    let base = srv.base_url();
+
+    // 1. Dual-chain /api/seed reports BOTH live testnet and live mainnet!
+    let mut s_resp = ureq::get(&format!("{base}/api/seed")).call().unwrap();
+    let seed: Value = serde_json::from_str(&s_resp.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(seed["live"], true);
+    assert_eq!(seed["status"]["height"], 22137);
+    assert_eq!(seed["mainnet_live"], true);
+    assert_eq!(seed["mainnet_status"]["network"], "mainnet");
+    assert_eq!(seed["mainnet_status"]["proofs"], "main");
+    assert_eq!(seed["mainnet_status"]["height"], 0);
+    assert_eq!(seed["mainnet_status"]["difficulty"], 1.0);
+
+    // 2. Prepare anchor (authed), then publicly verify on-chain WITHOUT admin token!
+    let mut a_resp = ureq::post(&format!("{base}/api/actions/anchor"))
+        .header("Content-Type", "application/json")
+        .header("Authorization", "Bearer op-tok")
+        .send(r#"{"network":"testnet"}"#)
+        .unwrap();
+    let anc: Value = serde_json::from_str(&a_resp.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(anc["ok"], true);
+    assert_eq!(anc["receipt"]["verified_on_l1"], false);
+    let anchor_hash = anc["receipt"]["anchor_hash"].as_str().unwrap().to_string();
+
+    let mut v_resp = ureq::post(&format!("{base}/api/actions/verify-anchor"))
+        .header("Content-Type", "application/json")
+        .send(json!({ "anchor_hash": anchor_hash }).to_string().as_str())
+        .unwrap();
+    let ver: Value = serde_json::from_str(&v_resp.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(ver["ok"], true);
+    assert_eq!(ver["verified_on_l1"], true);
+    assert_eq!(ver["receipt"]["verified_on_l1"], true);
+    assert_eq!(ver["receipt"]["broadcast_status"], "broadcast");
+    assert_eq!(ver["receipt"]["l1_confirmed_height"], 22118);
+    assert_eq!(ver["receipt"]["l1_confirmations"], 20);
+    assert_eq!(
+        ver["receipt"]["l1_lock_id"],
+        "d42929062155a119894219b36e312eb58dc14c0c1e763c2fb0072b1b6edd1c45"
+    );
+
+    srv.stop();
+    stop.store(true, std::sync::atomic::Ordering::SeqCst);
+    let _ = l1_thread.join();
     let _ = std::fs::remove_dir_all(&tmp_dir);
 }
