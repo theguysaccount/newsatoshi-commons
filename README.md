@@ -3,7 +3,8 @@
 Complete Client-Side Validated (CSV) Rust engine, NIST FIPS 205 SLH-DSA + XMSS post-quantum signing layer, real **Winterfell 0.13** STARK prover & verifier, live `newsatoshi-seed` L1 bridge, standalone hardware telemetry signer daemon, formal **RFC-0021** + **SP1 Hypercube / Miden VM** zkVM recursive IVC guest programs, **Live Thermodynamic Telemetry Mirror** web app, and **Parcel #1 Legal-Cryptographic Airlock & Sub-$50k Planning Kit** for **`NEWSATOSHI/2.1` (`LOVE`)**.
 
 - **Live Production Mirror:** `https://commons.newsatoshi.org` (Fly.io fallback: `https://newsatoshi-commons.fly.dev`)
-- **Live L1 Seed Reference:** `https://newsatoshi-seed.fly.dev/status` (`auxpow_chainid = 20051`)
+- **Live L1 Seed Reference:** `https://newsatoshi-seed.fly.dev/status` (Testnet) & `https://newsatoshi.org/mainnet/status` (Mainnet, `auxpow_chainid = 20051`)
+- **RFC-0021 L1 Soft-Fork Prototype (`0xb4`):** `https://github.com/theguysaccount/newsatoshi-rfc0021` (`feat/rfc-0021-op-verify-covenant-stark`)
 
 > **Core Invariant:** Keep Newsatoshi L1 issuance and SHA-256 merged-mining ordering (`auxpow_chainid = 20051`) **blind and ossified** — never mint base currency directly for physical work (avoiding Budish 2018 rented-hashpower 51% attacks and Sybil wash-farming). Run recursive Commons treasuries as a CSV engine anchored to live L1 blocks today, then activate `OP_VERIFY_COVENANT_STARK` (`0xb4`) via soft fork after the 90-day adversarial testnet & zkVM audit.
 
