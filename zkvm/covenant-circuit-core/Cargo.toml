@@ -1,0 +1,16 @@
+[package]
+name = "covenant-circuit-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "NEWSATOSHI/2.1 no_std zkVM guest verification kernel for OP_VERIFY_COVENANT_STARK recursive state transitions"
+
+[workspace]
+
+[features]
+default = ["std"]
+std = ["sha2/std", "serde/std"]
+
+[dependencies]
+sha2 = { version = "0.10", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }

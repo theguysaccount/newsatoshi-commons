@@ -1,0 +1,10 @@
+target/
+web/node_modules/
+web/dist/
+data/
+zkvm/
+legal/
+docs/
+.git/
+*.key.json
+.DS_Store

@@ -1,0 +1,17 @@
+[package]
+name = "sp1-covenant-host"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "SP1 Hypercube host prover and verifier driver for NEWSATOSHI/2.1 OP_VERIFY_COVENANT_STARK"
+
+[workspace]
+
+[dependencies]
+covenant-circuit-core = { path = "../../covenant-circuit-core" }
+hex = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+sp1-sdk = "5.0"
+
+[build-dependencies]
+sp1-build = "5.0"

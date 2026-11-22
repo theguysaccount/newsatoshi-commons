@@ -1,0 +1,25 @@
+[package]
+name = "sp1-covenant-guest"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "NEWSATOSHI/2.1 SP1 Hypercube (RISC-V) recursive IVC zkVM guest program for OP_VERIFY_COVENANT_STARK"
+
+[workspace]
+
+[features]
+default = []
+# Enable true cross-proof SP1 recursion via `sp1_zkvm::lib::verify::verify_sp1_proof`.
+# When enabled, the host MUST prove in compressed/recursive mode (never raw Core mode)
+# so all deferred recursive proof verifications are fully resolved.
+recursion = ["sp1-zkvm/verify"]
+
+[dependencies]
+covenant-circuit-core = { path = "../covenant-circuit-core", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+sp1-zkvm = "5.0"
+
+# For production SP1 Hypercube proving, uncomment the Succinct SHA-256 precompile patch
+# matching your installed `sp1up` toolchain release to accelerate SHA-256 by ~100x:
+# [patch.crates-io]
+# sha2-v0-10-8 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha2", tag = "patch-sha2-0.10.8-sp1-4.0.0" }

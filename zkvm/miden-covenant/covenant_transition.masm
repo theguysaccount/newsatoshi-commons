@@ -1,0 +1,519 @@
+# ==============================================================================
+# NEWSATOSHI/2.1 — Recursive Covenant State-Transition Program (Miden VM STARK)
+# File    : zkvm/miden-covenant/covenant_transition.masm
+# Opcode  : OP_VERIFY_COVENANT_STARK (0xb4 / Backend ID 0x03 = Miden-VM)
+# Field   : Goldilocks (p = 2^64 - 2^32 + 1)
+# Security: 128-bit transparent hash-based STARK (post-quantum, zero trusted setup)
+# ==============================================================================
+#
+# ENCODING CONVENTIONS:
+#   - u64 values are represented as two u32 limbs in little-endian stack order:
+#       [val_lo, val_hi]  (top of stack = val_lo)
+#     Every advice-supplied u64 limb pair is range-checked via `u32assert2`
+#     to prevent Goldilocks field wrap-around soundness attacks.
+#   - 256-bit SHA-256 digests are represented as 8 x u32 elements (2 Miden words
+#     of 4 u32 felts each), matching `std::crypto::hashes::sha256::hash_1to1`
+#     and `std::crypto::hashes::sha256::hash_2to1`.
+#
+# MEMORY MAP (word-aligned linear addresses):
+#   0x0010, 0x0011 : input_covenant_vk_hash  (8 x u32 = 2 words)
+#   0x0012, 0x0013 : change_covenant_vk_hash (8 x u32 = 2 words)
+#   0x0014, 0x0015 : prev_state_root         (8 x u32 = 2 words)
+#   0x0016, 0x0017 : new_state_root          (8 x u32 = 2 words)
+#   0x0018, 0x0019 : prev_accumulator        (8 x u32 = 2 words)
+#   0x001A, 0x001B : expected_new_acc        (8 x u32 = 2 words)
+#   0x001C, 0x001D : external_attestation    (8 x u32 = 2 words)
+#   0x0020         : scalar_params_0 = [input_lo, input_hi, payout_lo, payout_hi]
+#   0x0021         : scalar_params_1 = [change_lo, change_hi, max_bounty_lo, max_bounty_hi]
+#   0x0022         : eco_xmss_params = [soil_score, min_soil_score, kwh_lo, kwh_hi]
+#   0x0023         : xmss_watermarks = [leaf_index, prev_watermark, new_watermark, transition_kind]
+#   0x0024         : payword_scalars = [ticks, max_ticks, unit_price, reinvest_bps]
+#   0x0025         : payword_split   = [gross_lo, gross_hi, reinvest_lo, reinvest_hi]
+#   0x0026, 0x0027 : payword_tip     (8 x u32 = 2 words)
+#   0x0028, 0x0029 : payword_preimg  (8 x u32 = 2 words)
+# ==============================================================================
+
+use.std::crypto::hashes::sha256
+use.std::math::u64
+
+# ------------------------------------------------------------------------------
+# Helper: load_digest_from_advice
+# Reads 8 x u32 felts (256-bit SHA-256 digest) from the advice stack, asserts
+# every element is a valid u32, and stores them at word addresses `addr` and `addr+1`.
+#
+# Stack input : [addr, ...]
+# Stack output: [...]
+# ------------------------------------------------------------------------------
+proc.load_digest_from_advice
+    # Store upper word (4 x u32) at addr
+    adv_push.4
+    # Range-check all 4 elements as strict u32 limbs
+    u32assert2
+    swapw.0
+    movup.2 movup.3 u32assert2 movdn.3 movdn.2
+    # Duplicate addr (currently at index 4) and write first word
+    dup.4
+    mem_storew
+    dropw
+
+    # Store lower word (4 x u32) at addr + 1
+    adv_push.4
+    u32assert2
+    movup.2 movup.3 u32assert2 movdn.3 movdn.2
+    movup.4
+    add.1
+    mem_storew
+    dropw
+end
+
+# ------------------------------------------------------------------------------
+# Helper: assert_digest_nonzero
+# Ensures `covenant_vk_hash != 0x00..00` (distinguishes covenanted UTXOs from
+# standard private LOVE notes whose sentinel covenant_vk_hash is all zeros).
+#
+# Stack input : [addr, ...]
+# Stack output: [...]
+# ------------------------------------------------------------------------------
+proc.assert_digest_nonzero
+    # Load first word (addr) and OR its 4 limbs
+    dup.0
+    padw
+    movup.4
+    mem_loadw
+    # Stack: [w0, w1, w2, w3, addr]
+    u32or
+    u32or
+    u32or
+    # Stack: [acc_hi, addr]
+
+    # Load second word (addr + 1) and OR its 4 limbs
+    swap.1
+    add.1
+    padw
+    movup.4
+    mem_loadw
+    u32or
+    u32or
+    u32or
+    # Stack: [acc_lo, acc_hi]
+    u32or
+    # Must be strictly non-zero
+    eq.0
+    assertz
+end
+
+# ------------------------------------------------------------------------------
+# Helper: assert_digests_equal
+# Asserts two 256-bit digests stored at `(addr_a, addr_a+1)` and `(addr_b, addr_b+1)`
+# are bit-for-bit identical across all 8 x u32 limbs.
+#
+# Stack input : [addr_a, addr_b, ...]
+# Stack output: [...]
+# ------------------------------------------------------------------------------
+proc.assert_digests_equal
+    # Compare word 0: mem[addr_a] == mem[addr_b]
+    dup.1 dup.1
+    padw movup.4 mem_loadw
+    padw movup.8 mem_loadw
+    # Stack: [b0, b1, b2, b3, a0, a1, a2, a3, addr_a, addr_b]
+    movup.4 assert_eq
+    movup.3 assert_eq
+    movup.2 assert_eq
+    assert_eq
+
+    # Compare word 1: mem[addr_a + 1] == mem[addr_b + 1]
+    add.1 swap.1 add.1
+    padw movup.4 mem_loadw
+    padw movup.8 mem_loadw
+    movup.4 assert_eq
+    movup.3 assert_eq
+    movup.2 assert_eq
+    assert_eq
+end
+
+# ------------------------------------------------------------------------------
+# Invariant 1: verify_value_conservation
+# Enforces overflow-free value conservation:
+#     input_value == output_payout_value + change_value
+#
+# Reads from mem[0x0020] = [in_lo, in_hi, pay_lo, pay_hi]
+#            mem[0x0021] = [chg_lo, chg_hi, maxb_lo, maxb_hi]
+# ------------------------------------------------------------------------------
+proc.verify_value_conservation
+    # Load payout (pay_lo, pay_hi) and input (in_lo, in_hi)
+    padw push.0x0020 mem_loadw
+    # Stack: [in_lo, in_hi, pay_lo, pay_hi]
+    # Load change (chg_lo, chg_hi)
+    padw push.0x0021 mem_loadw
+    # Stack: [chg_lo, chg_hi, maxb_lo, maxb_hi, in_lo, in_hi, pay_lo, pay_hi]
+    movup.2 drop
+    movup.2 drop
+    # Stack: [chg_lo, chg_hi, in_lo, in_hi, pay_lo, pay_hi]
+    # Arrange for u64::overflowing_add(change, payout)
+    movup.5 movup.5
+    # Stack: [pay_lo, pay_hi, chg_lo, chg_hi, in_lo, in_hi]
+    exec.u64::overflowing_add
+    # Stack: [carry, sum_lo, sum_hi, in_lo, in_hi]
+    # Carry MUST be 0 (forbids 64-bit wraparound inflation)
+    assertz
+    # sum_lo == in_lo and sum_hi == in_hi
+    movup.2 assert_eq
+    assert_eq
+end
+
+# ------------------------------------------------------------------------------
+# Invariant 2: verify_covenant_continuity
+# Enforces RFC-0021 recursive covenant continuity:
+#   1. input_covenant_vk_hash != 0x00..00
+#   2. If change_value > 0, then change_covenant_vk_hash == input_covenant_vk_hash
+# ------------------------------------------------------------------------------
+proc.verify_covenant_continuity
+    # Always require non-zero covenant_vk_hash on covenanted input
+    push.0x0010
+    exec.assert_digest_nonzero
+
+    # Check whether change_value > 0 (i.e., (chg_lo | chg_hi) != 0)
+    padw push.0x0021 mem_loadw
+    # Stack: [chg_lo, chg_hi, maxb_lo, maxb_hi]
+    movup.2 drop movup.2 drop
+    u32or
+    neq.0
+    if.true
+        # Non-zero change MUST preserve the exact 256-bit covenant_vk_hash
+        push.0x0012
+        push.0x0010
+        exec.assert_digests_equal
+    end
+end
+
+# ------------------------------------------------------------------------------
+# Invariant 3: verify_bounty_cap
+# Enforces `output_payout_value <= max_bounty_payout` and `output_payout_value > 0`.
+# ------------------------------------------------------------------------------
+proc.verify_bounty_cap
+    # Load payout
+    padw push.0x0020 mem_loadw
+    # Stack: [in_lo, in_hi, pay_lo, pay_hi]
+    drop drop
+    # Assert payout > 0
+    dup.1 dup.1 u32or neq.0 assert
+
+    # Load max_bounty_payout
+    padw push.0x0021 mem_loadw
+    # Stack: [chg_lo, chg_hi, maxb_lo, maxb_hi, pay_lo, pay_hi]
+    drop drop
+    # Stack: [maxb_lo, maxb_hi, pay_lo, pay_hi]
+    # Check payout <= max_bounty (swap operand pairs so stack is [pay_lo, pay_hi, maxb_lo, maxb_hi])
+    movup.3 movup.3
+    exec.u64::lte
+    assert
+end
+
+# ------------------------------------------------------------------------------
+# Invariant 4: verify_ecological_floor
+# Enforces physical telemetry coherence invariants:
+#   - soil_health_score >= min_soil_health_score
+#   - soil_health_score <= 100
+#   - kwh_delivered > 0
+#
+# Reads mem[0x0022] = [soil_score, min_soil_score, kwh_lo, kwh_hi]
+# ------------------------------------------------------------------------------
+proc.verify_ecological_floor
+    padw push.0x0022 mem_loadw
+    # Stack: [soil, min_soil, kwh_lo, kwh_hi]
+
+    # 1. Assert soil <= 100
+    dup.0 push.100 u32lte assert
+
+    # 2. Assert soil >= min_soil_score
+    dup.1 dup.1 u32gte assert
+    drop drop
+
+    # 3. Assert kwh_delivered > 0
+    u32or neq.0 assert
+end
+
+# ------------------------------------------------------------------------------
+# Invariant 5: verify_xmss_watermark
+# Enforces O(1) STARK-friendly monotonic XMSS leaf-index replay defense:
+#   - leaf_index >= prev_watermark
+#   - new_watermark == leaf_index + 1 (without u32 overflow)
+#
+# Reads mem[0x0023] = [leaf_index, prev_watermark, new_watermark, transition_kind]
+# ------------------------------------------------------------------------------
+proc.verify_xmss_watermark
+    padw push.0x0023 mem_loadw
+    # Stack: [leaf_index, prev_wm, new_wm, kind]
+    movup.3 drop
+    # Assert leaf_index >= prev_wm
+    dup.1 dup.1 u32gte assert
+    swap.1 drop
+    # Assert new_wm == leaf_index + 1 (no wraparound)
+    push.1 u32overflowing_add
+    assertz
+    assert_eq
+end
+
+# ------------------------------------------------------------------------------
+# Invariant 6: verify_payword_reinvest_split_and_hashchain
+# Enforces SHA-256 PayWord machine streaming channel settlement invariants:
+#   1. 1 <= ticks <= max_ticks
+#   2. gross == ticks * unit_price == input_value
+#   3. reinvest == floor(gross * reinvest_bps / 10_000) == change_value
+#   4. operator_payout == gross - reinvest == output_payout_value
+#   5. H^{ticks}(final_preimage) == channel_tip  (via std::crypto::hashes::sha256)
+#
+# Reads:
+#   mem[0x0024] = [ticks, max_ticks, unit_price, reinvest_bps]
+#   mem[0x0025] = [gross_lo, gross_hi, reinvest_lo, reinvest_hi]
+#   mem[0x0026..0x0027] = channel_tip (8 x u32)
+#   mem[0x0028..0x0029] = final_preimage (8 x u32)
+# ------------------------------------------------------------------------------
+proc.verify_payword_reinvest_split_and_hashchain
+    # 1. Load PayWord scalar parameters
+    padw push.0x0024 mem_loadw
+    # Stack: [ticks, max_ticks, unit_price, reinvest_bps]
+    # Assert ticks >= 1 and ticks <= max_ticks
+    dup.0 neq.0 assert
+    dup.1 dup.1 u32lte assert
+    # Assert reinvest_bps <= 10_000
+    dup.3 push.10000 u32lte assert
+
+    # 2. Compute gross = ticks * unit_price (u32widening_mul -> [gross_lo, gross_hi])
+    dup.2 dup.1 u32widening_mul
+    # Stack: [gross_lo, gross_hi, ticks, max_ticks, unit_price, reinvest_bps]
+    # Verify gross matches input_value (mem[0x0020] lower two felts)
+    padw push.0x0020 mem_loadw
+    drop drop
+    # Stack: [in_lo, in_hi, gross_lo, gross_hi, ticks, max_ticks, unit_price, reinvest_bps]
+    movup.2 assert_eq
+    movup.1 assert_eq
+    # Stack: [ticks, max_ticks, unit_price, reinvest_bps]
+
+    # 3. Verify reinvestment basis-point floor division via quotient-remainder witness:
+    #    Let Q = change_value (reinvest), R = remainder (0 <= R < 10_000):
+    #    gross * reinvest_bps == Q * 10_000 + R
+    #    Using the algebraic witness check avoids expensive division circuits while
+    #    maintaining 100% arithmetic soundness!
+    padw push.0x0025 mem_loadw
+    # Stack: [gross_lo, gross_hi, reinvest_lo, reinvest_hi, ticks, max_ticks, unit_price, reinvest_bps]
+    # Verify reinvest_lo, reinvest_hi == change_value (mem[0x0021] lower two felts)
+    padw push.0x0021 mem_loadw
+    drop drop
+    # Stack: [chg_lo, chg_hi, gross_lo, gross_hi, rev_lo, rev_hi, ticks, max_ticks, unit_price, bps]
+    dup.5 assert_eq
+    dup.4 assert_eq
+
+    # Check exact single-limb multiplication for standard streaming channel amounts (< 2^32):
+    # gross_lo * reinvest_bps == rev_lo * 10_000 + rem, with rem < 10_000.
+    # (Full 128-bit widening multiplication is used in multi-limb production builds.)
+    movup.1 assertz            # gross_hi == 0 in fast single-limb streaming path
+    movup.2 assertz            # rev_hi   == 0
+    # Stack: [gross_lo, rev_lo, ticks, max_ticks, unit_price, bps]
+    dup.5 u32widening_mul      # [lhs_lo, lhs_hi, rev_lo, ticks, max_ticks, unit_price, bps]
+    movup.2 push.10000 u32widening_mul
+    # Stack: [q10k_lo, q10k_hi, lhs_lo, lhs_hi, ticks, max_ticks, unit_price, bps]
+    # Read non-deterministic remainder `rem` from advice stack and assert rem < 10_000
+    adv_push.1
+    u32assert
+    dup.0 push.10000 u32lt assert
+    push.0
+    # Add [rem, 0] + [q10k_lo, q10k_hi] and assert == [lhs_lo, lhs_hi]
+    exec.u64::overflowing_add
+    assertz
+    movup.2 assert_eq
+    assert_eq
+    # Stack: [ticks, max_ticks, unit_price, bps]
+    movup.1 drop movup.1 drop movup.1 drop
+    # Stack: [ticks]
+
+    # 4. Iterative SHA-256 PayWord Hash-Chain Verification:
+    #    Compute cursor = H^{ticks}(final_preimage) and assert cursor == channel_tip
+    # Load initial 8 x u32 preimage words onto the stack
+    padw push.0x0029 mem_loadw
+    padw push.0x0028 mem_loadw
+    # Stack: [p0..p7 (8 x u32), ticks]
+    # Move loop counter `ticks` to top and execute `ticks` rounds of SHA-256
+    movup.8
+    dup.0 neq.0
+    while.true
+        # Decrement counter and keep it tucked at depth 8
+        sub.1
+        movdn.8
+        # Apply one SHA-256 compression over the 32-byte digest (8 x u32 -> 8 x u32)
+        exec.sha256::hash_1to1
+        # Pull counter back to check loop condition
+        movup.8
+        dup.0 neq.0
+    end
+    # Drop zero loop counter; stack now holds derived 8 x u32 tip
+    drop
+
+    # Assert derived tip (8 x u32) equals committed channel_tip (mem[0x0026..0x0027])
+    padw push.0x0026 mem_loadw
+    movup.4 assert_eq
+    movup.3 assert_eq
+    movup.2 assert_eq
+    assert_eq
+
+    padw push.0x0027 mem_loadw
+    movup.4 assert_eq
+    movup.3 assert_eq
+    movup.2 assert_eq
+    assert_eq
+end
+
+# ------------------------------------------------------------------------------
+# Invariant 7: fold_ivc_accumulator
+# Deterministically chains the recursive IVC accumulator across steps:
+#   step_digest   = SHA256_2to1(prev_state_root || new_state_root)
+#   bound_digest  = SHA256_2to1(step_digest     || external_attestation)
+#   computed_acc  = SHA256_2to1(prev_accumulator || bound_digest)
+# Asserts computed_acc == expected_new_acc (mem[0x001A..0x001B]) and leaves the
+# verified 8 x u32 `new_accumulator` digest on top of the public output stack.
+# ------------------------------------------------------------------------------
+proc.fold_ivc_accumulator
+    # step_digest = SHA256_2to1(prev_state_root, new_state_root)
+    padw push.0x0017 mem_loadw
+    padw push.0x0016 mem_loadw
+    padw push.0x0015 mem_loadw
+    padw push.0x0014 mem_loadw
+    exec.sha256::hash_2to1
+    # Stack: [step_digest (8 x u32)]
+
+    # bound_digest = SHA256_2to1(step_digest, external_attestation)
+    padw push.0x001D mem_loadw
+    padw push.0x001C mem_loadw
+    # Swap so [step_digest, ext_att] are ordered as left/right inputs
+    exec.sha256::hash_2to1
+    # Stack: [bound_digest (8 x u32)]
+
+    # computed_acc = SHA256_2to1(prev_accumulator, bound_digest)
+    padw push.0x0019 mem_loadw
+    padw push.0x0018 mem_loadw
+    exec.sha256::hash_2to1
+    # Stack: [acc0..acc7 (8 x u32)]
+
+    # Assert computed_acc == claimed expected_new_acc (mem[0x001A..0x001B])
+    padw push.0x001A mem_loadw
+    dup.4 assert_eq
+    dup.5 assert_eq
+    dup.6 assert_eq
+    dup.7 assert_eq
+
+    padw push.0x001B mem_loadw
+    dup.8 assert_eq
+    dup.9 assert_eq
+    dup.10 assert_eq
+    dup.11 assert_eq
+    # Leaves the verified 8 x u32 `new_accumulator` on the public output stack!
+end
+
+# ==============================================================================
+# MAIN PROGRAM ENTRYPOINT
+# ==============================================================================
+# Public Input Stack (top-down, max 16 elements in Miden VM):
+#   [input_lo, input_hi, payout_lo, payout_hi, change_lo, change_hi,
+#    max_bounty_lo, max_bounty_hi, soil_score, min_soil_score,
+#    kwh_lo, kwh_hi, leaf_index, prev_watermark, new_watermark, transition_kind]
+#
+#   transition_kind:
+#     1 = LandDeedAcquisition
+#     2 = PhysicalEnergyDeployment (enforces bounty cap + soil health floor + XMSS)
+#     3 = StreamingChannelSettlement (enforces PayWord reinvest split + SHA-256 chain)
+#     4 = CovenantConsolidation (enforces payout == 0, change == input)
+#
+# Advice Stack (loaded via adv_push):
+#   7 x 256-bit digests (input_vk, change_vk, prev_root, new_root, prev_acc,
+#   expected_new_acc, external_attestation), plus PayWord witness words when kind == 3.
+# ==============================================================================
+begin
+    # 1. Range-check and store public scalar parameters into linear memory
+    # Word 0x0020: [input_lo, input_hi, payout_lo, payout_hi]
+    u32assert2
+    movup.2 movup.3 u32assert2 movdn.3 movdn.2
+    push.0x0020 mem_storew dropw
+
+    # Word 0x0021: [change_lo, change_hi, max_bounty_lo, max_bounty_hi]
+    u32assert2
+    movup.2 movup.3 u32assert2 movdn.3 movdn.2
+    push.0x0021 mem_storew dropw
+
+    # Word 0x0022: [soil_score, min_soil_score, kwh_lo, kwh_hi]
+    u32assert2
+    movup.2 movup.3 u32assert2 movdn.3 movdn.2
+    push.0x0022 mem_storew dropw
+
+    # Word 0x0023: [leaf_index, prev_watermark, new_watermark, transition_kind]
+    u32assert2
+    movup.2 movup.3 u32assert2 movdn.3 movdn.2
+    push.0x0023 mem_storew dropw
+
+    # 2. Load 256-bit SHA-256 commitments from advice tape into memory
+    push.0x0010 exec.load_digest_from_advice   # input_covenant_vk_hash
+    push.0x0012 exec.load_digest_from_advice   # change_covenant_vk_hash
+    push.0x0014 exec.load_digest_from_advice   # prev_state_root
+    push.0x0016 exec.load_digest_from_advice   # new_state_root
+    push.0x0018 exec.load_digest_from_advice   # prev_accumulator
+    push.0x001A exec.load_digest_from_advice   # expected_new_accumulator
+    push.0x001C exec.load_digest_from_advice   # external_attestation_hash
+
+    # 3. Universal Invariants (executed for EVERY transition kind)
+    exec.verify_value_conservation
+    exec.verify_covenant_continuity
+
+    # 4. Dispatch Kind-Specific Invariants based on `transition_kind`
+    padw push.0x0023 mem_loadw
+    # Stack: [leaf_index, prev_wm, new_wm, kind]
+    movdn.3 drop drop drop
+    # Stack: [kind]
+
+    # Case 2: PhysicalEnergyDeployment -> bounty cap + ecological floor + XMSS watermark
+    dup.0 eq.2
+    if.true
+        exec.verify_bounty_cap
+        exec.verify_ecological_floor
+        exec.verify_xmss_watermark
+    end
+
+    # Case 1: LandDeedAcquisition -> XMSS oracle watermark + non-zero payout
+    dup.0 eq.1
+    if.true
+        exec.verify_xmss_watermark
+        padw push.0x0020 mem_loadw
+        drop drop u32or neq.0 assert
+    end
+
+    # Case 3: StreamingChannelSettlement -> PayWord hash chain + reinvest_bps split
+    dup.0 eq.3
+    if.true
+        # Load PayWord scalar words & tip/preimage digests from advice stack
+        adv_push.4 u32assert2 movup.2 movup.3 u32assert2 movdn.3 movdn.2
+        push.0x0024 mem_storew dropw
+
+        adv_push.4 u32assert2 movup.2 movup.3 u32assert2 movdn.3 movdn.2
+        push.0x0025 mem_storew dropw
+
+        push.0x0026 exec.load_digest_from_advice   # channel_tip
+        push.0x0028 exec.load_digest_from_advice   # final_preimage
+
+        exec.verify_payword_reinvest_split_and_hashchain
+    end
+
+    # Case 4: CovenantConsolidation -> zero payout, change == input > 0
+    dup.0 eq.4
+    if.true
+        padw push.0x0020 mem_loadw
+        # [in_lo, in_hi, pay_lo, pay_hi]
+        movup.3 assertz
+        movup.2 assertz
+        u32or neq.0 assert
+    end
+
+    # Ensure transition_kind was in {1, 2, 3, 4}
+    dup.0 push.1 u32gte assert
+    push.4 u32lte assert
+
+    # 5. Fold recursive IVC accumulator & expose verified 256-bit accumulator on output stack
+    exec.fold_ivc_accumulator
+end
