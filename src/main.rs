@@ -26,6 +26,7 @@ fn main() {
         "anchor" => run_anchor(rest),
         "serve" => run_serve(rest),
         "export-legal-schedule" => run_export_legal_schedule(rest),
+        "derive-public-roots" => run_derive_public_roots(rest),
         "help" | "-h" | "--help" => {
             print_usage();
             Ok(())
@@ -71,6 +72,14 @@ SUBCOMMANDS:
                    NIST FIPS 205 SLH-DSA public keys, and Newsatoshi L1 genesis hashes for legal/
                      --out <path>        Output JSON file path (default: stdout)
                      --state-file <path> Optional existing ledger state file to read active keys from
+
+  derive-public-roots
+                   Cold-ceremony helper: reads 4 private 32-byte hex seeds strictly from env vars
+                   (DEED_XMSS_SEED, HW_XMSS_SEED, DEED_SLH_SEED, HW_SLH_SEED) and emits ONLY the
+                   public roots, SLH-DSA public keys, covenant_rule_hash, and LegalScheduleExport JSON
+                   (zero private material ever written to stdout or disk)
+                     --height <1..12>    XMSS Merkle tree height (default: 6 => 64 leaves)
+                     --out <path>        Optional path to write legal schedule JSON (e.g. legal/schedule-generated.json)
 
   simulate         Run full multi-parcel Autonomous Abundance Loop with XMSS, SLH-DSA & Winterfell STARKs
                      --height <1..12>    Merkle Lamport tree height (default: 6 => 64 leaves; 10 => 1024)
@@ -287,6 +296,60 @@ fn run_export_legal_schedule(args: &[String]) -> Result<(), String> {
     } else {
         println!("{json}");
     }
+    Ok(())
+}
+
+fn run_derive_public_roots(args: &[String]) -> Result<(), String> {
+    let height = parse_u8(args, "--height", DEFAULT_TREE_HEIGHT)?;
+    let read_seed = |var: &str| -> Result<Hash32, String> {
+        let raw = env::var(var).map_err(|_| format!("missing required environment variable {var}"))?;
+        parse_hash32(raw.trim(), var)
+    };
+
+    let deed_xmss_seed = read_seed("DEED_XMSS_SEED")?;
+    let hw_xmss_seed = read_seed("HW_XMSS_SEED")?;
+    let deed_slh_seed = read_seed("DEED_SLH_SEED")?;
+    let hw_slh_seed = read_seed("HW_SLH_SEED")?;
+
+    let deed_xmss =
+        MerkleLamportKeypair::from_seed(deed_xmss_seed, height).map_err(|e| e.to_string())?;
+    let hw_xmss =
+        MerkleLamportKeypair::from_seed(hw_xmss_seed, height).map_err(|e| e.to_string())?;
+    let deed_slh = SlhDsaKeypair::from_seed(deed_slh_seed);
+    let hw_slh = SlhDsaKeypair::from_seed(hw_slh_seed);
+
+    let ext = ExternalPublicKeysConfig {
+        deed_oracle_merkle_root: hex::encode(deed_xmss.root()),
+        hardware_merkle_root: hex::encode(hw_xmss.root()),
+        deed_oracle_slh_dsa_pk_hex: Some(deed_slh.pk.to_hex()),
+        hardware_slh_dsa_pk_hex: Some(hw_slh.pk.to_hex()),
+        max_bounty_payout: Some(25_000),
+        reinvest_bps: Some(1_500),
+        min_soil_health_score: Some(80),
+    };
+    let engine = CommonsEngine::new_verify_only(&ext)?;
+    let schedule = engine.export_legal_schedule();
+    let json = serde_json::to_string_pretty(&schedule)
+        .map_err(|e| format!("failed to serialize cold-ceremony legal schedule: {e}"))?;
+
+    if let Some(out_path_str) = find_flag_value(args, "--out") {
+        let out_path = PathBuf::from(&out_path_str);
+        if let Some(parent) = out_path.parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent).map_err(|e| {
+                    format!("failed to create parent dir '{}': {e}", parent.display())
+                })?;
+            }
+        }
+        let mut f = File::create(&out_path)
+            .map_err(|e| format!("failed to create '{}': {e}", out_path.display()))?;
+        f.write_all(json.as_bytes())
+            .map_err(|e| format!("failed to write '{}': {e}", out_path.display()))?;
+        f.write_all(b"\n")
+            .map_err(|e| format!("failed to finalize '{}': {e}", out_path.display()))?;
+    }
+
+    println!("{json}");
     Ok(())
 }
 

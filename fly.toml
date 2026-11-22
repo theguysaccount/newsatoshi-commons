@@ -4,6 +4,16 @@ primary_region = "iad"
 [build]
   dockerfile = "Dockerfile"
 
+[env]
+  COMMONS_VERIFY_ONLY = "1"
+  COMMONS_SEED_URL = "https://newsatoshi-seed.fly.dev/status"
+  COMMONS_MAINNET_SEED_URL = "https://newsatoshi.org/mainnet/status"
+  # Cold-ceremony PUBLIC roots & SLH-DSA public keys (private seeds live strictly offline in macOS Keychain)
+  COMMONS_DEED_ORACLE_ROOT = "f2d437944f9f498fd7db89167be42d1f042ceed7a7e6f8b82cfeac085e99f587"
+  COMMONS_HARDWARE_ROOT = "e4e12c4499429e47586388046904dd3bac4e41e7df125a42ebfb98a1927b7049"
+  COMMONS_DEED_ORACLE_SLH_PK = "3cc61cf569bd273c7d12a15c6dbd7ab6c56dbdafce9ed0eec7126170d69cab83"
+  COMMONS_HARDWARE_SLH_PK = "80d40a39ce6e9365c52d5df87f9ea7dbb88e7737d1321bc40480b06bb53b7c53"
+
 [mounts]
   source = "commons_data"
   destination = "/data"
