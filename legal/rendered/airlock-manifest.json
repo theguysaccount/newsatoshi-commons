@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0.0",
+  "protocol_version": "NEWSATOSHI/2.1",
+  "rendered_at_utc": "2026-11-22T05:16:28Z",
+  "schedule_source": "/Users/jack/.gemini/antigravity/scratch/gemini-web-handoffs/projects/newsatoshi-commons/legal/schedule-generated.json",
+  "covenant_rule_hash": "272a6205610a85485ed6114f9017cdc006329621fb245e6c32742738290ff237",
+  "covenant_rule": {
+    "max_bounty_payout": 25000,
+    "reinvest_bps": 1500,
+    "min_soil_health_score": 80
+  },
+  "keys": {
+    "deed_oracle_merkle_root": "b3b30ace5acc7f67de4b327d64e09e7721473632eb0cc8407d285706bffd568a",
+    "hardware_merkle_root": "0ac1bb595ca2a69561e4b3c8b9874012aa2b232727ff61104e63fa9a5ae105bd",
+    "deed_oracle_slh_dsa_pk_hex": "fc4122d458bc93ed05f508565782d2301fc783c98756a2fbd99bdaf8aea49f01",
+    "hardware_slh_dsa_pk_hex": "092f4cc254962783e6efa2f249a2089272038bfb86d88459b96c3a357b66382f"
+  },
+  "l1_anchors": {
+    "mainnet_genesis": "000000006ba30cc3c86ecaabcb962287e9d5fd0877c27f4b33661b4d1d3033f7",
+    "testnet_genesis": "00000fd814d823a0bc64a84135868402998cff81e28a85b2bede5f1125d0a394",
+    "auxpow_chainid": 20051
+  },
+  "airlock_bundle_sha256": "15dde7e685f3d9d4f0c0c37978e9a0a8db99749551d78b67a547af60ac421a54",
+  "l1_anchor_commands": {
+    "testnet_lock": "newsatoshi --net testnet lock 0.01 --hash 15dde7e685f3d9d4f0c0c37978e9a0a8db99749551d78b67a547af60ac421a54 --to <TRUST_ADDRESS>",
+    "mainnet_lock": "newsatoshi lock 0.01 --hash 15dde7e685f3d9d4f0c0c37978e9a0a8db99749551d78b67a547af60ac421a54 --to <TRUST_ADDRESS>",
+    "testnet_memo": "newsatoshi --net testnet send <TRUST_ADDRESS> 0.01 --memo AIRLOCK:15dde7e685f3d9d4f0c0c37978e9a0a8db99749551d78b67a547af60ac421a54"
+  },
+  "documents": [
+    {
+      "filename": "perpetual-purpose-trust-charter.md",
+      "template_path": "/Users/jack/.gemini/antigravity/scratch/gemini-web-handoffs/projects/newsatoshi-commons/legal/perpetual-purpose-trust-charter.md",
+      "rendered_path": "/Users/jack/.gemini/antigravity/scratch/gemini-web-handoffs/projects/newsatoshi-commons/legal/rendered/perpetual-purpose-trust-charter.md",
+      "template_sha256": "f828760dfd7506b81b15d5ae34fe0219c44c50ff4ea3175a13ceeb55ceac1ecb",
+      "rendered_sha256": "ac5d64ba8eb2ad0691426149d54bfc06e51e6fcc00266da68f0f68da604dbdc3",
+      "rendered_bytes": 43330,
+      "rendered_lines": 291,
+      "placeholders_replaced": 77,
+      "unresolved_placeholders": 0
+    },
+    {
+      "filename": "wyoming-duna-clt-operating-agreement.md",
+      "template_path": "/Users/jack/.gemini/antigravity/scratch/gemini-web-handoffs/projects/newsatoshi-commons/legal/wyoming-duna-clt-operating-agreement.md",
+      "rendered_path": "/Users/jack/.gemini/antigravity/scratch/gemini-web-handoffs/projects/newsatoshi-commons/legal/rendered/wyoming-duna-clt-operating-agreement.md",
+      "template_sha256": "f5839fee985c5d9696240105e2eb803bfff79cc824ed8b8636e5a720d3adcd92",
+      "rendered_sha256": "e618e20eb57f6b1e6cd013e60128da5dfd201096352719eadc16a58b6a0596c4",
+      "rendered_bytes": 25686,
+      "rendered_lines": 159,
+      "placeholders_replaced": 53,
+      "unresolved_placeholders": 0
+    }
+  ],
+  "verification": {
+    "all_placeholders_resolved": true,
+    "total_placeholders_replaced": 130,
+    "total_unresolved_placeholders": 0
+  }
+}

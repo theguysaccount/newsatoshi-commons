@@ -1,0 +1,20 @@
+{
+  "protocol_version": "NEWSATOSHI/2.1",
+  "covenant_rule_hash": "272a6205610a85485ed6114f9017cdc006329621fb245e6c32742738290ff237",
+  "covenant_rule": {
+    "max_bounty_payout": 25000,
+    "reinvest_bps": 1500,
+    "min_soil_health_score": 80
+  },
+  "keys": {
+    "deed_oracle_merkle_root": "b3b30ace5acc7f67de4b327d64e09e7721473632eb0cc8407d285706bffd568a",
+    "hardware_merkle_root": "0ac1bb595ca2a69561e4b3c8b9874012aa2b232727ff61104e63fa9a5ae105bd",
+    "deed_oracle_slh_dsa_pk_hex": "fc4122d458bc93ed05f508565782d2301fc783c98756a2fbd99bdaf8aea49f01",
+    "hardware_slh_dsa_pk_hex": "092f4cc254962783e6efa2f249a2089272038bfb86d88459b96c3a357b66382f"
+  },
+  "l1_anchors": {
+    "mainnet_genesis": "000000006ba30cc3c86ecaabcb962287e9d5fd0877c27f4b33661b4d1d3033f7",
+    "testnet_genesis": "00000fd814d823a0bc64a84135868402998cff81e28a85b2bede5f1125d0a394",
+    "auxpow_chainid": 20051
+  }
+}

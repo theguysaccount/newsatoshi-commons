@@ -1,0 +1,10 @@
+target/
+**/target/
+web/node_modules/
+web/dist/
+data/
+zkvm/testnet-harness/audit-logs/
+*.key.json
+hw-signer-key.json
+.DS_Store
+*.log
