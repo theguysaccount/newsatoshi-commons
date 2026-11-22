@@ -1,16 +1,16 @@
 {
   "protocol_version": "NEWSATOSHI/2.1",
-  "covenant_rule_hash": "272a6205610a85485ed6114f9017cdc006329621fb245e6c32742738290ff237",
+  "covenant_rule_hash": "a506e75738bb9e2d5ef10ad5ab0689437dfea9a0fd790b5262ff98362bccc164",
   "covenant_rule": {
     "max_bounty_payout": 25000,
     "reinvest_bps": 1500,
     "min_soil_health_score": 80
   },
   "keys": {
-    "deed_oracle_merkle_root": "b3b30ace5acc7f67de4b327d64e09e7721473632eb0cc8407d285706bffd568a",
-    "hardware_merkle_root": "0ac1bb595ca2a69561e4b3c8b9874012aa2b232727ff61104e63fa9a5ae105bd",
-    "deed_oracle_slh_dsa_pk_hex": "fc4122d458bc93ed05f508565782d2301fc783c98756a2fbd99bdaf8aea49f01",
-    "hardware_slh_dsa_pk_hex": "092f4cc254962783e6efa2f249a2089272038bfb86d88459b96c3a357b66382f"
+    "deed_oracle_merkle_root": "f2d437944f9f498fd7db89167be42d1f042ceed7a7e6f8b82cfeac085e99f587",
+    "hardware_merkle_root": "e4e12c4499429e47586388046904dd3bac4e41e7df125a42ebfb98a1927b7049",
+    "deed_oracle_slh_dsa_pk_hex": "3cc61cf569bd273c7d12a15c6dbd7ab6c56dbdafce9ed0eec7126170d69cab83",
+    "hardware_slh_dsa_pk_hex": "80d40a39ce6e9365c52d5df87f9ea7dbb88e7737d1321bc40480b06bb53b7c53"
   },
   "l1_anchors": {
     "mainnet_genesis": "000000006ba30cc3c86ecaabcb962287e9d5fd0877c27f4b33661b4d1d3033f7",

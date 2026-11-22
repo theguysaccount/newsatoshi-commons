@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  rust-core:
+    name: Rust Core, SLH-DSA & Winterfell STARKs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo build --bins
+
+  zkvm-kernel:
+    name: Pure-Rust no_std zkVM Covenant Kernel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: zkvm/covenant-circuit-core
+      - working-directory: zkvm/covenant-circuit-core
+        run: |
+          cargo test
+          cargo check --no-default-features
+          cargo clippy --all-targets -- -D warnings
+
+  web-ui:
+    name: Telemetry Mirror Web UI (TypeScript + Vite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+  legal-airlock:
+    name: Legal-Cryptographic Airlock Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          python3 legal/render_airlock.py --schedule legal/schedule-generated.json --out-dir /tmp/rendered-check
+          ! grep -rn "{{" /tmp/rendered-check/*.md

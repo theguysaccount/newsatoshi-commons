@@ -15,7 +15,7 @@
 ### Article 2 — Nonprofit Public-Good Purpose & Prohibition on Private Dividends (W.S. § 17-32-109)
 1. **Common Nonprofit Purpose:** The Association is formed and operated exclusively for the common nonprofit purpose of leasing non-enclosable land from the **Newsatoshi Autonomous Commons Perpetual Purpose Trust** (the **"Trust"**), deploying and maintaining off-grid solar microgrids, LiFePO4 storage, waste-heat-coupled regenerative greenhouses, and local edge-compute infrastructure, and delivering electricity, compute, and food to local communities at transparent, non-extractive marginal-cost tariffs while preserving verified ecological soil health (`>= 80`).
 2. **Permitted For-Profit Operations Dedicated to Nonprofit Purpose (W.S. § 17-32-104(b)):** As expressly authorized by the Wyoming DUNA Act, the Association may engage in revenue-generating commercial activities—including metered Bill-Killer local electricity offtake (`$0.09/kWh`), solar-matched edge-AI inference hosting (`$0.55/kWh-eq`), and local greenhouse CSA produce distribution—**provided that 100% of net operating revenue** after hard operating costs, hardware sinking-fund reserves, taxes, and reasonable service compensation is strictly dedicated to:
-   - The protocol-mandated **`1500` basis points (`15.00%`)** permanent Land Covenant sweep under `272a6205610a85485ed6114f9017cdc006329621fb245e6c32742738290ff237`; AND
+   - The protocol-mandated **`1500` basis points (`15.00%`)** permanent Land Covenant sweep under `a506e75738bb9e2d5ef10ad5ab0689437dfea9a0fd790b5262ff98362bccc164`; AND
    - Either (a) remitting remaining non-dividend net operating surplus into the Trust's Land Covenant Treasury to acquire adjacent debt-free Parcel #N acreage, OR (b) reducing local community electricity, compute, and produce tariffs even further toward pure thermodynamic marginal cost.
 3. **Strict Prohibition on Dividends & Private Benefit (W.S. § 17-32-109):** The Association shall **never** pay dividends, profit shares, token yield, or distributions of net assets to any member, Administrator, or private investor. Reasonable, market-benchmarked compensation for actual physical, technical, legal, or stewardship services rendered (such as the Resident CLT Steward stipend, accredited soil laboratory assays, and independent hardware audits) is expressly permitted under **W.S. § 17-32-109(b)** and strictly subject to open public accounting in the Commons Telemetry Mirror.
 
@@ -32,7 +32,7 @@
 5. **Suspension / Resignation (W.S. § 17-32-117):** Any member may resign at any time with zero continuing liability; members attempting fraud, meter tampering, or unauthorized enclosure may be removed upon two-thirds (2/3) member vote following written notice and opportunity to respond.
 
 ### Article 4 — Cryptographic Governing Principles Supremacy (W.S. § 17-32-102(a)(ii))
-1. **Incorporation of `NEWSATOSHI/2.1` Consensus Rules:** Pursuant to **W.S. § 17-32-102(a)(ii)**, the Association's legally binding **"Governing Principles"** expressly incorporate the open-source **`NEWSATOSHI/2.1`** consensus specification, the immutable Covenant Rule Hash **`272a6205610a85485ed6114f9017cdc006329621fb245e6c32742738290ff237`**, the mandatory **`1500` bps (`15.00%`)** PayWord reinvestment split, the **`25,000` LOVE** single-bounty ceiling, the **`>= 80`** Ecological Coherence Floor, and the L1 Genesis Anchors recorded in **Exhibit 1**.
+1. **Incorporation of `NEWSATOSHI/2.1` Consensus Rules:** Pursuant to **W.S. § 17-32-102(a)(ii)**, the Association's legally binding **"Governing Principles"** expressly incorporate the open-source **`NEWSATOSHI/2.1`** consensus specification, the immutable Covenant Rule Hash **`a506e75738bb9e2d5ef10ad5ab0689437dfea9a0fd790b5262ff98362bccc164`**, the mandatory **`1500` bps (`15.00%`)** PayWord reinvestment split, the **`25,000` LOVE** single-bounty ceiling, the **`>= 80`** Ecological Coherence Floor, and the L1 Genesis Anchors recorded in **Exhibit 1**.
 2. **Non-Amendable Cryptographic Core:** No member vote or Administrator resolution may authorize any act that violates Section 4.2 of the Perpetual Purpose Trust Charter, diverts the `1500` bps covenant reinvestment flow, encumbers Trust real estate, or lowers `min_soil_health_score` below `80`.
 
 ### Article 5 — Legal-Financial Bridge: Administrators, Contracts, EIN, Tax Filings & Banking
@@ -53,7 +53,7 @@
 1. **Wyoming Statutory Filing:** File the Statement of Appointment of Registered Agent with the Wyoming Secretary of State pursuant to **W.S. § 17-32-111** (and maintain active status through the W.S. § 17-22-101 → W.S. § 17-32-101 100-member transition).
 2. **Tax ID & Banking Airlock:** Apply for an IRS EIN (Form SS-4) and open a dedicated dual-control operating bank account restricted to Association nonprofit operations and Land Covenant surplus sweeps.
 3. **Execution of Parcel #1 CLT Ground Lease:** Execute the **99-Year Renewable CLT Ground Lease (Part III)** and **PayWord Offtake Addendum (Part IV)** with the Ministerial Trustee of the Newsatoshi Autonomous Commons Perpetual Purpose Trust immediately upon county recording of the Parcel #1 Warranty Deed and Schedule C Anti-Enclosure Covenant.
-4. **Hardware Commissioning & Telemetry Binding:** Procure and commission the Parcel #1 25 kW bifacial solar array, 50 kWh LiFePO4 battery bank, 800 sq ft climate-coupled greenhouse, 4-node waste-heat edge-compute cluster, and `newsatoshi-hw-signer` TEE telemetry kit, verifying burned-in XMSS Merkle root **`0ac1bb595ca2a69561e4b3c8b9874012aa2b232727ff61104e63fa9a5ae105bd`** and NIST FIPS 205 SLH-DSA public key **`092f4cc254962783e6efa2f249a2089272038bfb86d88459b96c3a357b66382f`**.
+4. **Hardware Commissioning & Telemetry Binding:** Procure and commission the Parcel #1 25 kW bifacial solar array, 50 kWh LiFePO4 battery bank, 800 sq ft climate-coupled greenhouse, 4-node waste-heat edge-compute cluster, and `newsatoshi-hw-signer` TEE telemetry kit, verifying burned-in XMSS Merkle root **`e4e12c4499429e47586388046904dd3bac4e41e7df125a42ebfb98a1927b7049`** and NIST FIPS 205 SLH-DSA public key **`80d40a39ce6e9365c52d5df87f9ea7dbb88e7737d1321bc40480b06bb53b7c53`**.
 5. **100-Member Community Enrollment Drive:** Open the zero-fee/nominal-dues public Membership Registry to onboard local subscribers, growers, open-source contributors, and verifier node operators past the 100-member Wyoming DUNA statutory threshold.
 
 ---
@@ -61,7 +61,7 @@
 ## PART III — COMMUNITY LAND TRUST (CLT) 99-YEAR RENEWABLE GROUND LEASE
 
 THIS **COMMUNITY LAND TRUST 99-YEAR RENEWABLE GROUND LEASE** (this **"Ground Lease"**) is entered into effective as of `[Insert Parcel #1 Closing Date]` by and between:
-- **LANDLORD:** `[Insert Ministerial Trustee Name]`, strictly as Ministerial Trustee of the **Newsatoshi Autonomous Commons Perpetual Purpose Trust** (acting solely pursuant to verified Section 4.2 cryptographic execution under Covenant Rule Hash `272a6205610a85485ed6114f9017cdc006329621fb245e6c32742738290ff237`); and
+- **LANDLORD:** `[Insert Ministerial Trustee Name]`, strictly as Ministerial Trustee of the **Newsatoshi Autonomous Commons Perpetual Purpose Trust** (acting solely pursuant to verified Section 4.2 cryptographic execution under Covenant Rule Hash `a506e75738bb9e2d5ef10ad5ab0689437dfea9a0fd790b5262ff98362bccc164`); and
 - **LESSEE:** **Newsatoshi Autonomous Commons Operating Association (DUNA)**, a Wyoming Decentralized Unincorporated Nonprofit Association (or its approved local resident operating cooperative sub-lessee).
 
 ### Section 3.1 — Leased Premises (Parcel #1)
@@ -87,7 +87,7 @@ To permanently eliminate speculative land rent from local energy and food prices
 
 ### Section 3.5 — Ecological Stewardship, Hardware Audit Access & Default Remedies
 1. **Continuous Ecological Covenant:** Lessee shall manage Parcel #1 strictly using regenerative agro-ecological practices maintaining **`soil_health_score >= 80`**. Prohibited practices include synthetic persistent biocides, hazardous waste dumping, unpermitted groundwater depletion, or soil-compacting industrial extraction.
-2. **Unrestricted Verification Access:** The Trust Enforcer, independent Hardware Auditors, and accredited soil laboratories shall have continuous physical access to inspect the hardware TEE signer (`0ac1bb595ca2a69561e4b3c8b9874012aa2b232727ff61104e63fa9a5ae105bd` / `092f4cc254962783e6efa2f249a2089272038bfb86d88459b96c3a357b66382f`), revenue-grade kWh meters, and soil test plots.
+2. **Unrestricted Verification Access:** The Trust Enforcer, independent Hardware Auditors, and accredited soil laboratories shall have continuous physical access to inspect the hardware TEE signer (`e4e12c4499429e47586388046904dd3bac4e41e7df125a42ebfb98a1927b7049` / `80d40a39ce6e9365c52d5df87f9ea7dbb88e7737d1321bc40480b06bb53b7c53`), revenue-grade kWh meters, and soil test plots.
 3. **Cure & Non-Punitive Remediation:** If `soil_health_score` falls below `80`, protocol bounties freeze automatically per Article V of the Trust Charter and Lessee shall have **one hundred eighty (180) days** to execute a Trust-Enforcer-approved regenerative remediation plan before lease termination remedies may be invoked.
 
 ---
@@ -117,12 +117,12 @@ All machine-to-machine electricity, compute, and automated CSA settlement flows 
 1. **Channel Open & Tip Commitment:** Before drawing power or compute ticks, a Subscriber (or the DUNA's fiat-bridge gateway settling on behalf of non-technical local households paying in USD) generates a random 32-byte seed `w_0`, computes a hash chain of length `N` (`w_i = SHA256(w_{i-1})`), and commits the public tip `w_N` (`channel_tip`) and per-tick `unit_price` into a `StreamingChannel` escrowed under `NEWSATOSHI/2.1`.
 2. **Metered Micro-Tick Streaming:** As the Parcel #1 revenue-grade smart meter verifies delivered `kWh` (or compute gateway verifies completed inference ticks), the client releases sequential preimages `w_{N-k}` representing `k` consumed ticks without requiring an on-chain L1 transaction per watt-hour.
 3. **Atomic Deterministic Settlement & Immutable Covenant Split:** Upon periodic channel settlement (daily, weekly, or on threshold), the `CommonsLedger` verifies `SHA256^k(w_{N-k}) == w_N` and **atomically splits** the gross settled value (`gross = k * unit_price`) with zero human discretion:
-   - **`reinvest_amount = floor(gross * 1500 / 10000)` (`15.00%`)** → locked permanently into a recursive Land Covenant UTXO bearing immutable `272a6205610a85485ed6114f9017cdc006329621fb245e6c32742738290ff237` (auto-consolidated into the Trust's Parcel #N acquisition treasury); and
+   - **`reinvest_amount = floor(gross * 1500 / 10000)` (`15.00%`)** → locked permanently into a recursive Land Covenant UTXO bearing immutable `a506e75738bb9e2d5ef10ad5ab0689437dfea9a0fd790b5262ff98362bccc164` (auto-consolidated into the Trust's Parcel #N acquisition treasury); and
    - **`operator_amount = gross - reinvest_amount` (`85.00%`)** → routed to the DUNA Operating Channel to pay hard O&M, hardware sinking reserves, taxes, Resident CLT Steward stipend, and any voluntary DUNA net surplus sweep or member tariff rebate.
 4. **Fiat Accessibility Bridge:** Local residents lacking cryptocurrency wallets may settle monthly utility or CSA bills in standard U.S. Dollars through the DUNA operating checking account; the DUNA Administrator's automated accounting bridge publishes a matching PayWord settlement receipt and remits the exact `1500` bps Land Covenant allocation (plus approved DUNA operating surplus) within five (5) business days of monthly close.
 
 ### Section 4.4 — Hardware-Attested Metering & Fair Dispute Resolution
-1. ***Prima Facie* Meter Evidence:** Signed telemetry packets (`PHYSICAL_TELEMETRY_V1`) attested by the parcel's registered Hardware Telemetry Signer (`0ac1bb595ca2a69561e4b3c8b9874012aa2b232727ff61104e63fa9a5ae105bd` / `092f4cc254962783e6efa2f249a2089272038bfb86d88459b96c3a357b66382f`) and anchored to Newsatoshi L1 constitute *prima facie* evidence of delivered energy and ecological compliance.
+1. ***Prima Facie* Meter Evidence:** Signed telemetry packets (`PHYSICAL_TELEMETRY_V1`) attested by the parcel's registered Hardware Telemetry Signer (`e4e12c4499429e47586388046904dd3bac4e41e7df125a42ebfb98a1927b7049` / `80d40a39ce6e9365c52d5df87f9ea7dbb88e7737d1321bc40480b06bb53b7c53`) and anchored to Newsatoshi L1 constitute *prima facie* evidence of delivered energy and ecological compliance.
 2. **Physical Meter Fault Remedy:** If any Subscriber reasonably disputes a metered reading due to suspected CT clamp failure, inverter telemetry glitch, or line loss, the DUNA shall inspect the physical revenue-grade meter within five (5) business days; any verified over-charge shall be refunded immediately from the `85.00%` operating reserve without impairing the Trust's immutable covenant invariant.
 
 ---
@@ -134,15 +134,15 @@ This Operating Agreement, 99-Year CLT Ground Lease, and PayWord Offtake Addendum
 | Cryptographic Parameter | Bound Value |
 | :--- | :--- |
 | **Protocol Version** | `NEWSATOSHI/2.1` |
-| **Immutable Covenant Rule Hash** | `272a6205610a85485ed6114f9017cdc006329621fb245e6c32742738290ff237` |
+| **Immutable Covenant Rule Hash** | `a506e75738bb9e2d5ef10ad5ab0689437dfea9a0fd790b5262ff98362bccc164` |
 | **PayWord Reinvestment Spread (`reinvest_bps`)** | `1500` bps (`15.00%` to Land Covenant) |
 | **Operator / Marginal O&M Share** | `8500` bps (`85.00%` to O&M / Steward / Rebates) |
 | **Single Bounty Payout Ceiling (`max_bounty_payout`)** | `25,000` LOVE |
 | **Ecological Coherence Floor (`min_soil_health_score`)** | `>= 80` (0–100 soil index) |
-| **Deed Oracle XMSS Merkle Root** | `b3b30ace5acc7f67de4b327d64e09e7721473632eb0cc8407d285706bffd568a` |
-| **Deed Oracle SLH-DSA Public Key (FIPS 205)** | `fc4122d458bc93ed05f508565782d2301fc783c98756a2fbd99bdaf8aea49f01` |
-| **Hardware Telemetry XMSS Merkle Root** | `0ac1bb595ca2a69561e4b3c8b9874012aa2b232727ff61104e63fa9a5ae105bd` |
-| **Hardware Telemetry SLH-DSA Public Key (FIPS 205)** | `092f4cc254962783e6efa2f249a2089272038bfb86d88459b96c3a357b66382f` |
+| **Deed Oracle XMSS Merkle Root** | `f2d437944f9f498fd7db89167be42d1f042ceed7a7e6f8b82cfeac085e99f587` |
+| **Deed Oracle SLH-DSA Public Key (FIPS 205)** | `3cc61cf569bd273c7d12a15c6dbd7ab6c56dbdafce9ed0eec7126170d69cab83` |
+| **Hardware Telemetry XMSS Merkle Root** | `e4e12c4499429e47586388046904dd3bac4e41e7df125a42ebfb98a1927b7049` |
+| **Hardware Telemetry SLH-DSA Public Key (FIPS 205)** | `80d40a39ce6e9365c52d5df87f9ea7dbb88e7737d1321bc40480b06bb53b7c53` |
 | **Newsatoshi L1 Mainnet Genesis (`chainid = 20051`)** | `000000006ba30cc3c86ecaabcb962287e9d5fd0877c27f4b33661b4d1d3033f7` |
 | **Newsatoshi L1 Testnet Genesis (Pilot / Soak Only)** | `00000fd814d823a0bc64a84135868402998cff81e28a85b2bede5f1125d0a394` |
 
