@@ -27,4 +27,6 @@ EXPOSE 8080
 ENV COMMONS_PORT=8080
 ENV COMMONS_STATE_FILE=/data/commons-ledger.json
 ENV COMMONS_SEED_URL=https://newsatoshi-seed.fly.dev/status
-ENTRYPOINT ["/bin/sh", "-c", "exec newsatoshi-commons serve --host 0.0.0.0 --port ${COMMONS_PORT} --state-file ${COMMONS_STATE_FILE} --seed-url ${COMMONS_SEED_URL} --static-dir /app/web/dist"]
+ENV COMMONS_MAINNET_SEED_URL=https://newsatoshi.org/mainnet/status
+ENV COMMONS_VERIFY_ONLY=1
+ENTRYPOINT ["/bin/sh", "-c", "exec newsatoshi-commons serve --host 0.0.0.0 --port ${COMMONS_PORT} --state-file ${COMMONS_STATE_FILE} --seed-url ${COMMONS_SEED_URL} --mainnet-seed-url ${COMMONS_MAINNET_SEED_URL} --static-dir /app/web/dist"]

@@ -15,23 +15,24 @@ Complete Client-Side Validated (CSV) Rust engine, NIST FIPS 205 SLH-DSA + XMSS p
 
 ```text
 newsatoshi-commons/
-├── Cargo.toml                         # v0.3.0: slh-dsa 0.2.0-rc.5, winterfell 0.13.1, tiny_http, ureq
-├── Dockerfile                         # 3-stage Node 22 + Rust + debian-slim production container
+├── Cargo.toml                         # v0.4.0: slh-dsa 0.2.0-rc.5, winterfell 0.13.1, tiny_http, ureq
+├── Dockerfile                         # 3-stage Node 22 + Rust + debian-slim production container (COMMONS_VERIFY_ONLY=1 + dual-chain polling)
 ├── fly.toml                           # Fly.io deployment config (persistent /data volume + /api/health check)
 ├── src/
 │   ├── crypto.rs                      # Pure SHA-256 Lamport OTS, XMSS Merkle-Lamport (64–4,096 leaves), NIST FIPS 205 SLH-DSA-SHA2-128f
 │   ├── lib.rs                         # CommonsLedger, CovenantRule, CheckedWorkProof, PayWord StreamingChannel, UTXO consolidation
 │   ├── stark.rs                       # Real Winterfell 0.13 AIR prover & verifier (15-col x 64-row, 63-bit bit-decomp, 99-bit PQ security)
-│   ├── storage.rs                     # Atomic fsync+rename JSON persistence + honest empty-initial-state engine + legal schedule exporter
-│   ├── seed.rs                        # Live HTTPS poller for https://newsatoshi-seed.fly.dev/status (no offline fabrication)
-│   ├── rpc.rs                         # Deterministic AnchorCommitment bound to live L1 tip + real newsatoshi CLI lock/memo generators
-│   ├── hardware.rs                    # HardwareTelemetrySigner (solar inverter / greenhouse robot TEE)
-│   ├── server.rs                      # CORS HTTP API + optional COMMONS_ADMIN_TOKEN bearer guard + SPA static server
+│   ├── storage.rs                     # Atomic fsync+rename JSON persistence + strict --verify-only key isolation (zero private seeds on server)
+│   ├── seed.rs                        # Live dual-chain HTTPS poller (testnet + mainnet /status) & live /api/lock?hash= on-chain verifier
+│   ├── rpc.rs                         # Deterministic AnchorCommitment bound to live L1 tip + on-chain lock verification metadata
+│   ├── hardware.rs                    # HardwareTelemetrySigner + ExternalTelemetryPacket + ExternalDeedPacket (offline XMSS/SLH-DSA)
+│   ├── server.rs                      # CORS HTTP API + COMMONS_ADMIN_TOKEN + --verify-only + POST /api/deeds + POST /api/actions/verify-anchor
 │   ├── main.rs                        # CLI (`serve`, `simulate`, `telemetry-sign`, `anchor`, `export-legal-schedule`)
 │   └── bin/newsatoshi-hw-signer.rs    # Standalone Pi / Linux / embedded hardware telemetry signer daemon (`provision`, `sign`, `daemon`)
-├── tests/integration_tests.rs         # 16 integration tests (+1 unit test = 17 total: SLH-DSA, Winterfell STARK, auth, HTTP API, hw-signer)
+├── tests/integration_tests.rs         # 18 integration tests (+1 unit test = 19 total: SLH-DSA, STARKs, verify-only, dual-chain, L1 lock verify)
 ├── docs/
-│   └── RFC-0021-OP_VERIFY_COVENANT_STARK.md  # Formal NEWSATOSHI/2.1 soft-fork specification & AuxPoW signaling
+│   ├── RFC-0021-OP_VERIFY_COVENANT_STARK.md  # Formal NEWSATOSHI/2.1 soft-fork specification & AuxPoW signaling
+│   └── AUXPOW-MAINNET-MINING-GUIDE.md        # Live-verified Mainnet & Bitcoin AuxPoW merged-mining pool onboarding guide (chainid 20051)
 ├── zkvm/
 │   ├── covenant-circuit-core/         # Pure-Rust `no_std`-compatible recursive IVC verification kernel (14/14 tests, 0 clippy warnings)
 │   ├── sp1-covenant-guest/            # SP1 Hypercube RISC-V guest & host prover/verifier driver

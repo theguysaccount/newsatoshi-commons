@@ -13,8 +13,8 @@ pub use crypto::{
     LARGE_TREE_HEIGHT, MAX_TREE_HEIGHT, SLH_DSA_PARAM_SET, SLH_DSA_PK_BYTES, SLH_DSA_SK_BYTES,
 };
 pub use hardware::{
-    ExternalTelemetryPacket, HardwareDeviceConfig, HardwareTelemetrySigner, SignedTelemetryPacket,
-    TelemetryPacketJson, TelemetryReading,
+    ExternalDeedPacket, ExternalTelemetryPacket, HardwareDeviceConfig, HardwareTelemetrySigner,
+    SignedTelemetryPacket, TelemetryPacketJson, TelemetryReading,
 };
 pub use rpc::{
     format_newsatoshi_cli_commands, AnchorCommitment, AnchorReceipt, AnchorRpcParams,
@@ -22,17 +22,19 @@ pub use rpc::{
     PROTOCOL_VERSION,
 };
 pub use seed::{
-    MainnetInfo, SeedRecentBlock, SeedSnapshot, SeedStatus, SeedStatusClient, AUXPOW_CHAIN_ID,
-    DEFAULT_SEED_STATUS_URL, MAINNET_GENESIS_HASH, TESTNET_GENESIS_HASH,
+    L1LockRecord, MainnetInfo, SeedRecentBlock, SeedSnapshot, SeedStatus, SeedStatusClient,
+    AUXPOW_CHAIN_ID, DEFAULT_MAINNET_SEED_STATUS_URL, DEFAULT_SEED_STATUS_URL,
+    MAINNET_GENESIS_HASH, TESTNET_GENESIS_HASH,
 };
 pub use stark::{
     prove_covenant_transition, verify_covenant_stark, CovenantProver, CovenantPublicInputs,
     CovenantTransitionAir, CovenantTxKind, StarkProofArtifact, StarkVerifyResult,
 };
 pub use storage::{
-    compute_verified_love_per_kwh, load_or_init_state, load_state, save_state_atomic, ApiStateView,
-    CommonsEngine, FundingRecord, LegalScheduleExport, ParcelRecord, PersistedEngineState,
-    StreamingRecord, TelemetryRecord, TelemetrySeriesPoint,
+    compute_verified_love_per_kwh, load_or_init_state, load_or_init_state_with_mode, load_state,
+    save_state_atomic, ApiStateView, CommonsEngine, ExternalPublicKeysConfig, FundingRecord,
+    InProcessSigningKeys, LegalScheduleExport, ParcelRecord, PersistedEngineState, StreamingRecord,
+    TelemetryRecord, TelemetrySeriesPoint,
 };
 
 use std::collections::{HashMap, HashSet};

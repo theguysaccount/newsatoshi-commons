@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub const DEFAULT_SEED_STATUS_URL: &str = "https://newsatoshi-seed.fly.dev/status";
+pub const DEFAULT_MAINNET_SEED_STATUS_URL: &str = "https://newsatoshi.org/mainnet/status";
 pub const MAINNET_GENESIS_HASH: &str =
     "000000006ba30cc3c86ecaabcb962287e9d5fd0877c27f4b33661b4d1d3033f7";
 pub const TESTNET_GENESIS_HASH: &str =
@@ -77,7 +78,42 @@ fn default_auxpow_chainid() -> u32 {
     AUXPOW_CHAIN_ID
 }
 
-/// Verified Newsatoshi v0.1.0 mainnet genesis constants (inspected from newsatoshi-seed).
+/// Live on-chain hash-lock record returned by `GET /api/lock?hash=<64hex>` on Newsatoshi v0.1.0.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct L1LockRecord {
+    #[serde(default)]
+    pub found: bool,
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub state: String,
+    #[serde(default)]
+    pub confirmed: bool,
+    #[serde(default)]
+    pub amount: u64,
+    #[serde(default)]
+    pub hash: String,
+    #[serde(default)]
+    pub timeout: u64,
+    #[serde(default)]
+    pub claim: String,
+    #[serde(default)]
+    pub refund: String,
+    #[serde(default)]
+    pub at: u64,
+    #[serde(default)]
+    pub confirmations: u64,
+    #[serde(default)]
+    pub height: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct L1LockListResponse {
+    #[serde(default)]
+    locks: Vec<L1LockRecord>,
+}
+
+/// Verified Newsatoshi v0.1.0 mainnet genesis metadata (dynamically refreshed when live mainnet status responds).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MainnetInfo {
     pub network: String,
@@ -98,13 +134,33 @@ impl MainnetInfo {
             auxpow_chainid: AUXPOW_CHAIN_ID,
             block_reward_love: MAINNET_BLOCK_REWARD_LOVE,
             p2p_port: MAINNET_P2P_PORT,
-            note: "Newsatoshi v0.1.0 mainnet genesis (height 0, 50 LOVE/block, AuxPoW chainid 20051; seed does not self-mine mainnet).".to_string(),
+            note: "Newsatoshi v0.1.0 mainnet genesis (50 LOVE/block, AuxPoW chainid 20051, bits 1d00ffff; seeds do not self-mine mainnet).".to_string(),
+        }
+    }
+
+    pub fn from_live_status(s: &SeedStatus) -> Self {
+        let note = if s.height == 0 {
+            "Live Newsatoshi v0.1.0 mainnet node online at genesis height 0 (no premine; awaiting external SHA-256 / Bitcoin AuxPoW miners on chainid 20051).".to_string()
+        } else {
+            format!(
+                "Live Newsatoshi v{} mainnet active at height #{} (AuxPoW chainid {}, {} peers, {} locks).",
+                s.version, s.height, s.auxpow_chainid, s.peers, s.locks
+            )
+        };
+        Self {
+            network: s.network.clone(),
+            genesis: s.genesis.clone(),
+            height: s.height,
+            auxpow_chainid: s.auxpow_chainid,
+            block_reward_love: MAINNET_BLOCK_REWARD_LOVE,
+            p2p_port: MAINNET_P2P_PORT,
+            note,
         }
     }
 }
 
 /// Envelope returned by `GET /api/seed` and used by L1 anchor binding.
-/// When the seed is unreachable, `live` is `false`, `status` is `None`, and `error` reports why.
+/// When a seed is unreachable, `live` is `false`, `status` is `None`, and `error` reports why.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SeedSnapshot {
     pub live: bool,
@@ -112,11 +168,19 @@ pub struct SeedSnapshot {
     pub fetched_at_unix: u64,
     pub status: Option<SeedStatus>,
     pub mainnet_info: MainnetInfo,
+    #[serde(default)]
+    pub mainnet_live: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mainnet_endpoint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mainnet_status: Option<SeedStatus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mainnet_error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
 
-/// HTTP/HTTPS client polling a live Newsatoshi L1 seed `/status` endpoint via `ureq`.
+/// HTTP/HTTPS client polling a live Newsatoshi L1 seed `/status` and `/api/lock` endpoints via `ureq`.
 #[derive(Clone, Debug)]
 pub struct SeedStatusClient {
     pub endpoint_url: String,
@@ -135,10 +199,29 @@ impl SeedStatusClient {
         Self::new(DEFAULT_SEED_STATUS_URL, Duration::from_secs(5))
     }
 
+    pub fn default_mainnet() -> Self {
+        Self::new(DEFAULT_MAINNET_SEED_STATUS_URL, Duration::from_secs(5))
+    }
+
     /// Parses raw JSON text from `/status` into a typed `SeedStatus`.
     pub fn parse_status_json(json_str: &str) -> Result<SeedStatus, String> {
         serde_json::from_str::<SeedStatus>(json_str)
             .map_err(|e| format!("failed to parse newsatoshi-seed status JSON: {e}"))
+    }
+
+    /// Derives the corresponding `/api/lock?hash=<hash_hex>` URL from a `/status` endpoint URL.
+    ///
+    /// Examples:
+    /// - `https://newsatoshi-seed.fly.dev/status` -> `https://newsatoshi-seed.fly.dev/api/lock?hash=...`
+    /// - `https://newsatoshi.org/mainnet/status` -> `https://newsatoshi.org/mainnet/api/lock?hash=...`
+    pub fn lock_by_hash_url(&self, hash_hex: &str) -> String {
+        let trimmed = self.endpoint_url.trim_end_matches('/');
+        let base = if let Some(prefix) = trimmed.strip_suffix("/status") {
+            prefix
+        } else {
+            trimmed
+        };
+        format!("{base}/api/lock?hash={hash_hex}")
     }
 
     /// Fetches live JSON from the configured seed endpoint (strict timeout).
@@ -151,7 +234,7 @@ impl SeedStatusClient {
         let mut resp = agent
             .get(&self.endpoint_url)
             .header("Accept", "application/json")
-            .header("User-Agent", "newsatoshi-commons/0.3.0")
+            .header("User-Agent", "newsatoshi-commons/0.4.0")
             .call()
             .map_err(|e| format!("seed fetch from '{}' failed: {e}", self.endpoint_url))?;
 
@@ -163,26 +246,80 @@ impl SeedStatusClient {
         Self::parse_status_json(&body)
     }
 
+    /// Queries the live L1 node's `GET /api/lock?hash=<hash_hex>` endpoint to verify whether an
+    /// anchor hash is confirmed on-chain as a Newsatoshi SHA-256 hash-lock.
+    pub fn fetch_locks_for_hash(&self, hash_hex: &str) -> Result<Vec<L1LockRecord>, String> {
+        let url = self.lock_by_hash_url(hash_hex);
+        let config = ureq::Agent::config_builder()
+            .timeout_global(Some(self.timeout))
+            .build();
+        let agent: ureq::Agent = config.into();
+
+        let mut resp = agent
+            .get(&url)
+            .header("Accept", "application/json")
+            .header("User-Agent", "newsatoshi-commons/0.4.0")
+            .call()
+            .map_err(|e| format!("L1 lock verification fetch from '{url}' failed: {e}"))?;
+
+        let body = resp
+            .body_mut()
+            .read_to_string()
+            .map_err(|e| format!("failed to read L1 lock response body: {e}"))?;
+
+        let parsed = serde_json::from_str::<L1LockListResponse>(&body)
+            .map_err(|e| format!("failed to parse L1 /api/lock response JSON: {e}"))?;
+        Ok(parsed.locks)
+    }
+
     /// Fetches live seed status; returns `status: None` with the exact error if unreachable.
     pub fn fetch_snapshot(&self) -> SeedSnapshot {
+        self.fetch_dual_snapshot(None)
+    }
+
+    /// Polls primary (testnet) and optional live mainnet seed endpoints simultaneously.
+    pub fn fetch_dual_snapshot(&self, mainnet_client: Option<&SeedStatusClient>) -> SeedSnapshot {
         let now = unix_now();
-        match self.fetch() {
-            Ok(status) => SeedSnapshot {
-                live: true,
-                endpoint: self.endpoint_url.clone(),
-                fetched_at_unix: now,
-                status: Some(status),
-                mainnet_info: MainnetInfo::verified_v0_1_0(),
-                error: None,
-            },
-            Err(err) => SeedSnapshot {
-                live: false,
-                endpoint: self.endpoint_url.clone(),
-                fetched_at_unix: now,
-                status: None,
-                mainnet_info: MainnetInfo::verified_v0_1_0(),
-                error: Some(err),
-            },
+        let (live, status, error) = match self.fetch() {
+            Ok(s) => (true, Some(s), None),
+            Err(err) => (false, None, Some(err)),
+        };
+
+        let (mainnet_live, mainnet_endpoint, mainnet_status, mainnet_error, mainnet_info) =
+            match mainnet_client {
+                Some(mc) => match mc.fetch() {
+                    Ok(ms) => {
+                        let info = MainnetInfo::from_live_status(&ms);
+                        (
+                            true,
+                            Some(mc.endpoint_url.clone()),
+                            Some(ms),
+                            None,
+                            info,
+                        )
+                    }
+                    Err(merr) => (
+                        false,
+                        Some(mc.endpoint_url.clone()),
+                        None,
+                        Some(merr),
+                        MainnetInfo::verified_v0_1_0(),
+                    ),
+                },
+                None => (false, None, None, None, MainnetInfo::verified_v0_1_0()),
+            };
+
+        SeedSnapshot {
+            live,
+            endpoint: self.endpoint_url.clone(),
+            fetched_at_unix: now,
+            status,
+            mainnet_info,
+            mainnet_live,
+            mainnet_endpoint,
+            mainnet_status,
+            mainnet_error,
+            error,
         }
     }
 }

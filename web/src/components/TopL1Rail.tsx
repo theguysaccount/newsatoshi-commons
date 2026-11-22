@@ -11,6 +11,7 @@ interface TopL1RailProps {
 
 export function TopL1Rail({ seed, refreshing, onRefresh }: TopL1RailProps) {
   const s = seed?.live ? seed.status : null;
+  const ms = seed?.mainnet_live ? seed.mainnet_status : null;
   const m = seed?.mainnet_info ?? null;
 
   return (
@@ -105,23 +106,42 @@ export function TopL1Rail({ seed, refreshing, onRefresh }: TopL1RailProps) {
           )}
         </div>
 
-        {/* Right: Verified Mainnet Genesis Pill + Refresh */}
+        {/* Right: Live Mainnet Node Pill + Refresh */}
         <div className="flex items-center gap-2">
-          {m && (
+          {(ms || m) && (
             <div
-              className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[10px]"
-              title={m.note}
+              className={`flex items-center gap-2 rounded-full border px-2.5 py-0.5 text-[10px] ${
+                ms
+                  ? 'border-amber-500/45 bg-amber-500/15'
+                  : 'border-amber-500/30 bg-amber-500/10'
+              }`}
+              title={
+                ms
+                  ? `Live Mainnet (${seed?.mainnet_endpoint ?? 'newsatoshi.org/mainnet/status'}): height #${ms.height}, proofs=${ms.proofs ?? 'main'}, diff=${ms.difficulty}, peers=${ms.peers}`
+                  : m?.note
+              }
             >
-              <Lock className="h-3 w-3 text-amber-400 shrink-0" />
+              {ms ? (
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
+              ) : (
+                <Lock className="h-3 w-3 text-amber-400 shrink-0" />
+              )}
               <span className="font-semibold uppercase tracking-wide text-amber-200">
-                Mainnet Genesis
+                {ms ? 'Mainnet Live' : 'Mainnet Genesis'}
               </span>
-              <span className="font-mono text-amber-300/90">h={m.height}</span>
+              <span className="font-mono text-amber-300/95">
+                h={(ms?.height ?? m?.height ?? 0).toLocaleString()}
+              </span>
+              {ms?.proofs && (
+                <span className="hidden font-mono text-emerald-300/90 md:inline">
+                  proofs:{ms.proofs}
+                </span>
+              )}
               <span className="hidden font-mono text-slate-400 xl:inline">
-                {truncateHash(m.genesis, 8, 6)}
+                {truncateHash(ms?.tip || m?.genesis || '', 8, 6)}
               </span>
               <CopyButton
-                value={m.genesis}
+                value={ms?.tip || m?.genesis || ''}
                 className="border-0 bg-transparent px-0.5 py-0 text-amber-300 hover:bg-amber-500/20"
               />
             </div>

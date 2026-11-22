@@ -224,6 +224,12 @@ export function normalizeAnchorReceipt(raw: unknown, idx: number): AnchorReceipt
     cli_lock_command: asStr(r.cli_lock_command, ''),
     cli_memo_command: asStr(r.cli_send_memo_command ?? r.cli_memo_command, ''),
     timestamp_unix: asNum(r.created_at_unix ?? r.timestamp_unix, 0),
+    verified_on_l1: asBool(r.verified_on_l1, false),
+    l1_lock_id: r.l1_lock_id ? asHex(r.l1_lock_id) : null,
+    l1_confirmed_height: asNullableNum(r.l1_confirmed_height),
+    l1_confirmations: asNullableNum(r.l1_confirmations),
+    l1_lock_state: r.l1_lock_state ? asStr(r.l1_lock_state) : null,
+    l1_verified_at_unix: asNullableNum(r.l1_verified_at_unix),
   };
 }
 
@@ -255,6 +261,8 @@ export function normalizeCommonsState(raw: unknown): CommonsState {
   const r = asRec(raw);
   return {
     protocol_version: asStr(r.protocol_version, ''),
+    verify_only: asBool(r.verify_only, false),
+    signing_keys_loaded: asBool(r.signing_keys_loaded, false),
     covenant_rule: normalizeCovenantRule(r.covenant_rule),
     covenant_rule_hash: asHex(r.covenant_rule_hash, ''),
     ledger_summary: normalizeLedgerSummary(r.ledger_summary),
@@ -270,41 +278,47 @@ export function normalizeCommonsState(raw: unknown): CommonsState {
   };
 }
 
+function normalizeChainStatus(raw: unknown): SeedChainStatus | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const rs = asRec(raw);
+  return {
+    network: asStr(rs.network, ''),
+    proofs: rs.proofs ? asStr(rs.proofs) : undefined,
+    bits: rs.bits ? asStr(rs.bits) : undefined,
+    version: asStr(rs.version, ''),
+    height: asNum(rs.height, 0),
+    tip: asHex(rs.tip, ''),
+    genesis: asHex(rs.genesis, ''),
+    difficulty: asNum(rs.difficulty, 0),
+    peers: asNum(rs.peers, 0),
+    issued: asNum(rs.issued, 0),
+    notes: asNum(rs.notes, 0),
+    nullifiers: asNum(rs.nullifiers, 0),
+    locks: asNum(rs.locks, 0),
+    conditions: asNum(rs.conditions, 0),
+    auxpow_chainid: asNum(rs.auxpow_chainid, 0),
+    mempool: rs.mempool !== undefined ? asNum(rs.mempool, 0) : undefined,
+    chainwork: rs.chainwork ? asStr(rs.chainwork) : undefined,
+    recent: asArr(rs.recent).map((b): SeedRecentBlock => {
+      const br = asRec(b);
+      return {
+        height: asNum(br.height, 0),
+        hash: asHex(br.hash, ''),
+        time: asNum(br.time, 0),
+        txs: asNum(br.txs, 0),
+        bytes: asNum(br.bytes, 0),
+        merge_mined: asBool(br.merge_mined, false),
+      };
+    }),
+  };
+}
+
 export function normalizeSeedResponse(raw: unknown): SeedStatusResponse {
   const r = asRec(raw);
-  const rawStatus = r.status && typeof r.status === 'object' ? asRec(r.status) : null;
   const rawMain = r.mainnet_info && typeof r.mainnet_info === 'object' ? asRec(r.mainnet_info) : null;
 
-  const status: SeedChainStatus | null = rawStatus
-    ? {
-        network: asStr(rawStatus.network, ''),
-        version: asStr(rawStatus.version, ''),
-        height: asNum(rawStatus.height, 0),
-        tip: asHex(rawStatus.tip, ''),
-        genesis: asHex(rawStatus.genesis, ''),
-        difficulty: asNum(rawStatus.difficulty, 0),
-        peers: asNum(rawStatus.peers, 0),
-        issued: asNum(rawStatus.issued, 0),
-        notes: asNum(rawStatus.notes, 0),
-        nullifiers: asNum(rawStatus.nullifiers, 0),
-        locks: asNum(rawStatus.locks, 0),
-        conditions: asNum(rawStatus.conditions, 0),
-        auxpow_chainid: asNum(rawStatus.auxpow_chainid, 0),
-        mempool: rawStatus.mempool !== undefined ? asNum(rawStatus.mempool, 0) : undefined,
-        chainwork: rawStatus.chainwork ? asStr(rawStatus.chainwork) : undefined,
-        recent: asArr(rawStatus.recent).map((b): SeedRecentBlock => {
-          const br = asRec(b);
-          return {
-            height: asNum(br.height, 0),
-            hash: asHex(br.hash, ''),
-            time: asNum(br.time, 0),
-            txs: asNum(br.txs, 0),
-            bytes: asNum(br.bytes, 0),
-            merge_mined: asBool(br.merge_mined, false),
-          };
-        }),
-      }
-    : null;
+  const status = normalizeChainStatus(r.status);
+  const mainnet_status = normalizeChainStatus(r.mainnet_status);
 
   const mainnet_info: MainnetInfo | null = rawMain
     ? {
@@ -323,6 +337,10 @@ export function normalizeSeedResponse(raw: unknown): SeedStatusResponse {
     fetched_at_unix: asNum(r.fetched_at_unix, 0),
     status,
     mainnet_info,
+    mainnet_live: asBool(r.mainnet_live, false) && mainnet_status !== null,
+    mainnet_endpoint: r.mainnet_endpoint ? asStr(r.mainnet_endpoint) : null,
+    mainnet_status,
+    mainnet_error: r.mainnet_error ? asStr(r.mainnet_error) : null,
     error: r.error ? asStr(r.error) : null,
   };
 }
