@@ -249,7 +249,10 @@ impl SeedStatusClient {
     /// Queries the live L1 node's `GET /api/lock?hash=<hash_hex>` endpoint to verify whether an
     /// anchor hash is confirmed on-chain as a Newsatoshi SHA-256 hash-lock.
     pub fn fetch_locks_for_hash(&self, hash_hex: &str) -> Result<Vec<L1LockRecord>, String> {
-        let url = self.lock_by_hash_url(hash_hex);
+        let clean_bytes = crate::crypto::hash32_from_hex(hash_hex)
+            .map_err(|e| format!("invalid 64-hex hash for L1 lock lookup: {e}"))?;
+        let normalized = hex::encode(clean_bytes);
+        let url = self.lock_by_hash_url(&normalized);
         let config = ureq::Agent::config_builder()
             .timeout_global(Some(self.timeout))
             .build();

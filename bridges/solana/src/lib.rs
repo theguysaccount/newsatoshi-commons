@@ -63,6 +63,14 @@ impl SolanaHtlcEscrow {
         if b.len() < ESCROW_ACCOUNT_SIZE {
             return Err("escrow account data truncated");
         }
+        let status = b[145];
+        if status > EscrowStatus::Refunded as u8 {
+            return Err("invalid escrow status discriminant");
+        }
+        let is_spl = b[146];
+        if is_spl > 1 {
+            return Err("invalid is_spl boolean flag");
+        }
         Ok(Self {
             bump: b[0],
             sender: b[1..33].try_into().unwrap(),
@@ -71,8 +79,8 @@ impl SolanaHtlcEscrow {
             payment_hash: b[97..129].try_into().unwrap(),
             amount: u64::from_le_bytes(b[129..137].try_into().unwrap()),
             timelock_unix: i64::from_le_bytes(b[137..145].try_into().unwrap()),
-            status: b[145],
-            is_spl: b[146],
+            status,
+            is_spl,
         })
     }
 
@@ -81,11 +89,21 @@ impl SolanaHtlcEscrow {
         if self.status != EscrowStatus::Open as u8 {
             return Err("escrow already settled");
         }
+        if self.amount == 0 {
+            return Err("escrow amount must be > 0");
+        }
+        if self.payment_hash == [0u8; 32] {
+            return Err("escrow payment_hash cannot be all-zero");
+        }
         if now_unix >= self.timelock_unix {
             return Err("escrow timelock expired");
         }
         let digest: [u8; 32] = Sha256::digest(preimage).into();
-        if digest != self.payment_hash {
+        let mut diff = 0u8;
+        for i in 0..32 {
+            diff |= digest[i] ^ self.payment_hash[i];
+        }
+        if diff != 0 {
             return Err("invalid SHA-256 preimage");
         }
         Ok(())
@@ -95,6 +113,9 @@ impl SolanaHtlcEscrow {
     pub fn verify_refund(&self, now_unix: i64) -> Result<(), &'static str> {
         if self.status != EscrowStatus::Open as u8 {
             return Err("escrow already settled");
+        }
+        if self.amount == 0 {
+            return Err("escrow amount must be > 0");
         }
         if now_unix < self.timelock_unix {
             return Err("escrow timelock still active");
@@ -164,5 +185,23 @@ mod tests {
         // Refund before expiry rejected; refund at/after expiry succeeds
         assert!(decoded.verify_refund(1_799_999_999).is_err());
         assert!(decoded.verify_refund(1_800_000_000).is_ok());
+
+        // Security audit guards: reject invalid discriminants, zero amount, zero payment_hash
+        let mut bad_status = raw;
+        bad_status[145] = 9;
+        assert!(SolanaHtlcEscrow::from_bytes(&bad_status).is_err());
+
+        let mut bad_flag = raw;
+        bad_flag[146] = 2;
+        assert!(SolanaHtlcEscrow::from_bytes(&bad_flag).is_err());
+
+        let mut zero_amt = escrow.clone();
+        zero_amt.amount = 0;
+        assert!(zero_amt.verify_claim(&preimage, 1_799_999_000).is_err());
+        assert!(zero_amt.verify_refund(1_800_000_000).is_err());
+
+        let mut zero_hash = escrow;
+        zero_hash.payment_hash = [0u8; 32];
+        assert!(zero_hash.verify_claim(&preimage, 1_799_999_000).is_err());
     }
 }

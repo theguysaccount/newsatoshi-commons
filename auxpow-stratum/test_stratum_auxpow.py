@@ -169,8 +169,53 @@ class AuxPowStratumTests(unittest.TestCase):
                 self.assertEqual(srv.aux_blocks_accepted, 1)
                 self.assertEqual(srv.shares_accepted, 1)
 
+                # 5. Replay same share with uppercase hex -> MUST be rejected as duplicate (code 22)
+                await send(
+                    {
+                        "id": 5,
+                        "method": "mining.submit",
+                        "params": [
+                            "bitaxe.rig1",
+                            job_id,
+                            en2_hex.upper(),
+                            ntime_hex.upper(),
+                            f"{found_nonce:08X}",
+                        ],
+                    }
+                )
+                dup_resp = None
+                for _ in range(4):
+                    msg = await recv()
+                    if msg.get("id") == 5:
+                        dup_resp = msg
+                        break
+                self.assertIsNotNone(dup_resp)
+                self.assertFalse(dup_resp["result"])
+                self.assertEqual(dup_resp["error"][0], 22)
+
+                # 6. Malformed version-rolling mask & non-dict JSON frame handled safely without disconnect
+                await send(
+                    {
+                        "id": 6,
+                        "method": "mining.configure",
+                        "params": [["version-rolling"], {"version-rolling.mask": "not_hex"}],
+                    }
+                )
+                bad_cfg = await recv()
+                self.assertEqual(bad_cfg["id"], 6)
+                self.assertIsNotNone(bad_cfg["error"])
+
                 writer.close()
                 await writer.wait_closed()
+
+                # 7. Oversized line (> MAX_LINE_BYTES) drops client cleanly without crashing server
+                r2, w2 = await asyncio.open_connection("127.0.0.1", port)
+                w2.write(b"A" * (sa.MAX_LINE_BYTES + 256) + b"\n")
+                await w2.drain()
+                eof_data = await asyncio.wait_for(r2.read(16), timeout=5.0)
+                self.assertEqual(eof_data, b"")
+                w2.close()
+                await w2.wait_closed()
             finally:
                 tcp_server.close()
                 await tcp_server.wait_closed()

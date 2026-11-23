@@ -20,6 +20,8 @@ pub const TRACE_LENGTH: usize = 64;
 pub const TRACE_WIDTH: usize = 15;
 /// Minimum conjectured security bits required by `verify_covenant_stark`.
 pub const MIN_SECURITY_BITS: u32 = 95;
+/// Maximum accepted serialized Winterfell STARK proof size (128 KiB; genuine proofs are ~22 KiB).
+pub const MAX_PROOF_BYTES: usize = 131_072;
 
 type StarkHashFn = Blake3_256<BaseElement>;
 type StarkVC = MerkleTree<StarkHashFn>;
@@ -138,13 +140,41 @@ impl CovenantPublicInputs {
         }
     }
 
-    /// Validates all integer witness invariants before constructing the 63-bit decomposition trace.
-    fn compute_checked_slacks(&self) -> Result<(u64, u64), String> {
+    /// Validates public-input domain bounds and strict 32-byte hex encodings before
+    /// invoking Winterfell verification (prevents field aliasing, out-of-range parameters,
+    /// and silent zero-hash fallback on malformed hex strings).
+    pub fn validate_verifier_bounds(&self) -> Result<(), String> {
         let max_63 = (1u64 << 63) - 1;
-        if self.input_amount > max_63 || self.payout_amount > max_63 || self.change_amount > max_63
+        if self.input_amount > max_63
+            || self.payout_amount > max_63
+            || self.change_amount > max_63
+            || self.max_bounty_payout > max_63
         {
             return Err("amounts exceed 63-bit STARK range bound".to_string());
         }
+        if self.reinvest_bps > 10_000 {
+            return Err(format!(
+                "reinvest_bps {} exceeds 10000 (100%)",
+                self.reinvest_bps
+            ));
+        }
+        if self.soil_health_score > 100 || self.min_soil_health_score > 100 {
+            return Err("soil_health_score and min_soil_health_score must be <= 100".to_string());
+        }
+        let _ = hash32_from_hex(&self.covenant_rule_hash)
+            .map_err(|e| format!("invalid covenant_rule_hash: {e}"))?;
+        let _ = hash32_from_hex(&self.change_covenant_rule_hash)
+            .map_err(|e| format!("invalid change_covenant_rule_hash: {e}"))?;
+        let _ = hash32_from_hex(&self.prev_state_root)
+            .map_err(|e| format!("invalid prev_state_root: {e}"))?;
+        let _ = hash32_from_hex(&self.new_state_root)
+            .map_err(|e| format!("invalid new_state_root: {e}"))?;
+        Ok(())
+    }
+
+    /// Validates all integer witness invariants before constructing the 63-bit decomposition trace.
+    fn compute_checked_slacks(&self) -> Result<(u64, u64), String> {
+        self.validate_verifier_bounds()?;
         if self.payout_amount.checked_add(self.change_amount) != Some(self.input_amount) {
             return Err(format!(
                 "value conservation violated: input={} != payout={} + change={}",
@@ -158,11 +188,6 @@ impl CovenantPublicInputs {
         if rule_in != rule_out {
             return Err("recursive covenant continuity violated in STARK public inputs".to_string());
         }
-        // Validate state root hex encodings
-        let _ = hash32_from_hex(&self.prev_state_root)
-            .map_err(|e| format!("invalid prev_state_root: {e}"))?;
-        let _ = hash32_from_hex(&self.new_state_root)
-            .map_err(|e| format!("invalid new_state_root: {e}"))?;
 
         match self.tx_kind {
             CovenantTxKind::TelemetryBounty => {
@@ -641,9 +666,31 @@ pub fn prove_covenant_transition(
 
 /// Deserializes and cryptographically verifies a Winterfell 0.13 STARK proof against its public inputs.
 pub fn verify_covenant_stark(artifact: &StarkProofArtifact) -> Result<StarkVerifyResult, String> {
+    if let Err(err) = artifact.public_inputs.validate_verifier_bounds() {
+        return Ok(StarkVerifyResult {
+            proof_id: artifact.proof_id.clone(),
+            valid: false,
+            verify_ms: 0,
+            proof_bytes_len: 0,
+            security_bits: 0,
+            error: Some(err),
+        });
+    }
+    if artifact.proof_hex.len() > MAX_PROOF_BYTES * 2 {
+        return Err(format!(
+            "STARK proof hex length {} exceeds maximum {} bytes",
+            artifact.proof_hex.len() / 2,
+            MAX_PROOF_BYTES
+        ));
+    }
     let proof_bytes = hex::decode(&artifact.proof_hex)
         .map_err(|e| format!("invalid proof_hex encoding: {e}"))?;
     let proof_bytes_len = proof_bytes.len();
+    if proof_bytes_len > MAX_PROOF_BYTES {
+        return Err(format!(
+            "STARK proof byte length {proof_bytes_len} exceeds maximum {MAX_PROOF_BYTES}"
+        ));
+    }
 
     let proof = Proof::from_bytes(&proof_bytes)
         .map_err(|e| format!("failed to deserialize Winterfell proof bytes: {e}"))?;

@@ -1280,17 +1280,31 @@ pub struct DualChainSwapVerification {
     pub verified_at_unix: u64,
 }
 
-/// Fetches real unspent outputs at a Bitcoin P2WSH address from public `mempool.space` API.
+/// Fetches real unspent outputs at a Bitcoin P2WSH/SegWit address from public `mempool.space` API.
+/// Strictly validates Bech32 checksum + HRP (`bc` or `tb`) to eliminate URL path traversal / SSRF.
 pub fn fetch_btc_utxos_mempool(btc_address: &str) -> Result<(String, Vec<BtcUtxoRecord>), String> {
     let addr = btc_address.trim();
-    let url = if addr.starts_with("bc1") {
-        format!("https://mempool.space/api/address/{addr}/utxo")
-    } else if addr.starts_with("tb1") {
-        format!("https://mempool.space/testnet/api/address/{addr}/utxo")
-    } else if addr.starts_with("bcrt1") {
-        return Err("regtest addresses (bcrt1…) cannot be queried on public mempool.space".to_string());
-    } else {
-        return Err("btc_address must be a valid Bech32 SegWit address (bc1… or tb1…)".to_string());
+    if addr.starts_with("bcrt1") {
+        return Err(
+            "regtest addresses (bcrt1…) cannot be queried on public mempool.space".to_string(),
+        );
+    }
+    // Enforce strict Bech32 decoding (blocks '/', '?', '#', '..', whitespace, and corrupt checksums)
+    let (hrp, _data) = bech32_decode(addr, 90)
+        .map_err(|e| format!("invalid Bitcoin Bech32 address '{addr}': {e}"))?;
+    let clean_lower = addr.to_ascii_lowercase();
+    if !clean_lower.bytes().all(|b| b.is_ascii_alphanumeric()) {
+        return Err("Bitcoin address must contain only ASCII alphanumeric Bech32 characters".to_string());
+    }
+    let url = match hrp.as_str() {
+        "bc" => format!("https://mempool.space/api/address/{clean_lower}/utxo"),
+        "tb" => format!("https://mempool.space/testnet/api/address/{clean_lower}/utxo"),
+        _ => {
+            return Err(
+                "btc_address must be a valid Bitcoin mainnet (bc1…) or testnet (tb1…) Bech32 address"
+                    .to_string(),
+            )
+        }
     };
 
     let config = ureq::Agent::config_builder()

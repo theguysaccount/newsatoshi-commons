@@ -44,6 +44,8 @@ pub struct TelemetryReading {
     pub parcel_id: u64,
     pub kwh_delivered: u64,
     pub soil_health_score: u16,
+    #[serde(default)]
+    pub payout_love: u64,
     pub timestamp_unix: u64,
 }
 
@@ -83,6 +85,7 @@ impl SignedTelemetryPacket {
             self.reading.parcel_id,
             self.reading.kwh_delivered,
             self.reading.soil_health_score,
+            self.reading.payout_love,
         );
         expected_msg == self.msg_hash && self.signature.verify(self.hardware_root, expected_msg)
     }
@@ -193,6 +196,7 @@ impl ExternalTelemetryPacket {
             parcel_id,
             kwh_delivered,
             soil_health_score,
+            payout_love,
             nonce,
         );
         let sig = kp.sign_hash(msg_hash);
@@ -306,15 +310,20 @@ impl HardwareTelemetrySigner {
         self.keypair.total_capacity()
     }
 
-    /// Signs a live `kwh_delivered` & `soil_health_score` reading with the next unused leaf.
+    /// Signs a live `kwh_delivered`, `soil_health_score`, and bound `payout_love` with the next unused leaf.
     pub fn sign_telemetry(
         &mut self,
         kwh_delivered: u64,
         soil_health_score: u16,
+        payout_love: u64,
         timestamp_unix: u64,
     ) -> Result<SignedTelemetryPacket, MerkleSignError> {
-        let msg_hash =
-            CheckedWorkProof::energy_msg(self.parcel_id, kwh_delivered, soil_health_score);
+        let msg_hash = CheckedWorkProof::energy_msg(
+            self.parcel_id,
+            kwh_delivered,
+            soil_health_score,
+            payout_love,
+        );
         let signature = self.keypair.sign_next(msg_hash)?;
 
         Ok(SignedTelemetryPacket {
@@ -323,6 +332,7 @@ impl HardwareTelemetrySigner {
                 parcel_id: self.parcel_id,
                 kwh_delivered,
                 soil_health_score,
+                payout_love,
                 timestamp_unix,
             },
             hardware_root: self.keypair.root(),
@@ -368,7 +378,7 @@ impl ExternalDeedPacket {
         deed_document_hash: Hash32,
         nonce: u64,
     ) -> Self {
-        let msg = CheckedWorkProof::deed_msg_with_nonce(parcel_id, deed_document_hash, nonce);
+        let msg = CheckedWorkProof::deed_msg_with_nonce(parcel_id, deed_document_hash, price_love, nonce);
         let sig = kp.sign_hash(msg);
         Self {
             protocol: "NEWSATOSHI/2.1-DEED-ORACLE".to_string(),
@@ -394,7 +404,7 @@ impl ExternalDeedPacket {
         deed_label: impl Into<String>,
         deed_document_hash: Hash32,
     ) -> Result<Self, MerkleSignError> {
-        let msg = CheckedWorkProof::deed_msg(parcel_id, deed_document_hash);
+        let msg = CheckedWorkProof::deed_msg(parcel_id, deed_document_hash, price_love);
         let sig = kp.sign_next(msg)?;
         Ok(Self {
             protocol: "NEWSATOSHI/2.1-DEED-ORACLE".to_string(),

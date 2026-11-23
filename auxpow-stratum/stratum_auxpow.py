@@ -42,6 +42,11 @@ BIP320_VERSION_MASK = 0x1FFFE000
 DIFF1_TARGET = 0x00000000FFFF0000000000000000000000000000000000000000000000000000
 EXTRANONCE1_SIZE = 4
 EXTRANONCE2_SIZE = 4
+MAX_CLIENTS = 256
+MAX_LINE_BYTES = 4096
+CLIENT_IDLE_TIMEOUT = 300.0
+HTTP_STATUS_TIMEOUT = 5.0
+MAX_SHARES_PER_JOB = 50_000
 
 
 def sha256d(data: bytes) -> bytes:
@@ -249,6 +254,7 @@ class StratumJob:
     merkle_branch_internal: List[bytes]
     btc_raw_txs: List[bytes] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
+    submitted_shares: set = field(default_factory=set)
 
     def notify_params(self, clean_jobs: bool = True) -> List[Any]:
         return [
@@ -288,7 +294,6 @@ class AuxPowStratumServer:
         self.job_seq = 0
         self.extranonce_seq = 0
         self.clients: Dict[int, Dict[str, Any]] = {}
-        self.submitted_shares: set = set()
 
         # Genuine zero-initial-state telemetry counters (zero fake data)
         self.started_at = int(time.time())
@@ -471,6 +476,14 @@ class AuxPowStratumServer:
     async def handle_stratum_client(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
+        if len(self.clients) >= MAX_CLIENTS:
+            try:
+                writer.close()
+                await writer.wait_closed()
+            except Exception:
+                pass
+            return
+
         cid = id(writer)
         extranonce1 = self._next_extranonce1()
         client_state: Dict[str, Any] = {
@@ -486,8 +499,15 @@ class AuxPowStratumServer:
 
         try:
             while not reader.at_eof():
-                raw_line = await reader.readline()
+                try:
+                    raw_line = await asyncio.wait_for(
+                        reader.readline(), timeout=CLIENT_IDLE_TIMEOUT
+                    )
+                except (asyncio.TimeoutError, ValueError):
+                    break
                 if not raw_line:
+                    break
+                if len(raw_line) > MAX_LINE_BYTES:
                     break
                 line = raw_line.decode("utf-8", errors="replace").strip()
                 if not line:
@@ -496,10 +516,17 @@ class AuxPowStratumServer:
                     msg = json.loads(line)
                 except json.JSONDecodeError:
                     continue
+                if not isinstance(msg, dict):
+                    continue
 
                 req_id = msg.get("id")
                 method = msg.get("method", "")
                 params = msg.get("params") or []
+                if not isinstance(method, str) or not isinstance(params, list):
+                    await self._send_json(
+                        writer, {"id": req_id, "result": None, "error": [20, "invalid stratum frame", None]}
+                    )
+                    continue
 
                 if method == "mining.configure":
                     # BIP-320 version-rolling negotiation for Bitaxe / Antminer S19/S21
@@ -507,7 +534,15 @@ class AuxPowStratumServer:
                     ext_params = params[1] if len(params) > 1 and isinstance(params[1], dict) else {}
                     res: Dict[str, Any] = {}
                     if "version-rolling" in extensions:
-                        req_mask = int(ext_params.get("version-rolling.mask", f"{BIP320_VERSION_MASK:08x}"), 16)
+                        try:
+                            raw_mask = ext_params.get("version-rolling.mask", f"{BIP320_VERSION_MASK:08x}")
+                            req_mask = int(str(raw_mask), 16)
+                        except (ValueError, TypeError):
+                            await self._send_json(
+                                writer,
+                                {"id": req_id, "result": None, "error": [20, "invalid version-rolling.mask", None]},
+                            )
+                            continue
                         granted = req_mask & BIP320_VERSION_MASK
                         client_state["version_mask"] = granted
                         res["version-rolling"] = True
@@ -579,7 +614,7 @@ class AuxPowStratumServer:
             return False, [20, "invalid submit params", None]
 
         worker, job_id, extranonce2_hex, ntime_hex, nonce_hex = (
-            str(params[0]),
+            str(params[0])[:128],
             str(params[1]),
             str(params[2]),
             str(params[3]),
@@ -599,6 +634,8 @@ class AuxPowStratumServer:
                 raise ValueError("bad extranonce2 size")
             ntime = int(ntime_hex, 16)
             nonce = int(nonce_hex, 16)
+            if not (0 <= ntime <= 0xFFFFFFFF and 0 <= nonce <= 0xFFFFFFFF):
+                raise ValueError("ntime/nonce out of uint32 range")
             version = job.parent_version
             if version_bits_hex:
                 vb = int(version_bits_hex, 16)
@@ -611,13 +648,16 @@ class AuxPowStratumServer:
             self.shares_rejected += 1
             return False, [20, f"malformed share: {exc}", None]
 
-        share_key = (job_id, client["extranonce1"], extranonce2_hex, ntime_hex, nonce_hex, version)
-        if share_key in self.submitted_shares:
+        # Canonical per-job deduplication key (normalized lowercase + uint32 values;
+        # evicted only when the job itself leaves the 16-job window, preventing intra-job replay).
+        share_key = (client["extranonce1"], en2, ntime, nonce, version)
+        if share_key in job.submitted_shares:
             self.shares_rejected += 1
             return False, [22, "duplicate share", None]
-        self.submitted_shares.add(share_key)
-        if len(self.submitted_shares) > 10_000:
-            self.submitted_shares.clear()
+        if len(job.submitted_shares) >= MAX_SHARES_PER_JOB:
+            self.shares_rejected += 1
+            return False, [20, "job share cap reached", None]
+        job.submitted_shares.add(share_key)
 
         coinbase = job.coinb1 + en1 + en2 + job.coinb2
         cb_txid = sha256d(coinbase)
@@ -689,11 +729,15 @@ class AuxPowStratumServer:
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
         try:
-            await reader.read(2048)
+            try:
+                await asyncio.wait_for(reader.read(2048), timeout=HTTP_STATUS_TIMEOUT)
+            except asyncio.TimeoutError:
+                return
             body = json.dumps(self.status_dict(), indent=2).encode("utf-8")
             resp = (
                 b"HTTP/1.1 200 OK\r\n"
                 b"Content-Type: application/json\r\n"
+                b"X-Content-Type-Options: nosniff\r\n"
                 b"Access-Control-Allow-Origin: *\r\n"
                 + f"Content-Length: {len(body)}\r\n".encode("ascii")
                 + b"Connection: close\r\n\r\n"
@@ -701,6 +745,8 @@ class AuxPowStratumServer:
             )
             writer.write(resp)
             await writer.drain()
+        except Exception:
+            pass
         finally:
             try:
                 writer.close()
@@ -745,8 +791,12 @@ async def run_server(args: argparse.Namespace) -> None:
         server.last_error = str(exc)
         print(f"[auxpow-stratum] waiting for newsatoshi node RPC: {exc}", flush=True)
 
-    stratum_srv = await asyncio.start_server(server.handle_stratum_client, args.bind, args.stratum_port)
-    status_srv = await asyncio.start_server(server.handle_http_status, args.bind, args.status_port)
+    stratum_srv = await asyncio.start_server(
+        server.handle_stratum_client, args.bind, args.stratum_port, limit=MAX_LINE_BYTES
+    )
+    status_srv = await asyncio.start_server(
+        server.handle_http_status, args.bind, args.status_port, limit=4096
+    )
 
     print(
         f"[auxpow-stratum] listening stratum+tcp://{args.bind}:{args.stratum_port} "

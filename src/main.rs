@@ -418,7 +418,7 @@ fn run_simulate(args: &[String]) -> Result<(), String> {
     // 3. Adversarial Guard #1: Attempt to strip the recursive covenant on change output
     let parcel1_deed = sha256(b"COUNTY_DEED_PARCEL_404_PERPETUAL_PURPOSE_TRUST_SEC_4_2");
     let parcel1_sig = deed_oracle
-        .sign_next(CheckedWorkProof::deed_msg(404, parcel1_deed))
+        .sign_next(CheckedWorkProof::deed_msg(404, parcel1_deed, 40_000))
         .map_err(|e| e.to_string())?;
 
     let mut blocked = Vec::new();
@@ -462,7 +462,7 @@ fn run_simulate(args: &[String]) -> Result<(), String> {
 
     // 6. Adversarial Guard #3: Degraded soil health (62 < 80) MUST be rejected
     let degraded_packet = hw_signer
-        .sign_telemetry(5_000, 62, 1_795_200_100)
+        .sign_telemetry(5_000, 62, 5_000, 1_795_200_100)
         .map_err(|e| e.to_string())?;
     let soil_err = ledger
         .spend_covenant(
@@ -482,7 +482,7 @@ fn run_simulate(args: &[String]) -> Result<(), String> {
         (14_200u64, 94u16, 10_000u64, 1_795_203_800u64),
     ] {
         let packet = hw_signer
-            .sign_telemetry(kwh, soil, ts)
+            .sign_telemetry(kwh, soil, bounty, ts)
             .map_err(|e| e.to_string())?;
         assert!(packet.verify(), "signed hardware packet must self-verify");
         let (_, next_change) = ledger
@@ -501,7 +501,7 @@ fn run_simulate(args: &[String]) -> Result<(), String> {
     // Third telemetry bounty signed via NIST FIPS 205 SLH-DSA-SHA2-128f + proved via Winterfell STARK!
     let prev_root_before_slh = hex::encode(ledger.state_root);
     let balance_before_slh = ledger.total_covenant_balance(&rule);
-    let slh_msg = CheckedWorkProof::energy_msg_with_nonce(404, 15_800, 95, 0);
+    let slh_msg = CheckedWorkProof::energy_msg_with_nonce(404, 15_800, 95, 10_000, 0);
     let slh_sig = hw_slh.sign_hash(slh_msg);
     let (_, next_change) = ledger
         .spend_covenant(
@@ -567,7 +567,7 @@ fn run_simulate(args: &[String]) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     let parcel2_deed = sha256(b"COUNTY_DEED_PARCEL_405_ADJACENT_ACREAGE_TRUST");
-    let parcel2_msg = CheckedWorkProof::deed_msg_with_nonce(405, parcel2_deed, 0);
+    let parcel2_msg = CheckedWorkProof::deed_msg_with_nonce(405, parcel2_deed, 45_000, 0);
     let parcel2_slh_sig = deed_slh.sign_hash(parcel2_msg);
 
     ledger
@@ -710,7 +710,7 @@ fn run_telemetry_sign(args: &[String]) -> Result<(), String> {
     for i in 0..count {
         let reading_kwh = kwh.saturating_add(u64::from(i) * 250);
         let packet = signer
-            .sign_telemetry(reading_kwh, soil, base_ts + u64::from(i) * 60)
+            .sign_telemetry(reading_kwh, soil, bounty, base_ts + u64::from(i) * 60)
             .map_err(|e| e.to_string())?;
         if !packet.verify() {
             return Err("internal verification failure on freshly signed packet".to_string());

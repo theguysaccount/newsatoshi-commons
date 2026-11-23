@@ -88,7 +88,7 @@ struct AppState {
 
 impl AppState {
     fn get_seed_snapshot(&self, force_refresh: bool) -> SeedSnapshot {
-        let mut cache = self.seed_cache.lock().unwrap();
+        let mut cache = self.seed_cache.lock().unwrap_or_else(|e| e.into_inner());
         if !force_refresh {
             if let Some(ref c) = *cache {
                 if c.fetched_at.elapsed() < Duration::from_secs(5) {
@@ -288,6 +288,9 @@ pub fn run_server_blocking(config: ServerConfig) -> Result<(), String> {
     Ok(())
 }
 
+/// Hard cap on inbound HTTP POST request body size (1 MiB) to prevent unauthenticated OOM DoS.
+const MAX_HTTP_BODY_BYTES: u64 = 1_048_576;
+
 fn cors_headers() -> Vec<Header> {
     vec![
         Header::from_bytes("Access-Control-Allow-Origin", "*").unwrap(),
@@ -297,6 +300,9 @@ fn cors_headers() -> Vec<Header> {
             "Content-Type, Authorization, Accept, Mcp-Session-Id, X-Newsatoshi-Payment, X-Newsatoshi-PayWord",
         )
         .unwrap(),
+        Header::from_bytes("X-Content-Type-Options", "nosniff").unwrap(),
+        Header::from_bytes("X-Frame-Options", "DENY").unwrap(),
+        Header::from_bytes("Referrer-Policy", "no-referrer").unwrap(),
     ]
 }
 
@@ -311,13 +317,22 @@ fn respond_text(req: Request, status: u16, content_type: &str, body: String) {
     let _ = req.respond(resp);
 }
 
+fn is_valid_host_header(h: &str) -> bool {
+    !h.is_empty()
+        && h.len() <= 128
+        && h.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b':' | b'[' | b']'))
+        && !h.starts_with('.')
+        && !h.contains("..")
+}
+
 fn infer_base_url(req: &Request) -> String {
     let host = req
         .headers()
         .iter()
         .find(|h| h.field.equiv("Host"))
         .map(|h| h.value.as_str().trim())
-        .filter(|h| !h.is_empty());
+        .filter(|h| is_valid_host_header(h));
     let proto = req
         .headers()
         .iter()
@@ -382,11 +397,25 @@ fn respond_empty(req: Request, status: u16) {
 }
 
 fn read_body_string(req: &mut Request) -> Result<String, String> {
-    let mut body = String::new();
+    use std::io::Read;
+    if let Some(len) = req.body_length() {
+        if (len as u64) > MAX_HTTP_BODY_BYTES {
+            return Err(format!(
+                "request body too large ({len} bytes > {MAX_HTTP_BODY_BYTES} byte limit)"
+            ));
+        }
+    }
+    let mut buf = Vec::new();
     req.as_reader()
-        .read_to_string(&mut body)
+        .take(MAX_HTTP_BODY_BYTES + 1)
+        .read_to_end(&mut buf)
         .map_err(|e| format!("failed to read HTTP request body: {e}"))?;
-    Ok(body)
+    if (buf.len() as u64) > MAX_HTTP_BODY_BYTES {
+        return Err(format!(
+            "request body exceeds maximum allowed size of {MAX_HTTP_BODY_BYTES} bytes"
+        ));
+    }
+    String::from_utf8(buf).map_err(|_| "HTTP request body must be valid UTF-8".to_string())
 }
 
 fn is_authorized_operator(req: &Request, state: &AppState) -> bool {
@@ -443,7 +472,7 @@ fn handle_request(mut req: Request, state: &AppState) {
         (Method::Get, "/llms.txt") => {
             let base_url = infer_base_url(&req);
             let seed = state.get_seed_snapshot(false);
-            let api_state = state.engine.lock().unwrap().to_api_state();
+            let api_state = state.engine.lock().unwrap_or_else(|e| e.into_inner()).to_api_state();
             respond_text(
                 req,
                 200,
@@ -454,7 +483,7 @@ fn handle_request(mut req: Request, state: &AppState) {
         (Method::Get, "/llms-full.txt") => {
             let base_url = infer_base_url(&req);
             let seed = state.get_seed_snapshot(false);
-            let api_state = state.engine.lock().unwrap().to_api_state();
+            let api_state = state.engine.lock().unwrap_or_else(|e| e.into_inner()).to_api_state();
             respond_text(
                 req,
                 200,
@@ -464,7 +493,7 @@ fn handle_request(mut req: Request, state: &AppState) {
         }
         (Method::Get, "/.well-known/agent.json") => {
             let base_url = infer_base_url(&req);
-            let api_state = state.engine.lock().unwrap().to_api_state();
+            let api_state = state.engine.lock().unwrap_or_else(|e| e.into_inner()).to_api_state();
             respond_json(req, 200, &render_agent_card_json(&base_url, &api_state));
         }
         (Method::Get, "/.well-known/mcp.json") => {
@@ -510,7 +539,7 @@ fn handle_request(mut req: Request, state: &AppState) {
                 .and_then(|b| b.as_bool())
                 .unwrap_or(false);
             let seed = state.get_seed_snapshot(force_refresh);
-            let engine = state.engine.lock().unwrap();
+            let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
             let (status, maybe_body) = handle_mcp_jsonrpc(
                 &rpc_val,
                 &base_url,
@@ -526,25 +555,47 @@ fn handle_request(mut req: Request, state: &AppState) {
             }
         }
         (Method::Get, "/api/agent/402-challenge") => {
-            let resource = query_param(&raw_url, "resource").unwrap_or_else(|| "/api/inference".to_string());
-            let amount = query_param(&raw_url, "amount_love").unwrap_or_else(|| "0.01".to_string());
-            let network = query_param(&raw_url, "network").unwrap_or_else(|| "mainnet".to_string());
-            let recipient = query_param(&raw_url, "to").unwrap_or_default();
+            let resource = query_param(&raw_url, "resource")
+                .filter(|r| {
+                    !r.is_empty()
+                        && r.len() <= 128
+                        && r.bytes()
+                            .all(|b| b.is_ascii_graphic() && b != b'"' && b != b'\\')
+                })
+                .unwrap_or_else(|| "/api/inference".to_string());
+            let amount = query_param(&raw_url, "amount_love")
+                .filter(|a| {
+                    !a.is_empty()
+                        && a.len() <= 20
+                        && a.bytes().all(|b| b.is_ascii_digit() || b == b'.')
+                        && a.bytes().filter(|&b| b == b'.').count() <= 1
+                })
+                .unwrap_or_else(|| "0.01".to_string());
+            let network = match query_param(&raw_url, "network")
+                .as_deref()
+                .map(str::trim)
+            {
+                Some("testnet") => "testnet".to_string(),
+                _ => "mainnet".to_string(),
+            };
+            let recipient = query_param(&raw_url, "to")
+                .filter(|a| a.len() <= 128 && a.bytes().all(|b| b.is_ascii_alphanumeric()))
+                .unwrap_or_default();
             let unit_price = query_param(&raw_url, "unit_price")
                 .and_then(|v| v.parse::<u64>().ok())
+                .filter(|&v| v > 0)
                 .unwrap_or(1_000);
             let challenge = build_http_402_challenge(&resource, &amount, &network, &recipient, unit_price);
             let body = serde_json::to_vec(&challenge).unwrap_or_else(|_| b"{}".to_vec());
             let mut resp = Response::from_data(body)
                 .with_status_code(StatusCode(402))
-                .with_header(Header::from_bytes("Content-Type", "application/json; charset=utf-8").unwrap())
-                .with_header(
-                    Header::from_bytes(
-                        "WWW-Authenticate",
-                        format!("Newsatoshi-402 realm=\"newsatoshi\", network=\"{network}\", amount=\"{amount}\""),
-                    )
-                    .unwrap(),
-                );
+                .with_header(Header::from_bytes("Content-Type", "application/json; charset=utf-8").unwrap());
+            if let Ok(www_auth) = Header::from_bytes(
+                "WWW-Authenticate",
+                format!("Newsatoshi-402 realm=\"newsatoshi\", network=\"{network}\", amount=\"{amount}\""),
+            ) {
+                resp = resp.with_header(www_auth);
+            }
             for h in cors_headers() {
                 resp = resp.with_header(h);
             }
@@ -614,7 +665,7 @@ fn handle_request(mut req: Request, state: &AppState) {
         (Method::Get, "/api/health") => {
             let uptime_secs = state.started_at.elapsed().as_secs();
             let signing_keys_loaded = {
-                let engine = state.engine.lock().unwrap();
+                let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
                 engine.has_signing_keys()
             };
             respond_json(
@@ -634,7 +685,7 @@ fn handle_request(mut req: Request, state: &AppState) {
         }
         (Method::Get, "/api/state") => {
             let api_state = {
-                let engine = state.engine.lock().unwrap();
+                let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
                 engine.to_api_state()
             };
             respond_json(req, 200, &api_state);
@@ -645,7 +696,7 @@ fn handle_request(mut req: Request, state: &AppState) {
             respond_json(req, 200, &snapshot);
         }
         (Method::Get, "/api/swaps") => {
-            let engine = state.engine.lock().unwrap();
+            let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
             respond_json(
                 req,
                 200,
@@ -1002,7 +1053,7 @@ fn handle_request(mut req: Request, state: &AppState) {
             if path == "/" && wants_markdown(&req) {
                 let base_url = infer_base_url(&req);
                 let seed = state.get_seed_snapshot(false);
-                let api_state = state.engine.lock().unwrap().to_api_state();
+                let api_state = state.engine.lock().unwrap_or_else(|e| e.into_inner()).to_api_state();
                 respond_text(
                     req,
                     200,
@@ -1051,7 +1102,7 @@ struct RecordFundingResponse {
 }
 
 fn handle_record_funding(state: &AppState, req: RecordFundingRequest) -> RecordFundingResponse {
-    let mut engine = state.engine.lock().unwrap();
+    let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
     let net = req.l1_network.trim().to_ascii_lowercase();
     if net != "testnet" && net != "mainnet" && net != "regtest" {
         return RecordFundingResponse {
@@ -1127,7 +1178,7 @@ fn handle_confirm_anchor(state: &AppState, req: ConfirmAnchorRequest) -> Confirm
     let txid_bytes = match crate::crypto::hash32_from_hex(&req.l1_txid) {
         Ok(b) => b,
         Err(e) => {
-            let engine = state.engine.lock().unwrap();
+            let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
             return ConfirmAnchorResponse {
                 ok: false,
                 receipt: None,
@@ -1140,7 +1191,7 @@ fn handle_confirm_anchor(state: &AppState, req: ConfirmAnchorRequest) -> Confirm
     let target = req.anchor_hash.trim().to_ascii_lowercase();
 
     let receipt_network = {
-        let engine = state.engine.lock().unwrap();
+        let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
         engine
             .anchor_receipts
             .iter()
@@ -1148,7 +1199,7 @@ fn handle_confirm_anchor(state: &AppState, req: ConfirmAnchorRequest) -> Confirm
             .map(|r| r.network.clone())
     };
     let Some(network) = receipt_network else {
-        let engine = state.engine.lock().unwrap();
+        let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
         return ConfirmAnchorResponse {
             ok: false,
             receipt: None,
@@ -1162,7 +1213,7 @@ fn handle_confirm_anchor(state: &AppState, req: ConfirmAnchorRequest) -> Confirm
         .client_for_network(&network)
         .and_then(|c| c.fetch_locks_for_hash(&target).ok());
 
-    let mut engine = state.engine.lock().unwrap();
+    let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
     let Some(receipt) = engine
         .anchor_receipts
         .iter_mut()
@@ -1220,7 +1271,7 @@ struct VerifyAnchorResponse {
 
 fn handle_verify_anchor(state: &AppState, req: VerifyAnchorRequest) -> VerifyAnchorResponse {
     let target_info = {
-        let engine = state.engine.lock().unwrap();
+        let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
         let found = match req.anchor_hash.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
             Some(h) => engine
                 .anchor_receipts
@@ -1232,7 +1283,7 @@ fn handle_verify_anchor(state: &AppState, req: VerifyAnchorRequest) -> VerifyAnc
     };
 
     let Some((anchor_hash, network)) = target_info else {
-        let engine = state.engine.lock().unwrap();
+        let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
         return VerifyAnchorResponse {
             ok: false,
             verified_on_l1: false,
@@ -1244,7 +1295,7 @@ fn handle_verify_anchor(state: &AppState, req: VerifyAnchorRequest) -> VerifyAnc
     };
 
     let Some(client) = state.client_for_network(&network) else {
-        let engine = state.engine.lock().unwrap();
+        let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
         return VerifyAnchorResponse {
             ok: false,
             verified_on_l1: false,
@@ -1258,7 +1309,7 @@ fn handle_verify_anchor(state: &AppState, req: VerifyAnchorRequest) -> VerifyAnc
     let locks = match client.fetch_locks_for_hash(&anchor_hash) {
         Ok(l) => l,
         Err(e) => {
-            let engine = state.engine.lock().unwrap();
+            let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
             return VerifyAnchorResponse {
                 ok: false,
                 verified_on_l1: false,
@@ -1270,7 +1321,7 @@ fn handle_verify_anchor(state: &AppState, req: VerifyAnchorRequest) -> VerifyAnc
         }
     };
 
-    let mut engine = state.engine.lock().unwrap();
+    let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
     let Some(receipt) = engine
         .anchor_receipts
         .iter_mut()
@@ -1335,7 +1386,7 @@ struct AcquireParcelResponse {
 }
 
 fn handle_acquire_parcel(state: &AppState, req: AcquireParcelRequest) -> AcquireParcelResponse {
-    let mut engine = state.engine.lock().unwrap();
+    let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
     if req.parcel_id == 0 {
         return AcquireParcelResponse {
             ok: false,
@@ -1430,7 +1481,8 @@ fn handle_acquire_parcel(state: &AppState, req: AcquireParcelRequest) -> Acquire
         match scheme.as_str() {
             "slh_dsa" => {
                 let nonce = keys.deed_oracle_slh_next_nonce;
-                let msg = CheckedWorkProof::deed_msg_with_nonce(parcel_id, deed_doc_hash, nonce);
+                let msg =
+                    CheckedWorkProof::deed_msg_with_nonce(parcel_id, deed_doc_hash, price_love, nonce);
                 let sig = keys.deed_oracle_slh.sign_hash(msg);
                 (
                     CheckedWorkProof::slh_dsa_land_deed(
@@ -1445,7 +1497,7 @@ fn handle_acquire_parcel(state: &AppState, req: AcquireParcelRequest) -> Acquire
                 )
             }
             _ => {
-                let msg = CheckedWorkProof::deed_msg(parcel_id, deed_doc_hash);
+                let msg = CheckedWorkProof::deed_msg(parcel_id, deed_doc_hash, price_love);
                 let sig = match keys.deed_oracle_xmss.sign_next(msg) {
                     Ok(s) => s,
                     Err(e) => {
@@ -1573,7 +1625,7 @@ fn handle_acquire_parcel(state: &AppState, req: AcquireParcelRequest) -> Acquire
 }
 
 fn handle_external_deed(state: &AppState, pkt: ExternalDeedPacket) -> AcquireParcelResponse {
-    let mut engine = state.engine.lock().unwrap();
+    let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
     if pkt.parcel_id == 0 {
         return AcquireParcelResponse {
             ok: false,
@@ -1787,7 +1839,7 @@ fn handle_simulated_telemetry(
     state: &AppState,
     req: TelemetryActionRequest,
 ) -> TelemetryActionResponse {
-    let mut engine = state.engine.lock().unwrap();
+    let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
     let attack = req
         .simulate_attack
         .as_deref()
@@ -1874,37 +1926,43 @@ fn handle_simulated_telemetry(
 
     // Handle explicit replay attack cleanly without corrupting live signer cursors
     if attack == "replay_leaf" {
+        let safe_payout = payout_love.min(rule_clone.max_bounty_payout).min(input_amount).max(1);
+        let sandbox_payout = safe_payout.min(input_amount / 2).max(1);
         let err_msg = match scheme.as_str() {
             "slh_dsa" => {
-                let (commit, proof) = {
+                let commit = engine.signing_keys.as_ref().unwrap().hardware_slh.pk.commitment();
+                let target_payout = if engine.ledger.next_slh_nonce_watermark(commit) > 0 {
+                    safe_payout
+                } else {
+                    sandbox_payout
+                };
+                let proof = {
                     let keys = engine.signing_keys.as_ref().unwrap();
-                    let commit = keys.hardware_slh.pk.commitment();
                     let replay_nonce = 0u64;
                     let msg = CheckedWorkProof::energy_msg_with_nonce(
                         parcel_id,
                         kwh_delivered.max(1),
                         soil_health_score.max(rule_clone.min_soil_health_score),
+                        target_payout,
                         replay_nonce,
                     );
                     let sig = keys.hardware_slh.sign_hash(msg);
-                    let proof = CheckedWorkProof::slh_dsa_energy_deployment(
+                    CheckedWorkProof::slh_dsa_energy_deployment(
                         parcel_id,
                         kwh_delivered.max(1),
                         soil_health_score.max(rule_clone.min_soil_health_score),
                         replay_nonce,
                         keys.hardware_slh.pk.clone(),
                         sig,
-                    );
-                    (commit, proof)
+                    )
                 };
-                let safe_payout = payout_love.min(rule_clone.max_bounty_payout).min(input_amount).max(1);
                 if engine.ledger.next_slh_nonce_watermark(commit) > 0 {
                     engine
                         .ledger
                         .spend_covenant(
                             input_ref,
                             &rule_clone,
-                            safe_payout,
+                            target_payout,
                             &device_id,
                             Some(rule_clone.rule_hash()),
                             proof,
@@ -1917,7 +1975,7 @@ fn handle_simulated_telemetry(
                         .spend_covenant(
                             input_ref,
                             &rule_clone,
-                            safe_payout.min(input_amount / 2).max(1),
+                            target_payout,
                             &device_id,
                             Some(rule_clone.rule_hash()),
                             proof.clone(),
@@ -1928,7 +1986,7 @@ fn handle_simulated_telemetry(
                         .spend_covenant(
                             next_ref,
                             &rule_clone,
-                            safe_payout.min(input_amount / 2).max(1),
+                            target_payout,
                             &device_id,
                             Some(rule_clone.rule_hash()),
                             proof,
@@ -1938,34 +1996,38 @@ fn handle_simulated_telemetry(
                 }
             }
             _ => {
-                let (root, proof) = {
+                let root = engine.signing_keys.as_ref().unwrap().hardware_xmss.root();
+                let target_payout = if engine.ledger.next_merkle_leaf_watermark(root) > 0 {
+                    safe_payout
+                } else {
+                    sandbox_payout
+                };
+                let proof = {
                     let keys = engine.signing_keys.as_ref().unwrap();
-                    let root = keys.hardware_xmss.root();
                     let msg = CheckedWorkProof::energy_msg(
                         parcel_id,
                         kwh_delivered.max(1),
                         soil_health_score.max(rule_clone.min_soil_health_score),
+                        target_payout,
                     );
                     let replay_sig = keys
                         .hardware_xmss
                         .sign_at_index_unchecked(0, msg)
                         .expect("leaf 0 exists");
-                    let proof = CheckedWorkProof::merkle_energy_deployment(
+                    CheckedWorkProof::merkle_energy_deployment(
                         parcel_id,
                         kwh_delivered.max(1),
                         soil_health_score.max(rule_clone.min_soil_health_score),
                         replay_sig,
-                    );
-                    (root, proof)
+                    )
                 };
-                let safe_payout = payout_love.min(rule_clone.max_bounty_payout).min(input_amount).max(1);
                 if engine.ledger.next_merkle_leaf_watermark(root) > 0 {
                     engine
                         .ledger
                         .spend_covenant(
                             input_ref,
                             &rule_clone,
-                            safe_payout,
+                            target_payout,
                             &device_id,
                             Some(rule_clone.rule_hash()),
                             proof,
@@ -1978,7 +2040,7 @@ fn handle_simulated_telemetry(
                         .spend_covenant(
                             input_ref,
                             &rule_clone,
-                            safe_payout.min(input_amount / 2).max(1),
+                            target_payout,
                             &device_id,
                             Some(rule_clone.rule_hash()),
                             proof.clone(),
@@ -1989,7 +2051,7 @@ fn handle_simulated_telemetry(
                         .spend_covenant(
                             next_ref,
                             &rule_clone,
-                            safe_payout.min(input_amount / 2).max(1),
+                            target_payout,
                             &device_id,
                             Some(rule_clone.rule_hash()),
                             proof,
@@ -2029,6 +2091,16 @@ fn handle_simulated_telemetry(
         };
     }
 
+    let proposed_change_covenant = if attack == "strip_covenant" {
+        // Ensure change > 0 so covenant-stripping check fires cleanly
+        if payout_love >= input_amount && input_amount > 1 {
+            payout_love = (input_amount / 2).min(rule_clone.max_bounty_payout);
+        }
+        None
+    } else {
+        Some(rule_clone.rule_hash())
+    };
+
     // Build proof without prematurely advancing XMSS leaf cursor if the transaction rejects
     let (proof, leaf_index, slh_nonce) = {
         let keys = engine.signing_keys.as_ref().unwrap();
@@ -2039,6 +2111,7 @@ fn handle_simulated_telemetry(
                     parcel_id,
                     kwh_delivered,
                     soil_health_score,
+                    payout_love,
                     nonce,
                 );
                 let sig = keys.hardware_slh.sign_hash(msg);
@@ -2057,7 +2130,12 @@ fn handle_simulated_telemetry(
             }
             _ => {
                 let idx = keys.hardware_xmss.next_index();
-                let msg = CheckedWorkProof::energy_msg(parcel_id, kwh_delivered, soil_health_score);
+                let msg = CheckedWorkProof::energy_msg(
+                    parcel_id,
+                    kwh_delivered,
+                    soil_health_score,
+                    payout_love,
+                );
                 let sig = match keys.hardware_xmss.sign_at_index_unchecked(idx, msg) {
                     Ok(s) => s,
                     Err(e) => {
@@ -2083,16 +2161,6 @@ fn handle_simulated_telemetry(
                 )
             }
         }
-    };
-
-    let proposed_change_covenant = if attack == "strip_covenant" {
-        // Ensure change > 0 so covenant-stripping check fires cleanly
-        if payout_love >= input_amount && input_amount > 1 {
-            payout_love = (input_amount / 2).min(rule_clone.max_bounty_payout);
-        }
-        None
-    } else {
-        Some(rule_clone.rule_hash())
     };
 
     let prev_state_root_hex = hex::encode(engine.ledger.state_root);
@@ -2226,7 +2294,7 @@ fn handle_external_telemetry(
     state: &AppState,
     pkt: ExternalTelemetryPacket,
 ) -> TelemetryActionResponse {
-    let mut engine = state.engine.lock().unwrap();
+    let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
     let proof = match pkt.to_checked_work_proof() {
         Ok(p) => p,
         Err(e) => {
@@ -2275,6 +2343,8 @@ fn handle_external_telemetry(
         proof,
     ) {
         Err(err_msg) => {
+            // Security invariant: NEVER persist unauthenticated / rejected external telemetry
+            // spam into `telemetry_history` or `/data/commons-ledger.json` (prevents disk-fill DoS).
             let record = TelemetryRecord {
                 id: format!("hw-blk-{}", engine.telemetry_history.len() + 1),
                 device_id: pkt.device_id,
@@ -2292,8 +2362,6 @@ fn handle_external_telemetry(
                 stark_proof_id: None,
                 timestamp_unix: pkt.timestamp_unix,
             };
-            engine.telemetry_history.push(record.clone());
-            let _ = save_state_atomic(&state.state_file, &engine.to_persisted());
             TelemetryActionResponse {
                 ok: false,
                 blocked: true,
@@ -2415,7 +2483,7 @@ struct StreamSettleResponse {
 }
 
 fn handle_stream_settle(state: &AppState, req: StreamSettleRequest) -> StreamSettleResponse {
-    let mut engine = state.engine.lock().unwrap();
+    let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
     if req.ticks == 0 || req.unit_price == 0 || req.ticks > 50_000 {
         return StreamSettleResponse {
             ok: false,
@@ -2580,7 +2648,7 @@ fn handle_anchor(state: &AppState, req: AnchorActionRequest) -> AnchorActionResp
 
     let seed_snapshot = state.get_seed_snapshot(true);
 
-    let mut engine = state.engine.lock().unwrap();
+    let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
     let base_commitment = engine.ledger.build_anchor_commitment(&engine.rule);
     let bound_commitment = match network.as_str() {
         "mainnet" => match seed_snapshot.mainnet_status.as_ref() {
@@ -2646,7 +2714,7 @@ struct VerifyStarkResponse {
 
 fn handle_verify_stark(state: &AppState, proof_id: &str) -> VerifyStarkResponse {
     let artifact = {
-        let engine = state.engine.lock().unwrap();
+        let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
         engine
             .stark_proofs
             .iter()
@@ -2702,7 +2770,7 @@ fn handle_publish_swap(state: &AppState, req: CompileSwapRequest) -> PublishSwap
     let contract = match compile_atomic_swap(&req) {
         Ok(c) => c,
         Err(e) => {
-            let engine = state.engine.lock().unwrap();
+            let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
             return PublishSwapResponse {
                 ok: false,
                 contract: None,
@@ -2712,7 +2780,7 @@ fn handle_publish_swap(state: &AppState, req: CompileSwapRequest) -> PublishSwap
         }
     };
 
-    let mut engine = state.engine.lock().unwrap();
+    let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
     if engine
         .swap_offers
         .iter()
@@ -2762,7 +2830,7 @@ struct VerifySwapResponse {
 
 fn handle_verify_swap(state: &AppState, req: VerifySwapRequest) -> VerifySwapResponse {
     let (network, stored_btc_addr) = {
-        let engine = state.engine.lock().unwrap();
+        let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
         let existing = engine
             .swap_offers
             .iter()
@@ -2786,7 +2854,7 @@ fn handle_verify_swap(state: &AppState, req: VerifySwapRequest) -> VerifySwapRes
     };
 
     let Some(client) = state.client_for_network(&network) else {
-        let engine = state.engine.lock().unwrap();
+        let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
         return VerifySwapResponse {
             ok: false,
             verification: None,
@@ -2804,7 +2872,7 @@ fn handle_verify_swap(state: &AppState, req: VerifySwapRequest) -> VerifySwapRes
     ) {
         Ok(r) => r,
         Err(e) => {
-            let engine = state.engine.lock().unwrap();
+            let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
             return VerifySwapResponse {
                 ok: false,
                 verification: None,
@@ -2815,7 +2883,7 @@ fn handle_verify_swap(state: &AppState, req: VerifySwapRequest) -> VerifySwapRes
     };
 
     // Update persisted swap record if one matches this payment_hash.
-    let mut engine = state.engine.lock().unwrap();
+    let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(offer) = engine
         .swap_offers
         .iter_mut()
@@ -2856,7 +2924,7 @@ struct ResetResponse {
 }
 
 fn handle_reset(state: &AppState) -> ResetResponse {
-    let mut engine = state.engine.lock().unwrap();
+    let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
     let fresh = match &state.external_public_keys {
         Some(ext) => CommonsEngine::new_verify_only(ext).unwrap_or_else(|_| CommonsEngine::new_empty()),
         None => CommonsEngine::new_empty(),
