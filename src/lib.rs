@@ -165,28 +165,41 @@ pub enum CheckedWorkProof {
 }
 
 impl CheckedWorkProof {
-    pub fn deed_msg(parcel_id: u64, deed_document_hash: Hash32) -> Hash32 {
+    pub fn deed_msg(parcel_id: u64, deed_document_hash: Hash32, price_love: u64) -> Hash32 {
         sha256_concat(&[
-            b"DEED_TRANSFER_V1",
+            b"DEED_TRANSFER_V2",
             &parcel_id.to_be_bytes(),
             &deed_document_hash,
+            &price_love.to_be_bytes(),
         ])
     }
 
-    pub fn energy_msg(parcel_id: u64, kwh_delivered: u64, soil_health_score: u16) -> Hash32 {
+    pub fn energy_msg(
+        parcel_id: u64,
+        kwh_delivered: u64,
+        soil_health_score: u16,
+        payout_love: u64,
+    ) -> Hash32 {
         sha256_concat(&[
-            b"PHYSICAL_TELEMETRY_V1",
+            b"PHYSICAL_TELEMETRY_V2",
             &parcel_id.to_be_bytes(),
             &kwh_delivered.to_be_bytes(),
             &soil_health_score.to_be_bytes(),
+            &payout_love.to_be_bytes(),
         ])
     }
 
-    pub fn deed_msg_with_nonce(parcel_id: u64, deed_document_hash: Hash32, nonce: u64) -> Hash32 {
+    pub fn deed_msg_with_nonce(
+        parcel_id: u64,
+        deed_document_hash: Hash32,
+        price_love: u64,
+        nonce: u64,
+    ) -> Hash32 {
         sha256_concat(&[
-            b"DEED_TRANSFER_SLH_V1",
+            b"DEED_TRANSFER_SLH_V2",
             &parcel_id.to_be_bytes(),
             &deed_document_hash,
+            &price_love.to_be_bytes(),
             &nonce.to_be_bytes(),
         ])
     }
@@ -195,13 +208,15 @@ impl CheckedWorkProof {
         parcel_id: u64,
         kwh_delivered: u64,
         soil_health_score: u16,
+        payout_love: u64,
         nonce: u64,
     ) -> Hash32 {
         sha256_concat(&[
-            b"PHYSICAL_TELEMETRY_SLH_V1",
+            b"PHYSICAL_TELEMETRY_SLH_V2",
             &parcel_id.to_be_bytes(),
             &kwh_delivered.to_be_bytes(),
             &soil_health_score.to_be_bytes(),
+            &payout_love.to_be_bytes(),
             &nonce.to_be_bytes(),
         ])
     }
@@ -444,7 +459,7 @@ impl CommonsLedger {
                 if self.spent_one_time_keys.contains(&commit) {
                     return Err("Lamport key already spent (replay blocked)");
                 }
-                let msg = CheckedWorkProof::deed_msg(parcel_id, deed_document_hash);
+                let msg = CheckedWorkProof::deed_msg(parcel_id, deed_document_hash, payout_amount);
                 if !oracle_pk.verify(msg, &oracle_sig) {
                     return Err("Invalid quantum-safe deed attestation signature");
                 }
@@ -476,7 +491,12 @@ impl CommonsLedger {
                 if self.spent_one_time_keys.contains(&commit) {
                     return Err("Lamport key already spent (replay blocked)");
                 }
-                let msg = CheckedWorkProof::energy_msg(parcel_id, kwh_delivered, soil_health_score);
+                let msg = CheckedWorkProof::energy_msg(
+                    parcel_id,
+                    kwh_delivered,
+                    soil_health_score,
+                    payout_amount,
+                );
                 if !device_pk.verify(msg, &device_sig) {
                     return Err("Invalid hardware telemetry signature");
                 }
@@ -492,7 +512,7 @@ impl CommonsLedger {
             } => {
                 let root = rule.authorized_deed_oracle_pk;
                 self.verify_merkle_leaf_fresh(root, oracle_sig.leaf_index)?;
-                let msg = CheckedWorkProof::deed_msg(parcel_id, deed_document_hash);
+                let msg = CheckedWorkProof::deed_msg(parcel_id, deed_document_hash, payout_amount);
                 if !oracle_sig.verify(root, msg) {
                     return Err("Invalid Merkleized deed attestation signature");
                 }
@@ -521,7 +541,12 @@ impl CommonsLedger {
                 }
                 let root = rule.authorized_hardware_pk;
                 self.verify_merkle_leaf_fresh(root, device_sig.leaf_index)?;
-                let msg = CheckedWorkProof::energy_msg(parcel_id, kwh_delivered, soil_health_score);
+                let msg = CheckedWorkProof::energy_msg(
+                    parcel_id,
+                    kwh_delivered,
+                    soil_health_score,
+                    payout_amount,
+                );
                 if !device_sig.verify(root, msg) {
                     return Err("Invalid Merkleized hardware telemetry signature");
                 }
@@ -544,8 +569,12 @@ impl CommonsLedger {
                 if !rule.matches_deed_slh_pk(pk_commit) {
                     return Err("Unauthorized SLH-DSA deed oracle key");
                 }
-                let msg =
-                    CheckedWorkProof::deed_msg_with_nonce(parcel_id, deed_document_hash, nonce);
+                let msg = CheckedWorkProof::deed_msg_with_nonce(
+                    parcel_id,
+                    deed_document_hash,
+                    payout_amount,
+                    nonce,
+                );
                 let replay_digest = self.verify_slh_fresh(pk_commit, nonce, msg, &oracle_sig)?;
                 if !oracle_pk.verify_hash(msg, &oracle_sig) {
                     return Err("Invalid NIST FIPS 205 SLH-DSA deed attestation signature");
@@ -584,6 +613,7 @@ impl CommonsLedger {
                     parcel_id,
                     kwh_delivered,
                     soil_health_score,
+                    payout_amount,
                     nonce,
                 );
                 let replay_digest = self.verify_slh_fresh(pk_commit, nonce, msg, &device_sig)?;
@@ -917,7 +947,7 @@ mod tests {
 
         // 3. Adversarial test: attempting to strip the recursive covenant MUST fail
         let deed_hash = sha256(b"COUNTY_RECORD_PARCEL_404_PERPETUAL_PURPOSE_TRUST");
-        let deed_sig = deed_oracle.sign(CheckedWorkProof::deed_msg(404, deed_hash));
+        let deed_sig = deed_oracle.sign(CheckedWorkProof::deed_msg(404, deed_hash, 40_000));
         let rug_attempt = ledger.spend_covenant(
             treasury_ref,
             &rule,
@@ -954,7 +984,7 @@ mod tests {
         assert_eq!(ledger.total_covenant_balance(&rule), 60_000);
 
         // 5. Physical Deployment Bounty: Solar + Greenhouse robot signs telemetry
-        let energy_sig = solar_device.sign(CheckedWorkProof::energy_msg(404, 12_500, 92));
+        let energy_sig = solar_device.sign(CheckedWorkProof::energy_msg(404, 12_500, 92, 15_000));
         let (_, change_ref) = ledger
             .spend_covenant(
                 treasury_ref,

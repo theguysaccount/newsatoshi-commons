@@ -446,7 +446,7 @@ fn sign_and_persist_packet(
                 xmss_kp,
             );
             let signed = signer
-                .sign_telemetry(kwh_delivered, soil_health_score, ts)
+                .sign_telemetry(kwh_delivered, soil_health_score, payout_love, ts)
                 .map_err(|e| e.to_string())?;
             if !signed.verify() {
                 return Err("internal XMSS self-verification failed".to_string());
@@ -460,7 +460,8 @@ fn sign_and_persist_packet(
                 hex::encode(CheckedWorkProof::energy_msg(
                     parcel_id,
                     kwh_delivered,
-                    soil_health_score
+                    soil_health_score,
+                    payout_love
                 ))
             );
             wire

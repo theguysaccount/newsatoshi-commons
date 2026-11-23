@@ -14,6 +14,7 @@ Safety Invariant:
 
 import argparse
 import hashlib
+import hmac
 import json
 import sys
 import urllib.error
@@ -34,23 +35,37 @@ DEFAULT_SOLANA_RPCS = {
 }
 
 
+def _validate_hex(value: str, expected_bytes: int, field_name: str) -> str:
+    clean = value.strip().lower().removeprefix("0x")
+    if len(clean) != expected_bytes * 2:
+        raise ValueError(f"{field_name} must be {expected_bytes * 2} hex chars")
+    try:
+        bytes.fromhex(clean)
+    except ValueError as exc:
+        raise ValueError(f"{field_name} contains invalid hex") from exc
+    return clean
+
+
 def http_json(url: str, payload: Optional[Dict[str, Any]] = None, timeout: float = 8.0) -> Any:
+    if not url.startswith(("https://", "http://")):
+        raise ValueError("RPC URL must use https:// or http:// scheme")
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
-    headers = {"Accept": "application/json", "User-Agent": "newsatoshi-maker-watcher/0.7.0"}
+    headers = {"Accept": "application/json", "User-Agent": "newsatoshi-maker-watcher/0.7.1"}
     if data is not None:
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=data, headers=headers)
     with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+        return json.loads(resp.read(2_097_152).decode("utf-8"))
 
 
 def check_newsatoshi_lock(payment_hash: str, network: str = "mainnet") -> Dict[str, Any]:
+    clean_hash = _validate_hex(payment_hash, 32, "payment_hash")
     base = (
         "https://newsatoshi.org/mainnet"
         if network == "mainnet"
         else "https://newsatoshi-seed.fly.dev"
     )
-    url = f"{base}/api/lock?hash={payment_hash}"
+    url = f"{base}/api/lock?hash={clean_hash}"
     res = http_json(url)
     locks = res.get("locks", [])
     matched = next((l for l in locks if l.get("found") and l.get("confirmed")), None) or next(
@@ -66,17 +81,18 @@ def check_newsatoshi_lock(payment_hash: str, network: str = "mainnet") -> Dict[s
 
 
 def check_evm_swap_status(rpc_url: str, contract_addr: str, swap_id_hex: str) -> Dict[str, Any]:
-    """Read `swaps(bytes32)` directly via standard Ethereum `eth_call` (selector `0x64b3577b`)."""
-    # keccak256("swaps(bytes32)")[:4] = 0x64b3577b (verified via EVM ABI)
-    clean_id = swap_id_hex.lower().removeprefix("0x").rjust(64, "0")
-    calldata = "0x64b3577b" + clean_id
+    """Read `swaps(bytes32)` directly via standard Ethereum `eth_call` (selector `0xeb84e7f2`)."""
+    # keccak256("swaps(bytes32)")[:4] = 0xeb84e7f2
+    clean_addr = "0x" + _validate_hex(contract_addr, 20, "contract_addr")
+    clean_id = _validate_hex(swap_id_hex, 32, "swap_id")
+    calldata = "0xeb84e7f2" + clean_id
     res = http_json(
         rpc_url,
         {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "eth_call",
-            "params": [{"to": contract_addr, "data": calldata}, "latest"],
+            "params": [{"to": clean_addr, "data": calldata}, "latest"],
         },
     )
     raw = (res.get("result") or "0x").removeprefix("0x")
@@ -130,7 +146,10 @@ def check_solana_escrow_account(rpc_url: str, escrow_pda: str) -> Dict[str, Any]
 
 
 def verify_preimage(payment_hash_hex: str, preimage_hex: str) -> bool:
-    return hashlib.sha256(bytes.fromhex(preimage_hex)).hexdigest() == payment_hash_hex.lower()
+    clean_hash = _validate_hex(payment_hash_hex, 32, "payment_hash")
+    clean_preimage = _validate_hex(preimage_hex, 32, "preimage")
+    digest = hashlib.sha256(bytes.fromhex(clean_preimage)).hexdigest()
+    return hmac.compare_digest(digest, clean_hash)
 
 
 def main() -> int:

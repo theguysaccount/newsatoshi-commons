@@ -7,11 +7,14 @@ pragma solidity ^0.8.24;
 ///         - Zero admin keys, zero upgradeability, zero custody, zero wrapped tokens.
 ///         - Uses the EVM native `sha256` precompile (0x02), byte-compatible with `newsatoshi lock --hash`.
 interface IERC20Minimal {
+    function balanceOf(address account) external view returns (uint256);
     function transfer(address to, uint256 value) external returns (bool);
     function transferFrom(address from, address to, uint256 value) external returns (bool);
 }
 
 contract NewsatoshiHtlc {
+    /// Upper bound preventing accidental permanent lockups from malformed timestamps.
+    uint64 public constant MAX_TIMELOCK_DURATION = 30 days;
     struct SwapLock {
         address sender;
         address recipient;
@@ -79,6 +82,7 @@ contract NewsatoshiHtlc {
         require(recipient != address(0) && recipient != msg.sender, "INVALID_RECIPIENT");
         require(paymentHash != bytes32(0), "INVALID_HASH");
         require(timelock > block.timestamp + 300, "TIMELOCK_TOO_SOON");
+        require(timelock <= block.timestamp + MAX_TIMELOCK_DURATION, "TIMELOCK_TOO_FAR");
 
         swapId = computeSwapId(msg.sender, recipient, address(0), msg.value, paymentHash, timelock);
         require(swaps[swapId].sender == address(0), "SWAP_EXISTS");
@@ -111,11 +115,16 @@ contract NewsatoshiHtlc {
         require(recipient != address(0) && recipient != msg.sender, "INVALID_RECIPIENT");
         require(paymentHash != bytes32(0), "INVALID_HASH");
         require(timelock > block.timestamp + 300, "TIMELOCK_TOO_SOON");
+        require(timelock <= block.timestamp + MAX_TIMELOCK_DURATION, "TIMELOCK_TOO_FAR");
 
         swapId = computeSwapId(msg.sender, recipient, token, amount, paymentHash, timelock);
         require(swaps[swapId].sender == address(0), "SWAP_EXISTS");
 
+        // Enforce exact token delivery (defends against fee-on-transfer / rebasing vault drain)
+        uint256 balBefore = IERC20Minimal(token).balanceOf(address(this));
         _safeTransferFrom(token, msg.sender, address(this), amount);
+        uint256 balAfter = IERC20Minimal(token).balanceOf(address(this));
+        require(balAfter >= balBefore && balAfter - balBefore == amount, "FEE_ON_TRANSFER_UNSUPPORTED");
 
         swaps[swapId] = SwapLock({
             sender: msg.sender,

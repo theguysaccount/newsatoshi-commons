@@ -100,8 +100,8 @@ fn covenant_continuity_rejects_strip_and_rule_substitution() {
     let treasury_ref = ledger.mint_genesis_covenant(100_000, &rule);
 
     let deed = sha256(b"PARCEL_1_DEED");
-    let sig = oracle
-        .sign_next(CheckedWorkProof::deed_msg(1, deed))
+    let sig_40k = oracle
+        .sign_next(CheckedWorkProof::deed_msg(1, deed, 40_000))
         .unwrap();
 
     // 1. Attempt to strip covenant on change output (`None`)
@@ -112,7 +112,7 @@ fn covenant_continuity_rejects_strip_and_rule_substitution() {
             40_000,
             "SELLER",
             None,
-            CheckedWorkProof::merkle_land_deed(1, deed, sig.clone()),
+            CheckedWorkProof::merkle_land_deed(1, deed, sig_40k.clone()),
         )
         .unwrap_err();
     assert!(strip_err.contains("Recursive covenant continuity violated"));
@@ -130,7 +130,7 @@ fn covenant_continuity_rejects_strip_and_rule_substitution() {
             40_000,
             "SELLER",
             Some(forged_rule.rule_hash()),
-            CheckedWorkProof::merkle_land_deed(1, deed, sig.clone()),
+            CheckedWorkProof::merkle_land_deed(1, deed, sig_40k),
         )
         .unwrap_err();
     assert!(swap_err.contains("Recursive covenant continuity violated"));
@@ -140,6 +140,9 @@ fn covenant_continuity_rejects_strip_and_rule_substitution() {
     assert_eq!(ledger.next_merkle_leaf_watermark(oracle.root()), 0);
 
     // 3. Exact spend (change == 0) is allowed with `proposed_change_covenant: None`
+    let sig_100k = oracle
+        .sign_next(CheckedWorkProof::deed_msg(1, deed, 100_000))
+        .unwrap();
     let (_, change_ref) = ledger
         .spend_covenant(
             treasury_ref,
@@ -147,7 +150,7 @@ fn covenant_continuity_rejects_strip_and_rule_substitution() {
             100_000,
             "SELLER",
             None,
-            CheckedWorkProof::merkle_land_deed(1, deed, sig),
+            CheckedWorkProof::merkle_land_deed(1, deed, sig_100k),
         )
         .expect("exact spend with zero change should succeed");
     assert!(change_ref.is_none());
@@ -173,7 +176,7 @@ fn merkle_leaf_replay_and_stale_index_blocked_by_ledger() {
 
     // Spend with hardware leaf #0
     let sig0 = hw
-        .sign_next(CheckedWorkProof::energy_msg(10, 5_000, 90))
+        .sign_next(CheckedWorkProof::energy_msg(10, 5_000, 90, 5_000))
         .unwrap();
     let (_, change_ref) = ledger
         .spend_covenant(
@@ -203,7 +206,7 @@ fn merkle_leaf_replay_and_stale_index_blocked_by_ledger() {
 
     // 2. Re-signing a DIFFERENT message on spent leaf #0 MUST fail
     let forged_reuse = hw
-        .sign_at_index_unchecked(0, CheckedWorkProof::energy_msg(10, 9_999, 95))
+        .sign_at_index_unchecked(0, CheckedWorkProof::energy_msg(10, 9_999, 95, 5_000))
         .unwrap();
     let reuse_err = ledger
         .spend_covenant(
@@ -219,7 +222,7 @@ fn merkle_leaf_replay_and_stale_index_blocked_by_ledger() {
 
     // 3. Unauthorized rogue Merkle root MUST fail
     let rogue_sig = rogue_hw
-        .sign_at_index_unchecked(1, CheckedWorkProof::energy_msg(10, 5_000, 90))
+        .sign_at_index_unchecked(1, CheckedWorkProof::energy_msg(10, 5_000, 90, 5_000))
         .unwrap();
     let rogue_err = ledger
         .spend_covenant(
@@ -236,7 +239,7 @@ fn merkle_leaf_replay_and_stale_index_blocked_by_ledger() {
     // 4. Skip leaves #1 and #2, submit leaf #3 -> succeeds and sets watermark to 4
     hw.skip_leaves(2).unwrap();
     let sig3 = hw
-        .sign_next(CheckedWorkProof::energy_msg(10, 6_000, 91))
+        .sign_next(CheckedWorkProof::energy_msg(10, 6_000, 91, 5_000))
         .unwrap();
     assert_eq!(sig3.leaf_index, 3);
     let (_, change_ref) = ledger
@@ -254,7 +257,7 @@ fn merkle_leaf_replay_and_stale_index_blocked_by_ledger() {
 
     // 5. Backfilling skipped stale leaf #1 MUST fail monotonic watermark check
     let stale_sig1 = hw
-        .sign_at_index_unchecked(1, CheckedWorkProof::energy_msg(10, 6_000, 91))
+        .sign_at_index_unchecked(1, CheckedWorkProof::energy_msg(10, 6_000, 91, 5_000))
         .unwrap();
     let stale_err = ledger
         .spend_covenant(
@@ -270,7 +273,7 @@ fn merkle_leaf_replay_and_stale_index_blocked_by_ledger() {
 
     // 6. Leaf #4 continues smoothly
     let sig4 = hw
-        .sign_next(CheckedWorkProof::energy_msg(10, 7_000, 93))
+        .sign_next(CheckedWorkProof::energy_msg(10, 7_000, 93, 5_000))
         .unwrap();
     assert_eq!(sig4.leaf_index, 4);
     ledger
@@ -305,7 +308,7 @@ fn low_soil_score_bounty_cap_and_zero_kwh_rejected() {
 
     // 1. Low soil health score (79 < 80) rejected
     let low_soil_sig = hw
-        .sign_next(CheckedWorkProof::energy_msg(404, 10_000, 79))
+        .sign_next(CheckedWorkProof::energy_msg(404, 10_000, 79, 5_000))
         .unwrap();
     let err = ledger
         .spend_covenant(
@@ -321,7 +324,7 @@ fn low_soil_score_bounty_cap_and_zero_kwh_rejected() {
 
     // 2. Payout above max_bounty_payout (10_001 > 10_000) rejected
     let over_cap_sig = hw
-        .sign_next(CheckedWorkProof::energy_msg(404, 10_000, 90))
+        .sign_next(CheckedWorkProof::energy_msg(404, 10_000, 90, 10_001))
         .unwrap();
     let err = ledger
         .spend_covenant(
@@ -337,7 +340,7 @@ fn low_soil_score_bounty_cap_and_zero_kwh_rejected() {
 
     // 3. Zero kWh rejected
     let zero_kwh_sig = hw
-        .sign_next(CheckedWorkProof::energy_msg(404, 0, 95))
+        .sign_next(CheckedWorkProof::energy_msg(404, 0, 95, 5_000))
         .unwrap();
     let err = ledger
         .spend_covenant(
@@ -375,7 +378,7 @@ fn streaming_channel_compounding_into_parcel_2() {
     // Acquire Parcel #1 (40,000 LOVE) using Oracle Leaf #0
     let deed1 = sha256(b"PARCEL_101_DEED");
     let sig_deed1 = oracle
-        .sign_next(CheckedWorkProof::deed_msg(101, deed1))
+        .sign_next(CheckedWorkProof::deed_msg(101, deed1, 40_000))
         .unwrap();
     let (_, change_ref) = ledger
         .spend_covenant(
@@ -392,7 +395,7 @@ fn streaming_channel_compounding_into_parcel_2() {
     // Deploy hardware on Parcel #1 (3 bounties x 10,000 = 30,000 LOVE -> 30,000 left)
     for kwh in [10_000u64, 12_000, 14_000] {
         let sig = hw
-            .sign_next(CheckedWorkProof::energy_msg(101, kwh, 92))
+            .sign_next(CheckedWorkProof::energy_msg(101, kwh, 92, 10_000))
             .unwrap();
         let (_, next_ref) = ledger
             .spend_covenant(
@@ -441,7 +444,7 @@ fn streaming_channel_compounding_into_parcel_2() {
     // Acquire Parcel #2 (45,000 LOVE) using Oracle Leaf #1 under the SAME burned-in root!
     let deed2 = sha256(b"PARCEL_102_ADJACENT_DEED");
     let sig_deed2 = oracle
-        .sign_next(CheckedWorkProof::deed_msg(102, deed2))
+        .sign_next(CheckedWorkProof::deed_msg(102, deed2, 45_000))
         .unwrap();
     assert_eq!(sig_deed2.leaf_index, 1);
 
@@ -488,7 +491,12 @@ fn hardware_telemetry_signer_to_ledger_and_deterministic_rpc_anchor() {
 
     for i in 0..5u64 {
         let pkt = signer
-            .sign_telemetry(8_000 + i * 500, 88 + (i as u16), 1_795_200_000 + i * 3600)
+            .sign_telemetry(
+                8_000 + i * 500,
+                88 + (i as u16),
+                5_000,
+                1_795_200_000 + i * 3600,
+            )
             .unwrap();
         assert!(pkt.verify());
         let summary = pkt.to_json_summary();
@@ -631,7 +639,7 @@ fn slh_dsa_fips_205_keygen_sign_verify_and_ledger_nonce_replay_guard() {
 
     // 1. Acquire Parcel #404 using NIST FIPS 205 SLH-DSA (nonce 0)
     let deed_hash = sha256(b"SLH_DEED_PARCEL_404");
-    let deed_msg = CheckedWorkProof::deed_msg_with_nonce(404, deed_hash, 0);
+    let deed_msg = CheckedWorkProof::deed_msg_with_nonce(404, deed_hash, 40_000, 0);
     let deed_sig = oracle_slh.sign_hash(deed_msg);
     let (_, change_ref) = ledger
         .spend_covenant(
@@ -667,7 +675,7 @@ fn slh_dsa_fips_205_keygen_sign_verify_and_ledger_nonce_replay_guard() {
     assert!(replay_err.contains("replay blocked"));
 
     // 3. Unauthorized rogue SLH-DSA hardware key MUST be rejected
-    let rogue_msg = CheckedWorkProof::energy_msg_with_nonce(404, 12_000, 92, 0);
+    let rogue_msg = CheckedWorkProof::energy_msg_with_nonce(404, 12_000, 92, 10_000, 0);
     let rogue_sig = rogue_slh.sign_hash(rogue_msg);
     let rogue_err = ledger
         .spend_covenant(
@@ -689,7 +697,7 @@ fn slh_dsa_fips_205_keygen_sign_verify_and_ledger_nonce_replay_guard() {
     assert!(rogue_err.contains("Unauthorized SLH-DSA"));
 
     // 4. Valid SLH-DSA hardware telemetry (nonce 0) succeeds
-    let hw_msg = CheckedWorkProof::energy_msg_with_nonce(404, 12_500, 93, 0);
+    let hw_msg = CheckedWorkProof::energy_msg_with_nonce(404, 12_500, 93, 10_000, 0);
     let hw_sig = hw_slh.sign_hash(hw_msg);
     let (_, change_ref) = ledger
         .spend_covenant(
@@ -1145,7 +1153,9 @@ fn http_api_server_full_abundance_loop_red_team_external_hw_and_persistence() {
             .unwrap();
     let mut ext_signer =
         HardwareTelemetrySigner::from_keypair("pi-gateway-01", 404, ext_xmss_kp);
-    let ext_signed = ext_signer.sign_telemetry(8_000, 94, 1_795_323_500).unwrap();
+    let ext_signed = ext_signer
+        .sign_telemetry(8_000, 94, 5_000, 1_795_323_500)
+        .unwrap();
     let ext_wire = ext_signed.to_external_wire_packet(5_000);
     let ext_resp = post_json("/api/telemetry", serde_json::to_value(&ext_wire).unwrap());
     assert_eq!(ext_resp["ok"], true);
@@ -2144,6 +2154,242 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
     .unwrap();
     assert_eq!(mcp_v["result"]["isError"], false);
     assert_eq!(mcp_v["result"]["structuredContent"]["valid"], true);
+
+    srv.stop();
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+}
+
+#[test]
+fn security_audit_hardening_guards() {
+    use newsatoshi_commons::server::{spawn_server, ServerConfig};
+    use newsatoshi_commons::stark::MAX_PROOF_BYTES;
+    use newsatoshi_commons::storage::{
+        default_deed_oracle_slh_seed, default_hardware_slh_seed, default_hardware_xmss_seed,
+    };
+    use newsatoshi_commons::swap::fetch_btc_utxos_mempool;
+    use newsatoshi_commons::{
+        prove_covenant_transition, verify_covenant_stark, CovenantPublicInputs, CovenantTxKind,
+        ExternalDeedPacket, ExternalTelemetryPacket, HardwareTelemetrySigner, MerkleLamportKeypair,
+        SlhDsaKeypair, DEFAULT_TREE_HEIGHT,
+    };
+    use serde_json::Value;
+
+    let tmp_dir = std::env::temp_dir().join(format!(
+        "newsatoshi_security_audit_{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+    std::fs::create_dir_all(&tmp_dir).unwrap();
+    let state_file = tmp_dir.join("audit-state.json");
+
+    let srv = spawn_server(ServerConfig {
+        host: "127.0.0.1".to_string(),
+        port: 0,
+        state_file,
+        seed_url: "http://127.0.0.1:9/status".to_string(),
+        mainnet_seed_url: Some("http://127.0.0.1:9/status".to_string()),
+        static_dir: None,
+        admin_token: None,
+        verify_only: false,
+        external_public_keys: None,
+    })
+    .unwrap();
+    let base = srv.base_url();
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .http_status_as_error(false)
+        .build()
+        .into();
+
+    // Record 100,000 LOVE funding fixture in isolated test state
+    let fund_txid = hex::encode(sha256(b"security_audit_funding_tx"));
+    let mut r_gen = agent
+        .post(&format!("{base}/api/actions/record-funding"))
+        .header("Content-Type", "application/json")
+        .send(
+            serde_json::json!({
+                "l1_network": "testnet",
+                "l1_txid": fund_txid,
+                "amount_love": 100_000,
+                "note": "Security audit test fixture"
+            })
+            .to_string()
+            .as_str(),
+        )
+        .unwrap();
+    assert_eq!(r_gen.status().as_u16(), 200);
+    let _ = r_gen.body_mut().read_to_string().unwrap();
+
+    // 1. MITM Payout Inflation on SLH-DSA & XMSS Telemetry MUST fail signature verification
+    let hw_slh = SlhDsaKeypair::from_seed(default_hardware_slh_seed());
+    let mut tampered_slh_tel = ExternalTelemetryPacket::sign_slh_dsa(
+        &hw_slh,
+        "esp32-s3-sensor-01",
+        404,
+        10_000,
+        94,
+        5_000,
+        0,
+        1_795_325_000,
+    );
+    tampered_slh_tel.payout_love = 25_000; // MITM inflation!
+    let mut r_mitm_slh = agent
+        .post(&format!("{base}/api/telemetry"))
+        .header("Content-Type", "application/json")
+        .send(serde_json::to_string(&tampered_slh_tel).unwrap().as_str())
+        .unwrap();
+    let body_mitm_slh: Value =
+        serde_json::from_str(&r_mitm_slh.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(body_mitm_slh["ok"], false);
+    assert_eq!(body_mitm_slh["blocked"], true);
+
+    let hw_xmss =
+        MerkleLamportKeypair::from_seed_at_index(default_hardware_xmss_seed(), DEFAULT_TREE_HEIGHT, 0)
+            .unwrap();
+    let mut hw_signer = HardwareTelemetrySigner::from_keypair("pi-gw-01", 404, hw_xmss);
+    let signed_xmss = hw_signer.sign_telemetry(9_000, 93, 5_000, 1_795_325_100).unwrap();
+    let mut tampered_xmss_tel = signed_xmss.to_external_wire_packet(5_000);
+    tampered_xmss_tel.payout_love = 20_000; // MITM inflation!
+    let mut r_mitm_xmss = agent
+        .post(&format!("{base}/api/telemetry"))
+        .header("Content-Type", "application/json")
+        .send(serde_json::to_string(&tampered_xmss_tel).unwrap().as_str())
+        .unwrap();
+    let body_mitm_xmss: Value =
+        serde_json::from_str(&r_mitm_xmss.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(body_mitm_xmss["ok"], false);
+    assert_eq!(body_mitm_xmss["blocked"], true);
+
+    // 2. MITM Price Inflation on SLH-DSA Deed MUST fail signature verification
+    let oracle_slh = SlhDsaKeypair::from_seed(default_deed_oracle_slh_seed());
+    let mut tampered_deed = ExternalDeedPacket::sign_slh_dsa(
+        &oracle_slh,
+        404,
+        12.5,
+        40_000,
+        "123 Solar Ridge",
+        sha256(b"SOLAR_RIDGE_DEED_DOC"),
+        0,
+    );
+    tampered_deed.price_love = 95_000; // MITM inflation!
+    let mut r_mitm_deed = agent
+        .post(&format!("{base}/api/deeds"))
+        .header("Content-Type", "application/json")
+        .send(serde_json::to_string(&tampered_deed).unwrap().as_str())
+        .unwrap();
+    let body_mitm_deed: Value =
+        serde_json::from_str(&r_mitm_deed.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(body_mitm_deed["ok"], false);
+    assert!(body_mitm_deed["error"]
+        .as_str()
+        .unwrap_or("")
+        .to_ascii_lowercase()
+        .contains("signature"));
+
+    // 3. Unauthenticated forged telemetry spam MUST NOT bloat telemetry_history or balance
+    let mut r_state = agent.get(&format!("{base}/api/state")).call().unwrap();
+    let state_val: Value =
+        serde_json::from_str(&r_state.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(state_val["ledger_summary"]["balance_love"], 100_000);
+    assert_eq!(state_val["telemetry_history"].as_array().unwrap().len(), 0);
+
+    // 4. Oversized POST body (> 1 MiB) MUST be rejected cleanly without OOM/panic
+    let huge_body = "x".repeat(1_100_000);
+    let mut r_big = agent
+        .post(&format!("{base}/api/telemetry"))
+        .header("Content-Type", "application/json")
+        .send(huge_body.as_str())
+        .unwrap();
+    assert_eq!(r_big.status().as_u16(), 400);
+    let big_txt = r_big.body_mut().read_to_string().unwrap();
+    assert!(
+        big_txt.contains("too large") || big_txt.contains("exceeds maximum"),
+        "unexpected oversized-body error: {big_txt}"
+    );
+
+    // 5. Hostile query params on /api/agent/402-challenge MUST NOT panic or inject headers
+    let mut r_inj = agent
+        .get(&format!(
+            "{base}/api/agent/402-challenge?network=mainnet%0d%0aX-Injected:evil&amount_love=1%22foo&resource=/x%0aY:1"
+        ))
+        .call()
+        .unwrap();
+    assert_eq!(r_inj.status().as_u16(), 402);
+    assert!(r_inj.headers().get("X-Injected").is_none());
+    assert_eq!(
+        r_inj
+            .headers()
+            .get("X-Content-Type-Options")
+            .and_then(|v| v.to_str().ok()),
+        Some("nosniff")
+    );
+    assert_eq!(
+        r_inj
+            .headers()
+            .get("X-Frame-Options")
+            .and_then(|v| v.to_str().ok()),
+        Some("DENY")
+    );
+    let www = r_inj
+        .headers()
+        .get("WWW-Authenticate")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    assert!(www.contains(r#"network="mainnet""#));
+    assert!(www.contains(r#"amount="0.01""#));
+    let _ = r_inj.body_mut().read_to_string().unwrap();
+
+    // 6. Malicious Host header MUST NOT be reflected in /llms.txt
+    let mut r_host = agent
+        .get(&format!("{base}/llms.txt"))
+        .header("Host", "evil.attacker.com/phish")
+        .call()
+        .unwrap();
+    let llms_body = r_host.body_mut().read_to_string().unwrap();
+    assert!(!llms_body.contains("evil.attacker.com"));
+    assert!(llms_body.contains("https://commons.newsatoshi.org"));
+
+    // 7. Outbound mempool.space path-traversal BTC address MUST be rejected before HTTP call
+    let traversal_err =
+        fetch_btc_utxos_mempool("bc1/../../../blocks/tip/height").unwrap_err();
+    assert!(traversal_err.contains("Bech32"));
+
+    // 8. STARK verifier pre-bounds + MAX_PROOF_BYTES guard
+    let rule_hash = hex::encode(sha256(b"AUDIT_STARK_RULE"));
+    let prev_root = hex::encode(sha256(b"AUDIT_STARK_PREV"));
+    let new_root = hex::encode(sha256(b"AUDIT_STARK_NEW"));
+    let valid_inputs = CovenantPublicInputs {
+        tx_kind: CovenantTxKind::TelemetryBounty,
+        label: "Audit Valid".to_string(),
+        tx_nonce: 1,
+        covenant_rule_hash: rule_hash.clone(),
+        change_covenant_rule_hash: rule_hash,
+        prev_state_root: prev_root,
+        new_state_root: new_root,
+        input_amount: 50_000,
+        payout_amount: 10_000,
+        change_amount: 40_000,
+        max_bounty_payout: 25_000,
+        reinvest_bps: 1_500,
+        min_soil_health_score: 80,
+        soil_health_score: 92,
+    };
+    let art = prove_covenant_transition(valid_inputs).unwrap();
+
+    let mut bad_bps = art.clone();
+    bad_bps.public_inputs.reinvest_bps = 15_000;
+    assert!(!verify_covenant_stark(&bad_bps).unwrap().valid);
+
+    let mut bad_soil = art.clone();
+    bad_soil.public_inputs.soil_health_score = 150;
+    assert!(!verify_covenant_stark(&bad_soil).unwrap().valid);
+
+    let mut bad_hex = art.clone();
+    bad_hex.public_inputs.covenant_rule_hash = "not_hex_at_all".to_string();
+    assert!(!verify_covenant_stark(&bad_hex).unwrap().valid);
+
+    let mut huge_proof = art;
+    huge_proof.proof_hex = "00".repeat(MAX_PROOF_BYTES + 16);
+    assert!(verify_covenant_stark(&huge_proof).is_err());
 
     srv.stop();
     let _ = std::fs::remove_dir_all(&tmp_dir);
