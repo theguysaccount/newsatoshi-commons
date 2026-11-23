@@ -478,7 +478,7 @@ pub fn mcp_tools_list() -> Value {
                     "type": "object",
                     "required": ["amount_love", "love_claim_address"],
                     "properties": {
-                        "rail": { "type": "string", "enum": ["btc_onchain", "lightning_bolt11"], "default": "btc_onchain" },
+                        "rail": { "type": "string", "enum": ["btc_onchain", "lightning_bolt11", "solana_htlc", "evm_htlc"], "default": "btc_onchain" },
                         "direction": { "type": "string", "enum": ["btc_to_love", "love_to_btc"], "default": "btc_to_love" },
                         "love_network": { "type": "string", "enum": ["mainnet", "testnet"], "default": "mainnet" },
                         "btc_network": { "type": "string", "enum": ["mainnet", "testnet", "signet", "regtest"], "default": "mainnet" },

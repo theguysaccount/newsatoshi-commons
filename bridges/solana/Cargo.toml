@@ -1,0 +1,8 @@
+[package]
+name = "newsatoshi-solana-htlc"
+version = "0.1.0"
+edition = "2021"
+description = "Immutable zero-admin Solana SHA-256 HTLC Escrow state & instruction codec for trustless SOL/USDC <-> Newsatoshi (LOVE) atomic swaps"
+
+[dependencies]
+sha2 = "0.10"

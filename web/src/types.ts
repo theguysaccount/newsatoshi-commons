@@ -205,10 +205,39 @@ export interface Bolt11Decoded {
   description?: string | null;
 }
 
+export interface SolanaHtlcArtifact {
+  cluster: string;
+  asset: string;
+  amount_raw: number;
+  spl_mint?: string | null;
+  sender_pubkey: string;
+  recipient_pubkey: string;
+  program_id: string;
+  pda_seeds_description: string;
+  lock_instruction_hex: string;
+  claim_instruction_template: string;
+  timelock_unix: number;
+  jupiter_route_note: string;
+}
+
+export interface EvmHtlcArtifact {
+  chain: string;
+  chain_id: number;
+  asset: string;
+  amount_raw: number;
+  token_address: string;
+  recipient_address: string;
+  contract_address: string;
+  timelock_unix: number;
+  cast_lock_command: string;
+  cast_claim_command: string;
+  cast_refund_command: string;
+}
+
 export interface AtomicSwapContract {
   swap_id: string;
   protocol: string;
-  rail: 'btc_onchain' | 'lightning_bolt11' | string;
+  rail: 'btc_onchain' | 'lightning_bolt11' | 'solana_htlc' | 'evm_htlc' | string;
   direction: 'btc_to_love' | 'love_to_btc' | string;
   love_network: 'mainnet' | 'testnet' | string;
   btc_network: string;
@@ -219,6 +248,8 @@ export interface AtomicSwapContract {
   love_timeout_blocks: number;
   btc_htlc?: BitcoinHtlcArtifact | null;
   bolt11?: Bolt11Decoded | null;
+  solana_htlc?: SolanaHtlcArtifact | null;
+  evm_htlc?: EvmHtlcArtifact | null;
   love_lock_command: string;
   love_unlock_command: string;
   love_expire_command: string;
@@ -238,7 +269,7 @@ export interface AtomicSwapContract {
 }
 
 export interface CompileSwapPayload {
-  rail: 'btc_onchain' | 'lightning_bolt11';
+  rail: 'btc_onchain' | 'lightning_bolt11' | 'solana_htlc' | 'evm_htlc';
   direction: 'btc_to_love' | 'love_to_btc';
   love_network: 'mainnet' | 'testnet';
   btc_network: 'mainnet' | 'testnet' | 'signet' | 'regtest';
@@ -252,6 +283,17 @@ export interface CompileSwapPayload {
   btc_refund_pubkey_hex?: string;
   btc_locktime?: number;
   btc_current_height?: number;
+  source_asset?: string;
+  solana_cluster?: string;
+  solana_sender_pubkey?: string;
+  solana_recipient_pubkey?: string;
+  solana_program_id?: string;
+  solana_spl_mint?: string;
+  evm_chain?: string;
+  evm_recipient_address?: string;
+  evm_token_address?: string;
+  evm_contract_address?: string;
+  timelock_unix?: number;
   maker_label?: string;
 }
 
