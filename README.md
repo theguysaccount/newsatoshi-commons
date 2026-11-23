@@ -1,4 +1,4 @@
-# `newsatoshi-commons` — Post-Quantum Machine Money (`LOVE`), Multi-Chain Atomic Swaps & AI Agent API
+# `newsatoshi-commons` — Sound Money Upgraded for the Quantum & AI Era (`LOVE`)
 
 [![CI](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml/badge.svg)](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/theguysaccount/newsatoshi-commons)](https://github.com/theguysaccount/newsatoshi-commons/releases)
@@ -6,7 +6,19 @@
 [![Live Gateway](https://img.shields.io/badge/Live-commons.newsatoshi.org-10b981)](https://commons.newsatoshi.org)
 [![MCP](https://img.shields.io/badge/MCP-Streamable%20HTTP%20(9%20Tools)-38bdf8)](https://commons.newsatoshi.org/mcp)
 
-Complete open-source, zero-custody infrastructure for **Newsatoshi (`LOVE` / `NEWSATOSHI/2.1`)**: post-quantum NIST FIPS 205 SLH-DSA + XMSS covenants, **Winterfell 0.13** transparent STARK proofs, **4 trustless multi-chain SHA-256 HTLC buy roads** (Bitcoin L1, Lightning, Solana SOL/USDC, Base/Ethereum/Arbitrum ETH/USDC), **1-command AuxPoW Bitcoin merge-mining (`chainid = 20051`)**, **Streamable HTTP MCP (9 tools)**, **zero-dependency JS & Python HTTP `402` PayWord SDKs**, and a **Live Verify-Only Telemetry Mirror & Cockpit**.
+### Why Newsatoshi Exists (In Plain English)
+Bitcoin invented unstoppable digital gold for humans. **Two shocks are breaking legacy blockchains today:** quantum computers targeting elliptic-curve keys, and billions of autonomous AI agents that can’t open a bank account, swipe a Visa card, or pay high gas fees for microscopic API calls.
+
+Newsatoshi (`LOVE` / `NEWSATOSHI/2.1`) solves both with **four protocol breakthroughs** — no venture pre-mine, no custodians, no wasted energy:
+
+1. **Free Bitcoin-Grade Security (Zero Extra Watts):** Any Bitcoin SHA-256 miner (Bitaxe, NerdQAxe, Antminer S19/S21) can protect Newsatoshi and earn `50 LOVE/block` using the *exact same electricity* it already spends on Bitcoin (`AuxPoW chainid = 20051`).
+2. **Quantum-Proof & Private Like Cash:** Throws out elliptic curves completely. Pure hash math (SHA-256, NIST FIPS 205 SLH-DSA, Winterfell STARKs) with shielded `nsd1…` wallets and zero trusted-setup ceremonies.
+3. **Pay by the Thought for AI Agents:** One Newsatoshi lock streams up to **1,000,000 sub-millisecond HTTP `402` PayWord micropayments** with zero gas per call, zero subscriptions, and 9 live unauthenticated Streamable HTTP MCP tools (`/mcp`).
+4. **Zero-Vault Multi-Chain Buy Roads:** No honeypot bridge vaults or wrapped IOUs. Bitcoin L1, Lightning, Solana (SOL/USDC), and Base/EVM (ETH/USDC) all snap onto one shared `SHA256(preimage) == payment_hash` atomic lock — instant swap or 100% automatic refund.
+
+---
+
+**Technical Stack:** Complete open-source, zero-custody infrastructure for **Newsatoshi (`LOVE` / `NEWSATOSHI/2.1`)** — NIST FIPS 205 SLH-DSA + XMSS covenants, **Winterfell 0.13** transparent STARK proofs, 4 trustless multi-chain SHA-256 HTLC buy roads, 1-command AuxPoW Stratum merge-mining, Streamable HTTP MCP (9 tools), zero-dependency JS & Python HTTP `402` PayWord SDKs, and a Live Verify-Only Telemetry Mirror & Cockpit.
 
 - **Live Verify-Only Gateway:** `https://commons.newsatoshi.org` (`0` server private keys, security-audited `v0.8.0`)
 - **AI Agent Discovery:** `POST /mcp` · `/llms.txt` · `/llms-full.txt` · `/docs` · `/developers` · `/.well-known/agent.json` · `/.well-known/mcp/server-card.json` · `/.well-known/api-catalog` · `/.well-known/agent-skills/index.json` · `/openapi.json`
