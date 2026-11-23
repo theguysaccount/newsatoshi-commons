@@ -551,12 +551,82 @@ pub fn verify_preimage(payment_hash_hex: &str, preimage_hex: &str) -> Result<boo
 // Atomic Swap Contract Compilation & Persisted Offer Record
 // ---------------------------------------------------------------------------
 
-#[derive(Clone, Debug, Deserialize)]
+/// Canonical Solana USDC SPL mint (Mainnet-Beta).
+pub const SOLANA_MAINNET_USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SolanaHtlcArtifact {
+    pub cluster: String,
+    pub asset: String,
+    pub amount_raw: u64,
+    pub spl_mint: Option<String>,
+    pub sender_pubkey: String,
+    pub recipient_pubkey: String,
+    pub program_id: String,
+    pub pda_seeds_description: String,
+    pub lock_instruction_hex: String,
+    pub claim_instruction_template: String,
+    pub timelock_unix: i64,
+    pub jupiter_route_note: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvmHtlcArtifact {
+    pub chain: String,
+    pub chain_id: u64,
+    pub asset: String,
+    pub amount_raw: u64,
+    pub token_address: String,
+    pub recipient_address: String,
+    pub contract_address: String,
+    pub timelock_unix: u64,
+    pub cast_lock_command: String,
+    pub cast_claim_command: String,
+    pub cast_refund_command: String,
+}
+
+fn validate_solana_base58_pubkey(s: &str, label: &str) -> Result<String, String> {
+    let clean = s.trim();
+    const BASE58_CHARS: &str = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    if clean.len() < 32 || clean.len() > 44 || !clean.chars().all(|c| BASE58_CHARS.contains(c)) {
+        return Err(format!(
+            "{label} must be a valid Base58 Solana public key (32–44 chars)"
+        ));
+    }
+    Ok(clean.to_string())
+}
+
+fn validate_evm_address(s: &str, label: &str) -> Result<String, String> {
+    let clean = s.trim();
+    let hex_part = clean
+        .strip_prefix("0x")
+        .or_else(|| clean.strip_prefix("0X"))
+        .ok_or_else(|| format!("{label} must start with '0x' (42 chars)"))?;
+    if hex_part.len() != 40 || !hex_part.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(format!("{label} must be a 20-byte 0x-prefixed hex address"));
+    }
+    Ok(format!("0x{}", hex_part.to_ascii_lowercase()))
+}
+
+fn evm_chain_metadata(chain: &str) -> Result<(u64, &'static str, &'static str), String> {
+    match chain.trim().to_ascii_lowercase().as_str() {
+        "base" => Ok((8453, "https://mainnet.base.org", "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913")),
+        "ethereum" | "eth" => Ok((1, "https://ethereum-rpc.publicnode.com", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")),
+        "arbitrum" | "arb" => Ok((42161, "https://arb1.arbitrum.io/rpc", "0xaf88d065e77c8cC2239327C5EDb3A432268e5831")),
+        "optimism" | "op" => Ok((10, "https://mainnet.optimism.io", "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85")),
+        "polygon" | "matic" => Ok((137, "https://polygon-bor-rpc.publicnode.com", "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359")),
+        other => Err(format!(
+            "unsupported evm_chain '{other}' (expected base, ethereum, arbitrum, optimism, or polygon)"
+        )),
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct CompileSwapRequest {
-    /// `"btc_onchain"` or `"lightning_bolt11"`.
+    /// `"btc_onchain"`, `"lightning_bolt11"`, `"solana_htlc"`, or `"evm_htlc"`.
     #[serde(default = "default_rail")]
     pub rail: String,
-    /// `"btc_to_love"` (Maker locks LOVE, Taker locks BTC) or `"love_to_btc"` (Maker locks BTC, Taker locks LOVE).
+    /// `"btc_to_love"` (source asset → LOVE) or `"love_to_btc"` (LOVE → source asset).
     #[serde(default = "default_direction")]
     pub direction: String,
     /// `"mainnet"` or `"testnet"`.
@@ -565,7 +635,7 @@ pub struct CompileSwapRequest {
     /// `"mainnet"`, `"testnet"`, `"signet"`, or `"regtest"`.
     #[serde(default = "default_btc_net")]
     pub btc_network: String,
-    /// Optional 64-hex SHA-256 payment hash (required for `btc_onchain`; derived automatically from `bolt11_invoice` for `lightning_bolt11`).
+    /// Optional 64-hex SHA-256 payment hash (required for `btc_onchain`, `solana_htlc`, `evm_htlc`).
     #[serde(default)]
     pub payment_hash_hex: Option<String>,
     /// Optional Lightning BOLT-11 invoice (`lnbc…` / `lntb…`).
@@ -573,7 +643,7 @@ pub struct CompileSwapRequest {
     pub bolt11_invoice: Option<String>,
     /// LOVE amount as decimal string (e.g. `"100"`, `"0.5"`) or numeric string.
     pub amount_love: String,
-    /// BTC amount in satoshis (optional if decoded from BOLT-11).
+    /// Source asset base units (satoshis for BTC/LN, lamports or 6-dec USDC units for Solana/EVM).
     #[serde(default)]
     pub amount_btc_sats: Option<u64>,
     /// Newsatoshi claim address (`ns1…` or `nsd1…`).
@@ -593,6 +663,39 @@ pub struct CompileSwapRequest {
     /// Optional current Bitcoin block height (used only to compute exact remaining Bitcoin blocks for timelock safety check).
     #[serde(default)]
     pub btc_current_height: Option<u32>,
+    /// Solana / EVM asset symbol (e.g. `"USDC"`, `"SOL"`, `"ETH"`, `"cbBTC"`).
+    #[serde(default)]
+    pub source_asset: Option<String>,
+    /// Solana cluster (`"mainnet-beta"` or `"devnet"`).
+    #[serde(default)]
+    pub solana_cluster: Option<String>,
+    /// Solana sender pubkey (Base58) for `solana_htlc`.
+    #[serde(default)]
+    pub solana_sender_pubkey: Option<String>,
+    /// Solana recipient/maker pubkey (Base58) for `solana_htlc`.
+    #[serde(default)]
+    pub solana_recipient_pubkey: Option<String>,
+    /// Optional deployed Solana HTLC program ID (Base58).
+    #[serde(default)]
+    pub solana_program_id: Option<String>,
+    /// Optional custom SPL mint (defaults to canonical Solana USDC when `source_asset == "USDC"`).
+    #[serde(default)]
+    pub solana_spl_mint: Option<String>,
+    /// EVM chain (`"base"`, `"ethereum"`, `"arbitrum"`, `"optimism"`, `"polygon"`).
+    #[serde(default)]
+    pub evm_chain: Option<String>,
+    /// EVM recipient `0x…` address for `evm_htlc`.
+    #[serde(default)]
+    pub evm_recipient_address: Option<String>,
+    /// Optional ERC-20 token address (defaults to canonical chain USDC or `0x000…000` for ETH).
+    #[serde(default)]
+    pub evm_token_address: Option<String>,
+    /// Optional deployed `NewsatoshiHtlc.sol` address (`0x…`).
+    #[serde(default)]
+    pub evm_contract_address: Option<String>,
+    /// Unix timestamp (seconds) expiry for `solana_htlc` or `evm_htlc`.
+    #[serde(default)]
+    pub timelock_unix: Option<u64>,
     /// Optional human note / maker tag.
     #[serde(default)]
     pub maker_label: Option<String>,
@@ -631,6 +734,10 @@ pub struct AtomicSwapContract {
     pub btc_htlc: Option<BitcoinHtlcArtifact>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bolt11: Option<Bolt11Decoded>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub solana_htlc: Option<SolanaHtlcArtifact>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evm_htlc: Option<EvmHtlcArtifact>,
     pub love_lock_command: String,
     pub love_unlock_command: String,
     pub love_expire_command: String,
@@ -702,11 +809,18 @@ fn validate_newsatoshi_address(addr: &str) -> Result<String, String> {
     Ok(a.to_string())
 }
 
-/// Compiles a complete, verifiable `BTC <-> LOVE` atomic swap contract (non-custodial).
+/// Compiles a complete, verifiable multi-chain (`BTC / Lightning / Solana / Base-EVM <-> LOVE`)
+/// non-custodial atomic swap contract.
 pub fn compile_atomic_swap(req: &CompileSwapRequest) -> Result<AtomicSwapContract, String> {
     let rail = req.rail.trim().to_ascii_lowercase();
-    if rail != "btc_onchain" && rail != "lightning_bolt11" {
-        return Err("rail must be 'btc_onchain' or 'lightning_bolt11'".to_string());
+    if !matches!(
+        rail.as_str(),
+        "btc_onchain" | "lightning_bolt11" | "solana_htlc" | "evm_htlc"
+    ) {
+        return Err(
+            "rail must be 'btc_onchain', 'lightning_bolt11', 'solana_htlc', or 'evm_htlc'"
+                .to_string(),
+        );
     }
     let direction = req.direction.trim().to_ascii_lowercase();
     if direction != "btc_to_love" && direction != "love_to_btc" {
@@ -729,8 +843,211 @@ pub fn compile_atomic_swap(req: &CompileSwapRequest) -> Result<AtomicSwapContrac
     let love_block_minutes: u64 = if love_network == "mainnet" { 10 } else { 1 };
     let love_window_mins = (req.love_timeout_blocks as u64) * love_block_minutes;
 
+    let mut solana_htlc: Option<SolanaHtlcArtifact> = None;
+    let mut evm_htlc: Option<EvmHtlcArtifact> = None;
+
     let (payment_hash_hex, amount_btc_sats, btc_htlc, bolt11, timelock_safe, timelock_note) =
-        if rail == "lightning_bolt11" {
+        if rail == "solana_htlc" {
+            let hash_in = req
+                .payment_hash_hex
+                .as_deref()
+                .ok_or_else(|| "payment_hash_hex is required when rail='solana_htlc'".to_string())?;
+            let hash_bytes = hash32_from_hex(hash_in)?;
+            let hash_hex = hex::encode(hash_bytes);
+            let cluster = req
+                .solana_cluster
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .unwrap_or("mainnet-beta")
+                .to_string();
+            let asset = req
+                .source_asset
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .unwrap_or("USDC")
+                .to_ascii_uppercase();
+            let amount_raw = req
+                .amount_btc_sats
+                .filter(|&v| v > 0)
+                .ok_or_else(|| {
+                    "amount_btc_sats (Solana raw base units: lamports or 6-dec USDC) must be > 0"
+                        .to_string()
+                })?;
+            let sender = validate_solana_base58_pubkey(
+                req.solana_sender_pubkey
+                    .as_deref()
+                    .ok_or_else(|| "solana_sender_pubkey (Base58) is required for solana_htlc".to_string())?,
+                "solana_sender_pubkey",
+            )?;
+            let recipient = validate_solana_base58_pubkey(
+                req.solana_recipient_pubkey
+                    .as_deref()
+                    .ok_or_else(|| "solana_recipient_pubkey (Base58) is required for solana_htlc".to_string())?,
+                "solana_recipient_pubkey",
+            )?;
+            if sender == recipient {
+                return Err("solana_sender_pubkey and solana_recipient_pubkey must be distinct".to_string());
+            }
+            let program_id = match req.solana_program_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+                Some(p) => validate_solana_base58_pubkey(p, "solana_program_id")?,
+                None => "<DEPLOYED_NEWSATOSHI_SOLANA_HTLC_PROGRAM_ID>".to_string(),
+            };
+            let is_spl = asset != "SOL";
+            let spl_mint = if is_spl {
+                Some(match req.solana_spl_mint.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+                    Some(m) => validate_solana_base58_pubkey(m, "solana_spl_mint")?,
+                    None => SOLANA_MAINNET_USDC_MINT.to_string(),
+                })
+            } else {
+                None
+            };
+            let now = unix_now();
+            let timelock_unix = req.timelock_unix.unwrap_or(now + 4 * 3600);
+            let sol_window_mins = timelock_unix.saturating_sub(now) / 60;
+
+            // Exact 49-byte instruction matching `bridges/solana/src/lib.rs::encode_lock_instruction`
+            let mut ix = [0u8; 49];
+            ix[0] = if is_spl { 3 } else { 0 };
+            ix[1..33].copy_from_slice(&hash_bytes);
+            ix[33..41].copy_from_slice(&amount_raw.to_le_bytes());
+            ix[41..49].copy_from_slice(&(timelock_unix as i64).to_le_bytes());
+
+            let safe = req.love_timeout_blocks >= MIN_RECOMMENDED_LOVE_BLOCKS
+                && timelock_unix > now + 1800
+                && (if direction == "btc_to_love" {
+                    love_window_mins >= sol_window_mins + 120
+                } else {
+                    sol_window_mins >= love_window_mins + 120
+                });
+            let note = if safe {
+                format!(
+                    "Safe Solana ↔ LOVE ordering: Solana HTLC expires in ~{sol_window_mins} min vs LOVE lock ~{love_window_mins} min (zero-custody SHA-256 PDA escrow)."
+                )
+            } else {
+                format!(
+                    "Check Solana ↔ LOVE timelock margin: Solana window ~{sol_window_mins} min vs LOVE window ~{love_window_mins} min (first locker should outlive second locker by ≥ 120 min)."
+                )
+            };
+
+            solana_htlc = Some(SolanaHtlcArtifact {
+                cluster,
+                asset: asset.clone(),
+                amount_raw,
+                spl_mint,
+                sender_pubkey: sender.clone(),
+                recipient_pubkey: recipient,
+                program_id,
+                pda_seeds_description: format!(
+                    "PDA seeds = [b\"ns_htlc\", bytes.fromhex(\"{hash_hex}\"), base58_decode(\"{sender}\")]"
+                ),
+                lock_instruction_hex: hex::encode(ix),
+                claim_instruction_template: "0x01 || <32-byte preimage> (33 bytes total)".to_string(),
+                timelock_unix: timelock_unix as i64,
+                jupiter_route_note: "Any Solana SPL token can swap into USDC via Jupiter before locking into this SHA-256 HTLC PDA in one Phantom session.".to_string(),
+            });
+
+            (hash_hex, amount_raw, None, None, safe, note)
+        } else if rail == "evm_htlc" {
+            let hash_in = req
+                .payment_hash_hex
+                .as_deref()
+                .ok_or_else(|| "payment_hash_hex is required when rail='evm_htlc'".to_string())?;
+            let hash_hex = hex::encode(hash32_from_hex(hash_in)?);
+            let chain = req
+                .evm_chain
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .unwrap_or("base")
+                .to_ascii_lowercase();
+            let (chain_id, rpc_url, default_usdc) = evm_chain_metadata(&chain)?;
+            let asset = req
+                .source_asset
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .unwrap_or("USDC")
+                .to_ascii_uppercase();
+            let amount_raw = req
+                .amount_btc_sats
+                .filter(|&v| v > 0)
+                .ok_or_else(|| {
+                    "amount_btc_sats (EVM raw base units: wei or 6-dec USDC) must be > 0".to_string()
+                })?;
+            let recipient = validate_evm_address(
+                req.evm_recipient_address
+                    .as_deref()
+                    .ok_or_else(|| "evm_recipient_address (0x...) is required for evm_htlc".to_string())?,
+                "evm_recipient_address",
+            )?;
+            let contract = match req.evm_contract_address.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+                Some(c) => validate_evm_address(c, "evm_contract_address")?,
+                None => "<DEPLOYED_NEWSATOSHI_HTLC_SOL_ADDRESS>".to_string(),
+            };
+            let is_native_eth = asset == "ETH";
+            let token_addr = if is_native_eth {
+                "0x0000000000000000000000000000000000000000".to_string()
+            } else {
+                match req.evm_token_address.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+                    Some(t) => validate_evm_address(t, "evm_token_address")?,
+                    None => default_usdc.to_string(),
+                }
+            };
+            let now = unix_now();
+            let timelock_unix = req.timelock_unix.unwrap_or(now + 4 * 3600);
+            let evm_window_mins = timelock_unix.saturating_sub(now) / 60;
+
+            let cast_lock_command = if is_native_eth {
+                format!(
+                    "cast send {contract} \"lockEth(address,bytes32,uint64)\" {recipient} 0x{hash_hex} {timelock_unix} --value {amount_raw} --rpc-url {rpc_url}"
+                )
+            } else {
+                format!(
+                    "cast send {token_addr} \"approve(address,uint256)\" {contract} {amount_raw} --rpc-url {rpc_url} && cast send {contract} \"lockErc20(address,address,uint256,bytes32,uint64)\" {recipient} {token_addr} {amount_raw} 0x{hash_hex} {timelock_unix} --rpc-url {rpc_url}"
+                )
+            };
+            let cast_claim_command = format!(
+                "cast send {contract} \"claim(bytes32,bytes32)\" <SWAP_ID_BYTES32> 0x<PREIMAGE_64HEX> --rpc-url {rpc_url}"
+            );
+            let cast_refund_command = format!(
+                "cast send {contract} \"refund(bytes32)\" <SWAP_ID_BYTES32> --rpc-url {rpc_url}"
+            );
+
+            let safe = req.love_timeout_blocks >= MIN_RECOMMENDED_LOVE_BLOCKS
+                && timelock_unix > now + 1800
+                && (if direction == "btc_to_love" {
+                    love_window_mins >= evm_window_mins + 120
+                } else {
+                    evm_window_mins >= love_window_mins + 120
+                });
+            let note = if safe {
+                format!(
+                    "Safe {chain} ({asset}) ↔ LOVE ordering: EVM HTLC expires in ~{evm_window_mins} min vs LOVE lock ~{love_window_mins} min (EVM 0x02 sha256 precompile)."
+                )
+            } else {
+                format!(
+                    "Check {chain} ↔ LOVE timelock margin: EVM window ~{evm_window_mins} min vs LOVE window ~{love_window_mins} min (first locker should outlive second locker by ≥ 120 min)."
+                )
+            };
+
+            evm_htlc = Some(EvmHtlcArtifact {
+                chain,
+                chain_id,
+                asset,
+                amount_raw,
+                token_address: token_addr,
+                recipient_address: recipient,
+                contract_address: contract,
+                timelock_unix,
+                cast_lock_command,
+                cast_claim_command,
+                cast_refund_command,
+            });
+
+            (hash_hex, amount_raw, None, None, safe, note)
+        } else if rail == "lightning_bolt11" {
             let invoice = req
                 .bolt11_invoice
                 .as_deref()
@@ -888,6 +1205,8 @@ pub fn compile_atomic_swap(req: &CompileSwapRequest) -> Result<AtomicSwapContrac
         love_timeout_blocks: req.love_timeout_blocks,
         btc_htlc,
         bolt11,
+        solana_htlc,
+        evm_htlc,
         love_lock_command,
         love_unlock_command,
         love_expire_command,
@@ -1180,6 +1499,7 @@ mod tests {
             btc_locktime: Some(900_036),
             btc_current_height: Some(900_000),
             maker_label: Some("mainnet-maker-1".into()),
+            ..Default::default()
         };
         let contract = compile_atomic_swap(&req_safe).unwrap();
         assert!(contract.timelock_safe);
@@ -1191,5 +1511,60 @@ mod tests {
         req_unsafe.btc_locktime = Some(900_144);
         let unsafe_contract = compile_atomic_swap(&req_unsafe).unwrap();
         assert!(!unsafe_contract.timelock_safe);
+    }
+
+    #[test]
+    fn compile_solana_and_base_evm_htlc_buy_roads() {
+        let secret = generate_swap_secret().unwrap();
+        let now = unix_now();
+
+        // 1. Solana USDC -> LOVE HTLC
+        let sol_req = CompileSwapRequest {
+            rail: "solana_htlc".into(),
+            direction: "btc_to_love".into(),
+            love_network: "mainnet".into(),
+            payment_hash_hex: Some(secret.payment_hash_hex.clone()),
+            amount_love: "100".into(),
+            amount_btc_sats: Some(50_000_000), // 50 USDC (6 decimals)
+            love_claim_address: "ns1bc03485c35c661a5f6685a52f19351a143b44994df2943c20285b2e9876f68fa10452da1".into(),
+            love_timeout_blocks: 144,
+            source_asset: Some("USDC".into()),
+            solana_cluster: Some("mainnet-beta".into()),
+            solana_sender_pubkey: Some("7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU".into()),
+            solana_recipient_pubkey: Some("9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin".into()),
+            timelock_unix: Some(now + 4 * 3600),
+            ..Default::default()
+        };
+        let sol_c = compile_atomic_swap(&sol_req).unwrap();
+        assert!(sol_c.timelock_safe);
+        let sol = sol_c.solana_htlc.unwrap();
+        assert_eq!(sol.asset, "USDC");
+        assert_eq!(sol.spl_mint.as_deref(), Some(SOLANA_MAINNET_USDC_MINT));
+        assert_eq!(sol.lock_instruction_hex.len(), 98); // 49 bytes = 98 hex chars
+        assert!(sol.lock_instruction_hex.starts_with("03")); // LockSpl discriminant = 3
+
+        // 2. Base Mainnet USDC -> LOVE HTLC
+        let evm_req = CompileSwapRequest {
+            rail: "evm_htlc".into(),
+            direction: "btc_to_love".into(),
+            love_network: "mainnet".into(),
+            payment_hash_hex: Some(secret.payment_hash_hex.clone()),
+            amount_love: "100".into(),
+            amount_btc_sats: Some(50_000_000), // 50 Base USDC
+            love_claim_address: "ns1bc03485c35c661a5f6685a52f19351a143b44994df2943c20285b2e9876f68fa10452da1".into(),
+            love_timeout_blocks: 144,
+            source_asset: Some("USDC".into()),
+            evm_chain: Some("base".into()),
+            evm_recipient_address: Some("0x1111111111111111111111111111111111111111".into()),
+            timelock_unix: Some(now + 4 * 3600),
+            ..Default::default()
+        };
+        let evm_c = compile_atomic_swap(&evm_req).unwrap();
+        assert!(evm_c.timelock_safe);
+        let evm = evm_c.evm_htlc.unwrap();
+        assert_eq!(evm.chain, "base");
+        assert_eq!(evm.chain_id, 8453);
+        assert_eq!(evm.token_address, "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913");
+        assert!(evm.cast_lock_command.contains("lockErc20"));
     }
 }

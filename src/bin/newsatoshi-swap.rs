@@ -139,6 +139,23 @@ fn run_htlc(args: &[String]) -> Result<(), String> {
             ),
             None => None,
         },
+        source_asset: find_flag(args, "--asset"),
+        solana_cluster: find_flag(args, "--solana-cluster"),
+        solana_sender_pubkey: find_flag(args, "--sol-sender"),
+        solana_recipient_pubkey: find_flag(args, "--sol-recipient"),
+        solana_program_id: find_flag(args, "--sol-program"),
+        solana_spl_mint: find_flag(args, "--sol-mint"),
+        evm_chain: find_flag(args, "--evm-chain"),
+        evm_recipient_address: find_flag(args, "--evm-recipient"),
+        evm_token_address: find_flag(args, "--evm-token"),
+        evm_contract_address: find_flag(args, "--evm-contract"),
+        timelock_unix: match find_flag(args, "--timelock-unix") {
+            Some(v) => Some(
+                v.parse::<u64>()
+                    .map_err(|_| format!("invalid --timelock-unix '{v}'"))?,
+            ),
+            None => None,
+        },
         maker_label: find_flag(args, "--label"),
     };
 

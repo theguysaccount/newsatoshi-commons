@@ -1,0 +1,51 @@
+# 1-Command Newsatoshi Mainnet Lightning Swap Desk (Cash App / Strike / Coinbase / Phoenix -> LOVE)
+#
+# Uses newsatoshi-0.1.0's built-in non-custodial LND Hold-Invoice swap engine (`swap.rs`).
+# Buyers pay ANY Lightning invoice (Apple Pay / Cash App / Strike / Phoenix / Wallet of Satoshi)
+# and receive native shielded Newsatoshi (LOVE) atomically via SHA-256 hash-locks.
+#
+# Prerequisites:
+#   - An LND node reachable over private network (REST, `no-rest-tls`) with admin/invoice macaroon
+#   - Mainnet LOVE liquidity in the newsatoshi node wallet (e.g. from AuxPoW merge-mining)
+
+services:
+  newsatoshi-lightning-desk:
+    build:
+      context: ../../auxpow-stratum
+      dockerfile: Dockerfile.node
+    container_name: newsatoshi-lightning-swap-desk
+    restart: unless-stopped
+    environment:
+      LND_MACAROON_HEX: "${LND_MACAROON_HEX:?Set LND_MACAROON_HEX via secret manager}"
+    command:
+      - "--net"
+      - "${NS_NETWORK:-mainnet}"
+      - "--datadir"
+      - "/data"
+      - "node"
+      - "--status"
+      - "8080"
+      - "--statusbind"
+      - "0.0.0.0"
+      - "--swap-lnd"
+      - "${LND_REST_HOST:?Set LND_REST_HOST e.g. 10.0.0.5:8080}"
+      - "--swap-macaroon"
+      - "env:LND_MACAROON_HEX"
+      - "--swap-rate"
+      - "${SWAP_SATS_PER_LOVE:?Set SWAP_SATS_PER_LOVE e.g. 1000}"
+      - "--swap-min"
+      - "${SWAP_MIN_SATS:-10000}"
+      - "--swap-max"
+      - "${SWAP_MAX_SATS:-5000000}"
+      - "--swap-fee-ppm"
+      - "${SWAP_FEE_PPM:-5000}"
+      - "--swap-network"
+      - "${LND_NETWORK:-bitcoin}"
+    ports:
+      - "${NS_P2P_PORT:-8444}:8444"
+      - "${SWAP_HTTP_PORT:-8090}:8080"
+    volumes:
+      - newsatoshi-swap-data:/data
+
+volumes:
+  newsatoshi-swap-data:

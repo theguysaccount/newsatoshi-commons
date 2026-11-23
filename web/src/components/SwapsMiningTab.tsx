@@ -44,8 +44,8 @@ export function SwapsMiningTab({
   onStateUpdated,
   onNotice,
 }: SwapsMiningTabProps) {
-  // Atomic Swap Compiler form state (strictly blank inputs — zero fake keys or orders)
-  const [rail, setRail] = useState<'btc_onchain' | 'lightning_bolt11'>('btc_onchain');
+  // Multi-chain Atomic Swap Compiler form state (strictly blank inputs — zero fake keys or orders)
+  const [rail, setRail] = useState<'btc_onchain' | 'lightning_bolt11' | 'solana_htlc' | 'evm_htlc'>('btc_onchain');
   const [direction, setDirection] = useState<'btc_to_love' | 'love_to_btc'>('btc_to_love');
   const [loveNet, setLoveNet] = useState<'mainnet' | 'testnet'>('mainnet');
   const [btcNet, setBtcNet] = useState<'mainnet' | 'testnet' | 'signet' | 'regtest'>('mainnet');
@@ -60,6 +60,12 @@ export function SwapsMiningTab({
   const [btcRefundPk, setBtcRefundPk] = useState<string>('');
   const [btcLocktime, setBtcLocktime] = useState<string>('');
   const [btcCurrentHeight, setBtcCurrentHeight] = useState<string>('');
+  const [sourceAsset, setSourceAsset] = useState<string>('USDC');
+  const [solCluster, setSolCluster] = useState<string>('mainnet-beta');
+  const [solSender, setSolSender] = useState<string>('');
+  const [solRecipient, setSolRecipient] = useState<string>('');
+  const [evmChain, setEvmChain] = useState<string>('base');
+  const [evmRecipient, setEvmRecipient] = useState<string>('');
   const [makerLabel, setMakerLabel] = useState<string>('');
 
   const [compiling, setCompiling] = useState(false);
@@ -101,7 +107,7 @@ export function SwapsMiningTab({
       direction,
       love_network: loveNet,
       btc_network: btcNet,
-      payment_hash_hex: rail === 'btc_onchain' ? paymentHash.trim() : undefined,
+      payment_hash_hex: rail !== 'lightning_bolt11' ? paymentHash.trim() : undefined,
       bolt11_invoice: rail === 'lightning_bolt11' ? bolt11Invoice.trim() : undefined,
       amount_love: amountLove.trim(),
       amount_btc_sats: satsNum && Number.isFinite(satsNum) ? Math.floor(satsNum) : undefined,
@@ -111,6 +117,12 @@ export function SwapsMiningTab({
       btc_refund_pubkey_hex: rail === 'btc_onchain' ? btcRefundPk.trim() : undefined,
       btc_locktime: rail === 'btc_onchain' && lockNum ? Math.floor(lockNum) : undefined,
       btc_current_height: rail === 'btc_onchain' && curHeightNum ? Math.floor(curHeightNum) : undefined,
+      source_asset: rail === 'solana_htlc' || rail === 'evm_htlc' ? sourceAsset : undefined,
+      solana_cluster: rail === 'solana_htlc' ? solCluster : undefined,
+      solana_sender_pubkey: rail === 'solana_htlc' ? solSender.trim() : undefined,
+      solana_recipient_pubkey: rail === 'solana_htlc' ? solRecipient.trim() : undefined,
+      evm_chain: rail === 'evm_htlc' ? evmChain : undefined,
+      evm_recipient_address: rail === 'evm_htlc' ? evmRecipient.trim() : undefined,
       maker_label: makerLabel.trim() || undefined,
     };
   };
@@ -292,23 +304,23 @@ docker compose up -d`;
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
         <div className="xl:col-span-7">
           <Panel
-            title="Trustless BTC ↔ LOVE Atomic Swap Compiler"
-            subtitle="Canonical BIP-199 Bitcoin SegWit v0 P2WSH HTLCs & Lightning BOLT-11 mapped directly to Newsatoshi L1 SHA-256 locks — zero custody, zero bridges"
+            title="Multi-Chain Trustless Buy Roads (BTC · Lightning · Solana · Base/EVM ↔ LOVE)"
+            subtitle="All 4 rails share the identical SHA-256 HTLC preimage invariant verified by Newsatoshi L1 — zero custodians, zero wrapped tokens"
             icon={<ArrowLeftRight className="h-4 w-4" />}
             accent="emerald"
             badge={
               <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-emerald-300">
-                NEWSATOSHI-HTLC-SWAP/1.0
+                4 TRUSTLESS RAILS · 0 CUSTODY
               </span>
             }
           >
             <form onSubmit={handleCompile} className="space-y-4">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-3">
                 <div>
                   <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                    Bitcoin Settlement Rail
+                    Source Buy / Bridge Rail
                   </label>
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                     <button
                       type="button"
                       onClick={() => setRail('btc_onchain')}
@@ -318,7 +330,7 @@ docker compose up -d`;
                           : 'border-slate-800 bg-slate-950/70 text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      On-Chain P2WSH
+                      BTC P2WSH
                     </button>
                     <button
                       type="button"
@@ -330,7 +342,29 @@ docker compose up -d`;
                       }`}
                     >
                       <Zap className="h-3.5 w-3.5" />
-                      Lightning BOLT-11
+                      Lightning
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRail('solana_htlc')}
+                      className={`rounded-lg border px-2.5 py-2 text-xs font-medium transition cursor-pointer ${
+                        rail === 'solana_htlc'
+                          ? 'border-purple-500/60 bg-purple-500/15 text-purple-200'
+                          : 'border-slate-800 bg-slate-950/70 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Solana (SOL/USDC)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRail('evm_htlc')}
+                      className={`rounded-lg border px-2.5 py-2 text-xs font-medium transition cursor-pointer ${
+                        rail === 'evm_htlc'
+                          ? 'border-sky-500/60 bg-sky-500/15 text-sky-200'
+                          : 'border-slate-800 bg-slate-950/70 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Base / EVM
                     </button>
                   </div>
                 </div>
@@ -345,8 +379,8 @@ docker compose up -d`;
                       onChange={(e) => setDirection(e.target.value as 'btc_to_love' | 'love_to_btc')}
                       className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-2 font-mono text-[11px] text-slate-200"
                     >
-                      <option value="btc_to_love">BTC → LOVE</option>
-                      <option value="love_to_btc">LOVE → BTC</option>
+                      <option value="btc_to_love">Bridge In → LOVE</option>
+                      <option value="love_to_btc">LOVE → Bridge Out</option>
                     </select>
                     <select
                       value={loveNet}
@@ -356,23 +390,46 @@ docker compose up -d`;
                       <option value="mainnet">LOVE Mainnet</option>
                       <option value="testnet">LOVE Testnet</option>
                     </select>
-                    <select
-                      value={btcNet}
-                      onChange={(e) =>
-                        setBtcNet(e.target.value as 'mainnet' | 'testnet' | 'signet' | 'regtest')
-                      }
-                      className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-2 font-mono text-[11px] text-slate-200"
-                    >
-                      <option value="mainnet">BTC Mainnet</option>
-                      <option value="testnet">BTC Testnet</option>
-                      <option value="signet">BTC Signet</option>
-                      <option value="regtest">BTC Regtest</option>
-                    </select>
+                    {rail === 'solana_htlc' ? (
+                      <select
+                        value={solCluster}
+                        onChange={(e) => setSolCluster(e.target.value)}
+                        className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-2 font-mono text-[11px] text-slate-200"
+                      >
+                        <option value="mainnet-beta">Solana Mainnet</option>
+                        <option value="devnet">Solana Devnet</option>
+                      </select>
+                    ) : rail === 'evm_htlc' ? (
+                      <select
+                        value={evmChain}
+                        onChange={(e) => setEvmChain(e.target.value)}
+                        className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-2 font-mono text-[11px] text-slate-200"
+                      >
+                        <option value="base">Base (8453)</option>
+                        <option value="arbitrum">Arbitrum (42161)</option>
+                        <option value="ethereum">Ethereum (1)</option>
+                        <option value="optimism">Optimism (10)</option>
+                        <option value="polygon">Polygon (137)</option>
+                      </select>
+                    ) : (
+                      <select
+                        value={btcNet}
+                        onChange={(e) =>
+                          setBtcNet(e.target.value as 'mainnet' | 'testnet' | 'signet' | 'regtest')
+                        }
+                        className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-2 font-mono text-[11px] text-slate-200"
+                      >
+                        <option value="mainnet">BTC Mainnet</option>
+                        <option value="testnet">BTC Testnet</option>
+                        <option value="signet">BTC Signet</option>
+                        <option value="regtest">BTC Regtest</option>
+                      </select>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {rail === 'btc_onchain' ? (
+              {rail !== 'lightning_bolt11' ? (
                 <div className="space-y-3">
                   <div>
                     <div className="mb-1 flex items-center justify-between">
@@ -407,34 +464,111 @@ docker compose up -d`;
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                        BTC Claim Pubkey (33-byte compressed hex)
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={btcClaimPk}
-                        onChange={(e) => setBtcClaimPk(e.target.value)}
-                        placeholder="02… or 03… (66 hex chars)"
-                        className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
-                      />
+                  {rail === 'btc_onchain' && (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
+                          BTC Claim Pubkey (33-byte compressed hex)
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={btcClaimPk}
+                          onChange={(e) => setBtcClaimPk(e.target.value)}
+                          placeholder="02… or 03… (66 hex chars)"
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
+                          BTC Refund Pubkey (33-byte compressed hex)
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={btcRefundPk}
+                          onChange={(e) => setBtcRefundPk(e.target.value)}
+                          placeholder="02… or 03… (66 hex chars)"
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                        BTC Refund Pubkey (33-byte compressed hex)
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={btcRefundPk}
-                        onChange={(e) => setBtcRefundPk(e.target.value)}
-                        placeholder="02… or 03… (66 hex chars)"
-                        className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
-                      />
+                  )}
+
+                  {rail === 'solana_htlc' && (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div>
+                        <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
+                          Solana Asset
+                        </label>
+                        <select
+                          value={sourceAsset}
+                          onChange={(e) => setSourceAsset(e.target.value)}
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100"
+                        >
+                          <option value="USDC">USDC (SPL)</option>
+                          <option value="SOL">Native SOL</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
+                          Solana Sender (Base58)
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={solSender}
+                          onChange={(e) => setSolSender(e.target.value)}
+                          placeholder="Phantom wallet pubkey"
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
+                          Solana Maker Recipient
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={solRecipient}
+                          onChange={(e) => setSolRecipient(e.target.value)}
+                          placeholder="Counterparty Base58 pubkey"
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {rail === 'evm_htlc' && (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div>
+                        <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
+                          EVM Asset
+                        </label>
+                        <select
+                          value={sourceAsset}
+                          onChange={(e) => setSourceAsset(e.target.value)}
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100"
+                        >
+                          <option value="USDC">USDC (ERC-20)</option>
+                          <option value="ETH">Native ETH</option>
+                        </select>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
+                          EVM Counterparty Recipient (0x…)
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={evmRecipient}
+                          onChange={(e) => setEvmRecipient(e.target.value)}
+                          placeholder="0x… maker address (Base / Arbitrum / Ethereum)"
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div>
@@ -468,15 +602,23 @@ docker compose up -d`;
                 </div>
                 <div>
                   <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                    BTC Amount (sats)
+                    {rail === 'solana_htlc' || rail === 'evm_htlc'
+                      ? `${sourceAsset} Base Units`
+                      : 'BTC Amount (sats)'}
                   </label>
                   <input
                     type="number"
                     min={1}
-                    required={rail === 'btc_onchain'}
+                    required={rail !== 'lightning_bolt11'}
                     value={amountBtcSats}
                     onChange={(e) => setAmountBtcSats(e.target.value)}
-                    placeholder={rail === 'lightning_bolt11' ? 'Auto from BOLT-11' : 'e.g. 500000'}
+                    placeholder={
+                      rail === 'lightning_bolt11'
+                        ? 'Auto from BOLT-11'
+                        : rail === 'solana_htlc' || rail === 'evm_htlc'
+                          ? 'e.g. 50000000 (50 USDC)'
+                          : 'e.g. 500000'
+                    }
                     className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
                   />
                 </div>
@@ -635,6 +777,38 @@ docker compose up -d`;
                     Decoded BOLT-11 ({compiled.bolt11.network}): payment_hash{' '}
                     <span className="break-all text-slate-100">{compiled.bolt11.payment_hash_hex}</span>
                     {compiled.bolt11.description ? ` · "${compiled.bolt11.description}"` : ''}
+                  </div>
+                )}
+
+                {compiled.solana_htlc && (
+                  <div className="space-y-2 rounded-lg border border-purple-500/35 bg-purple-500/5 p-3 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[10px] uppercase text-purple-300">
+                        Solana SHA-256 HTLC Escrow ({compiled.solana_htlc.cluster} · {compiled.solana_htlc.asset})
+                      </span>
+                      <CopyButton value={compiled.solana_htlc.lock_instruction_hex} label="Copy 49B Ix" />
+                    </div>
+                    <code className="block break-all font-mono text-[10px] text-slate-200">
+                      {compiled.solana_htlc.pda_seeds_description}
+                    </code>
+                    <code className="block break-all font-mono text-[10px] text-purple-200">
+                      Lock Ix (49B): {compiled.solana_htlc.lock_instruction_hex}
+                    </code>
+                    <p className="text-[11px] text-slate-400">{compiled.solana_htlc.jupiter_route_note}</p>
+                  </div>
+                )}
+
+                {compiled.evm_htlc && (
+                  <div className="space-y-2 rounded-lg border border-sky-500/35 bg-sky-500/5 p-3 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[10px] uppercase text-sky-300">
+                        {compiled.evm_htlc.chain.toUpperCase()} (Chain {compiled.evm_htlc.chain_id}) · {compiled.evm_htlc.asset} HTLC
+                      </span>
+                      <CopyButton value={compiled.evm_htlc.cast_lock_command} label="Copy cast" />
+                    </div>
+                    <code className="block break-all font-mono text-[10px] text-sky-200">
+                      {compiled.evm_htlc.cast_lock_command}
+                    </code>
                   </div>
                 )}
 
