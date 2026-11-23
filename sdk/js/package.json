@@ -1,0 +1,35 @@
+{
+  "name": "@newsatoshi/402",
+  "version": "0.8.0",
+  "description": "Zero-dependency post-quantum HTTP 402 PayWord micropayment middleware, autonomous agent client, and Streamable HTTP MCP client for Newsatoshi (LOVE).",
+  "type": "module",
+  "main": "./newsatoshi-402.mjs",
+  "exports": {
+    ".": "./newsatoshi-402.mjs"
+  },
+  "scripts": {
+    "test": "node --test test_newsatoshi_402.mjs"
+  },
+  "keywords": [
+    "newsatoshi",
+    "love",
+    "http-402",
+    "payword",
+    "micropayments",
+    "ai-agents",
+    "mcp",
+    "post-quantum",
+    "bitcoin",
+    "htlc"
+  ],
+  "license": "MIT",
+  "homepage": "https://commons.newsatoshi.org/developers",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/theguysaccount/newsatoshi-commons.git",
+    "directory": "sdk/js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

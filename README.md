@@ -1,16 +1,39 @@
-# `newsatoshi-commons` — Newsatoshi 2.1 Autonomous Abundance Full Stack
+# `newsatoshi-commons` — Post-Quantum Machine Money (`LOVE`), Multi-Chain Atomic Swaps & AI Agent API
 
-Complete Client-Side Validated (CSV) Rust engine, NIST FIPS 205 SLH-DSA + XMSS post-quantum signing layer, real **Winterfell 0.13** STARK prover & verifier, live `newsatoshi-seed` L1 bridge, standalone hardware telemetry signer daemon, formal **RFC-0021** + **SP1 Hypercube / Miden VM** zkVM recursive IVC guest programs, **Live Thermodynamic Telemetry Mirror** web app, and **Parcel #1 Legal-Cryptographic Airlock & Sub-$50k Planning Kit** for **`NEWSATOSHI/2.1` (`LOVE`)**.
+[![CI](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml/badge.svg)](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/theguysaccount/newsatoshi-commons)](https://github.com/theguysaccount/newsatoshi-commons/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](LICENSE)
+[![Live Gateway](https://img.shields.io/badge/Live-commons.newsatoshi.org-10b981)](https://commons.newsatoshi.org)
+[![MCP](https://img.shields.io/badge/MCP-Streamable%20HTTP%20(9%20Tools)-38bdf8)](https://commons.newsatoshi.org/mcp)
 
-- **Live Production Mirror:** `https://commons.newsatoshi.org` (Fly.io fallback: `https://newsatoshi-commons.fly.dev`)
-- **AI Agent Interfaces:** MCP Streamable HTTP `https://commons.newsatoshi.org/mcp` · `/llms.txt` · `/llms-full.txt` · `/.well-known/agent.json` · `/openapi.json` · Installable Skill: `skills/newsatoshi-agent-payments/SKILL.md`
-- **Live L1 Seed Reference:** `https://newsatoshi-seed.fly.dev/status` (Testnet) & `https://newsatoshi.org/mainnet/status` (Mainnet, `auxpow_chainid = 20051`)
-- **RFC-0021 L1 Soft-Fork Prototype (`0xb4`):** `https://github.com/theguysaccount/newsatoshi-rfc0021` (`feat/rfc-0021-op-verify-covenant-stark`)
+Complete open-source, zero-custody infrastructure for **Newsatoshi (`LOVE` / `NEWSATOSHI/2.1`)**: post-quantum NIST FIPS 205 SLH-DSA + XMSS covenants, **Winterfell 0.13** transparent STARK proofs, **4 trustless multi-chain SHA-256 HTLC buy roads** (Bitcoin L1, Lightning, Solana SOL/USDC, Base/Ethereum/Arbitrum ETH/USDC), **1-command AuxPoW Bitcoin merge-mining (`chainid = 20051`)**, **Streamable HTTP MCP (9 tools)**, **zero-dependency JS & Python HTTP `402` PayWord SDKs**, and a **Live Verify-Only Telemetry Mirror & Cockpit**.
 
-### Transacting as an AI Agent (60-Second Setup)
-1. **Connect MCP (`POST https://commons.newsatoshi.org/mcp`):** Zero auth required for live network status, `BTC ↔ LOVE` HTLC compilation, dual-chain lock verification, Winterfell STARK verification, and pure-SHA-256 PayWord HTTP `402` micropayment verification.
-2. **Install the Agent Skill:** `npx skills add theguysaccount/newsatoshi-commons` (`skills/newsatoshi-agent-payments/SKILL.md`).
-3. **Run the zero-dep Agent Client:** `python3 agent-kit/payword_402_client.py --base-url https://commons.newsatoshi.org` (see `docs/AGENT-TRANSACTION-GUIDE.md`).
+- **Live Verify-Only Gateway:** `https://commons.newsatoshi.org` (`0` server private keys, security-audited `v0.8.0`)
+- **AI Agent Discovery:** `POST /mcp` · `/llms.txt` · `/llms-full.txt` · `/docs` · `/developers` · `/.well-known/agent.json` · `/.well-known/mcp/server-card.json` · `/.well-known/api-catalog` · `/.well-known/agent-skills/index.json` · `/openapi.json`
+- **Live L1 Seed Reference:** `https://newsatoshi.org/mainnet/status` (Mainnet, `auxpow_chainid = 20051`, `50 LOVE/block`) & `https://newsatoshi-seed.fly.dev/status` (Testnet)
+- **RFC-0021 L1 Soft-Fork Prototype (`0xb4`):** `https://github.com/theguysaccount/newsatoshi-rfc0021`
+
+### 1-Line Install (macOS & Linux — Verified SHA-256 Prebuilt Binaries)
+```bash
+curl -fsSL https://commons.newsatoshi.org/install.sh | sh
+```
+Installs `newsatoshi-commons`, `newsatoshi-swap`, and `newsatoshi-hw-signer` into `~/.local/bin` (with automatic `SHA256SUMS.txt` verification and `cargo install` fallback).
+
+### Transacting & Monetizing as an AI Agent (60-Second Setup)
+1. **Connect Streamable HTTP MCP (`POST https://commons.newsatoshi.org/mcp`):** Zero auth required for 9 live tools (network status, live AuxPoW mining yield economics, multi-chain BTC/Lightning/Solana/Base HTLC swap compilation, dual-chain lock verification, HTTP `402` challenge generation + PayWord verification, and Winterfell STARK verification).
+2. **Install the Agent Skill:** `npx skills add theguysaccount/newsatoshi-commons` (`https://commons.newsatoshi.org/skills/newsatoshi-agent-payments/SKILL.md`).
+3. **Add a 3-Line HTTP `402` PayWord Paywall (Zero Dependencies):**
+   - **Node 18+ / Cloudflare Workers / Vercel Edge:** `sdk/js/newsatoshi-402.mjs` (`generatePayWordChain`, `createPayWordGate`, `fetchWithNewsatoshi402`, `NewsatoshiMcpClient`)
+   - **Python 3 (FastAPI / Flask / stdlib):** `sdk/python/newsatoshi_402.py` (`generate_payword_chain`, `PayWordGate`, `NewsatoshiMcpClient`)
+
+### 4 Trustless Multi-Chain Buy Roads (Zero Exchanges · Zero Wrapped IOUs · Zero Custody)
+
+| Source Chain / Asset | Contract / Script Standard | Shared Atomic Invariant | Location |
+|---|---|---|---|
+| **Bitcoin L1 (BTC)** | Canonical BIP-199 SegWit v0 P2WSH (`bc1q…`) | `SHA256(preimage) == payment_hash` | `src/swap.rs`, `newsatoshi-swap` |
+| **Lightning Network (BTC)** | BOLT-11 Invoice Decoding → L1 Hash-Lock | `SHA256(preimage) == payment_hash` | `src/swap.rs`, `bridges/lightning/` |
+| **Solana (SOL & SPL-USDC)** | Deterministic PDA Escrow (`ns_htlc` seeds) | `SHA256(preimage) == payment_hash` | `bridges/solana/src/lib.rs` |
+| **Base / Eth / Arb / OP / Polygon** | Immutable Ownerless `NewsatoshiHtlc.sol` (`0x02`) | `SHA256(preimage) == payment_hash` | `bridges/evm/NewsatoshiHtlc.sol` |
 
 > **Core Invariant:** Keep Newsatoshi L1 issuance and SHA-256 merged-mining ordering (`auxpow_chainid = 20051`) **blind and ossified** — never mint base currency directly for physical work (avoiding Budish 2018 rented-hashpower 51% attacks and Sybil wash-farming). Run recursive Commons treasuries as a CSV engine anchored to live L1 blocks today, then activate `OP_VERIFY_COVENANT_STARK` (`0xb4`) via soft fork after the 90-day adversarial testnet & zkVM audit.
 

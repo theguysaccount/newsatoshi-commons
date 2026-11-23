@@ -134,6 +134,91 @@ pub fn build_http_402_challenge(
 pub const AGENT_SKILL_MARKDOWN: &str =
     include_str!("../skills/newsatoshi-agent-payments/SKILL.md");
 
+/// Embedded 1-line POSIX CLI installer served at `/install.sh`.
+pub const INSTALL_SCRIPT_SH: &str = include_str!("../scripts/install.sh");
+
+/// Computes strictly real, live derived network & AuxPoW merge-mining metrics from
+/// live Newsatoshi Mainnet and Testnet `/status` snapshots (zero fabricated figures).
+pub fn compute_network_metrics(seed: &SeedSnapshot, hashrate_ths: f64) -> Value {
+    let clamped_ths = if hashrate_ths.is_finite() && hashrate_ths > 0.0 {
+        hashrate_ths.clamp(0.001, 1_000_000.0)
+    } else {
+        1.2
+    };
+    let max_supply_love = 21_000_000.0f64;
+    let block_reward_love = 50.0f64;
+    let two_pow_32 = 4_294_967_296.0f64;
+
+    let derive_chain = |st: &crate::seed::SeedStatus| -> Value {
+        let issued_love = (st.issued as f64) / 100_000_000.0;
+        let supply_mined_pct = (issued_love / max_supply_love) * 100.0;
+        let recent_count = st.recent.len();
+        let merge_mined_count = st.recent.iter().filter(|b| b.merge_mined).count();
+        let merge_mined_pct = if recent_count > 0 {
+            (merge_mined_count as f64 / recent_count as f64) * 100.0
+        } else {
+            0.0
+        };
+        let observed_avg_block_secs = if recent_count >= 2 {
+            let newest = st.recent[0].time;
+            let oldest = st.recent[recent_count - 1].time;
+            if newest > oldest {
+                Some((newest - oldest) as f64 / ((recent_count - 1) as f64))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let hashes_per_block = st.difficulty.max(1e-9) * two_pow_32;
+        let est_hashrate_hs_600s = hashes_per_block / 600.0;
+        let est_hashrate_hs_observed = observed_avg_block_secs.map(|dt| hashes_per_block / dt.max(1.0));
+
+        let miner_hs = clamped_ths * 1_000_000_000_000.0;
+        let expected_blocks_per_day = (miner_hs * 86_400.0) / hashes_per_block;
+        let expected_love_per_day = expected_blocks_per_day * block_reward_love;
+
+        json!({
+            "network": st.network,
+            "height": st.height,
+            "difficulty": st.difficulty,
+            "bits": st.bits,
+            "auxpow_chainid": st.auxpow_chainid,
+            "peers": st.peers,
+            "locks": st.locks,
+            "notes": st.notes,
+            "nullifiers": st.nullifiers,
+            "mempool": st.mempool,
+            "issued_love": issued_love,
+            "max_supply_love": max_supply_love,
+            "supply_mined_pct": supply_mined_pct,
+            "block_reward_love": block_reward_love,
+            "recent_blocks_sampled": recent_count,
+            "merge_mined_pct": merge_mined_pct,
+            "observed_avg_block_secs": observed_avg_block_secs,
+            "estimated_network_hashrate_hs_nominal_600s": est_hashrate_hs_600s,
+            "estimated_network_hashrate_hs_observed": est_hashrate_hs_observed,
+            "auxpow_yield_at_current_difficulty": {
+                "miner_hashrate_ths": clamped_ths,
+                "hashes_per_block": hashes_per_block,
+                "expected_blocks_per_day_snapshot": expected_blocks_per_day,
+                "expected_love_per_day_snapshot": expected_love_per_day,
+                "asert_note": "Snapshot computed strictly from live on-chain difficulty before ASERT retargeting; adding significant hashrate raises network difficulty dynamically."
+            }
+        })
+    };
+
+    json!({
+        "ok": true,
+        "fetched_at_unix": seed.fetched_at_unix,
+        "auxpow_chainid": AUXPOW_CHAIN_ID,
+        "miner_hashrate_ths": clamped_ths,
+        "mainnet": seed.mainnet_status.as_ref().map(derive_chain),
+        "testnet": seed.status.as_ref().map(derive_chain),
+        "stratum_quickstart": "cd auxpow-stratum && NS_PAYOUT_ADDRESS=<YOUR_NS1_ADDRESS> docker compose up -d"
+    })
+}
+
 // ---------------------------------------------------------------------------
 // Agent Discovery Documents (/robots.txt, /sitemap.xml, /llms.txt, /.well-known/*, /openapi.json)
 // ---------------------------------------------------------------------------
@@ -193,7 +278,9 @@ pub fn render_sitemap_xml(base_url: &str) -> String {
         ("/.well-known/agent-skills/index.json", "0.8", "daily"),
         ("/skills/newsatoshi-agent-payments/SKILL.md", "0.8", "weekly"),
         ("/server.json", "0.7", "daily"),
+        ("/install.sh", "0.8", "weekly"),
         ("/api/health", "0.6", "hourly"),
+        ("/api/network/metrics", "0.8", "hourly"),
         ("/api/state", "0.7", "hourly"),
         ("/api/swaps", "0.7", "hourly"),
     ];
@@ -482,7 +569,9 @@ pub fn render_mcp_server_card_json(base_url: &str) -> Value {
             "newsatoshi_verify_onchain_lock",
             "newsatoshi_verify_payword_402",
             "newsatoshi_verify_stark_proof",
-            "newsatoshi_agent_quickstart"
+            "newsatoshi_agent_quickstart",
+            "newsatoshi_create_402_challenge",
+            "newsatoshi_get_mining_economics"
         ],
         "resources": [
             "newsatoshi://llms.txt",
@@ -949,6 +1038,21 @@ pub fn render_openapi_json(base_url: &str) -> Value {
                     }
                 }
             },
+            "/api/network/metrics": {
+                "get": {
+                    "operationId": "getNetworkMetrics",
+                    "summary": "Live derived Newsatoshi Mainnet/Testnet hashrate, AuxPoW dominance, supply, and merge-mining yield",
+                    "description": "Computes live estimated network hashrate, observed block interval, AuxPoW merge-mined percentage, supply mined percentage, and snapshot LOVE/day yield for a given miner hashrate_ths.",
+                    "parameters": [
+                        api_ver_param.clone(),
+                        { "name": "hashrate_ths", "in": "query", "required": false, "description": "Miner SHA-256 hashrate in TH/s (default 1.2 for Bitaxe Gamma).", "schema": { "type": "number", "default": 1.2 } }
+                    ],
+                    "responses": {
+                        "200": json_ok("Live network & mining economics", "#/components/schemas/GenericApiResponse"),
+                        "500": err_ref.clone()
+                    }
+                }
+            },
             "/api/state": {
                 "get": {
                     "operationId": "getCommonsState",
@@ -1215,6 +1319,31 @@ pub fn mcp_tools_list() -> Value {
                         "network": { "type": "string", "enum": ["mainnet", "testnet"], "default": "testnet" }
                     }
                 }
+            },
+            {
+                "name": "newsatoshi_create_402_challenge",
+                "description": "Generate a standard NEWSATOSHI-402/1.0 Payment Required challenge (L1 hash-lock + pure-SHA-256 PayWord stream) so any AI agent or developer can monetize their own API or tool in LOVE with zero KYC.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "resource": { "type": "string", "default": "/api/inference" },
+                        "amount_love": { "type": "string", "default": "0.01" },
+                        "network": { "type": "string", "enum": ["mainnet", "testnet"], "default": "mainnet" },
+                        "recipient": { "type": "string", "description": "Recipient Newsatoshi ns1... or nsd1... address" },
+                        "unit_price_base_units": { "type": "integer", "default": 1000 }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_get_mining_economics",
+                "description": "Return real-time Newsatoshi Mainnet & Testnet derived hashrate, AuxPoW merge-mined %, supply mined %, and snapshot merge-mining yield for any SHA-256 ASIC hashrate (Bitaxe, NerdQAxe, Antminer S19/S21) at zero extra electricity cost.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "hashrate_ths": { "type": "number", "default": 1.2, "description": "Miner SHA-256 hashrate in TH/s (e.g. 1.2 for Bitaxe Gamma, 200 for Antminer S21)" },
+                        "refresh": { "type": "boolean", "default": false }
+                    }
+                }
             }
         ]
     })
@@ -1443,6 +1572,41 @@ pub fn handle_mcp_jsonrpc(
                         ]
                     }))
                 }
+                "newsatoshi_create_402_challenge" => {
+                    let resource = args
+                        .get("resource")
+                        .and_then(|v| v.as_str())
+                        .filter(|s| !s.is_empty() && s.len() <= 128)
+                        .unwrap_or("/api/inference");
+                    let amount = args
+                        .get("amount_love")
+                        .and_then(|v| v.as_str())
+                        .filter(|a| !a.is_empty() && a.len() <= 20 && a.bytes().all(|b| b.is_ascii_digit() || b == b'.'))
+                        .unwrap_or("0.01");
+                    let net = args
+                        .get("network")
+                        .and_then(|v| v.as_str())
+                        .filter(|s| *s == "mainnet" || *s == "testnet")
+                        .unwrap_or("mainnet");
+                    let recipient = args
+                        .get("recipient")
+                        .and_then(|v| v.as_str())
+                        .filter(|a| a.len() <= 128 && a.bytes().all(|b| b.is_ascii_alphanumeric()))
+                        .unwrap_or("");
+                    let unit = args
+                        .get("unit_price_base_units")
+                        .and_then(|v| v.as_u64())
+                        .filter(|&v| v > 0)
+                        .unwrap_or(1_000);
+                    Ok(build_http_402_challenge(resource, amount, net, recipient, unit))
+                }
+                "newsatoshi_get_mining_economics" => {
+                    let ths = args
+                        .get("hashrate_ths")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(1.2);
+                    Ok(compute_network_metrics(seed_snapshot, ths))
+                }
                 other => Err(format!("unknown MCP tool '{other}'")),
             };
 
@@ -1537,6 +1701,6 @@ mod tests {
             &client,
             None,
         );
-        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 7);
+        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 9);
     }
 }
