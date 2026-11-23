@@ -173,10 +173,12 @@ pub fn compute_network_metrics(seed: &SeedSnapshot, hashrate_ths: f64) -> Value 
         let hashes_per_block = st.difficulty.max(1e-9) * two_pow_32;
         let est_hashrate_hs_600s = hashes_per_block / 600.0;
         let est_hashrate_hs_observed = observed_avg_block_secs.map(|dt| hashes_per_block / dt.max(1.0));
+        let net_hs = est_hashrate_hs_observed.unwrap_or(est_hashrate_hs_600s);
 
         let miner_hs = clamped_ths * 1_000_000_000_000.0;
-        let expected_blocks_per_day = (miner_hs * 86_400.0) / hashes_per_block;
-        let expected_love_per_day = expected_blocks_per_day * block_reward_love;
+        let steady_state_daily_emission_love = 144.0 * block_reward_love; // 144 blocks/day * 50 LOVE = 7,200 LOVE/day
+        let post_asert_share = miner_hs / (net_hs + miner_hs);
+        let post_asert_love_per_day = post_asert_share * steady_state_daily_emission_love;
 
         json!({
             "network": st.network,
@@ -193,17 +195,18 @@ pub fn compute_network_metrics(seed: &SeedSnapshot, hashrate_ths: f64) -> Value 
             "max_supply_love": max_supply_love,
             "supply_mined_pct": supply_mined_pct,
             "block_reward_love": block_reward_love,
+            "steady_state_daily_emission_love": steady_state_daily_emission_love,
             "recent_blocks_sampled": recent_count,
             "merge_mined_pct": merge_mined_pct,
             "observed_avg_block_secs": observed_avg_block_secs,
             "estimated_network_hashrate_hs_nominal_600s": est_hashrate_hs_600s,
             "estimated_network_hashrate_hs_observed": est_hashrate_hs_observed,
-            "auxpow_yield_at_current_difficulty": {
+            "auxpow_yield_post_asert": {
                 "miner_hashrate_ths": clamped_ths,
-                "hashes_per_block": hashes_per_block,
-                "expected_blocks_per_day_snapshot": expected_blocks_per_day,
-                "expected_love_per_day_snapshot": expected_love_per_day,
-                "asert_note": "Snapshot computed strictly from live on-chain difficulty before ASERT retargeting; adding significant hashrate raises network difficulty dynamically."
+                "post_asert_network_share_pct": post_asert_share * 100.0,
+                "expected_love_per_day_post_asert": post_asert_love_per_day,
+                "steady_state_global_love_per_day": steady_state_daily_emission_love,
+                "asert_note": "Computed as miner_hashrate / (live_network_hashrate + miner_hashrate) * 7,200 LOVE/day steady-state emission after ASERT retargeting (zero extra electricity when merge-mining Bitcoin)."
             }
         })
     };

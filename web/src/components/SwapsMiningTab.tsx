@@ -247,7 +247,7 @@ docker compose up -d`;
         accent="emerald"
         badge={
           <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-emerald-300">
-            MCP STREAMABLE HTTP · 7 LIVE TOOLS
+            MCP STREAMABLE HTTP · 9 LIVE TOOLS
           </span>
         }
       >
@@ -1096,14 +1096,16 @@ docker compose up -d`;
               const obsDt = recent.length >= 2 && recent[0].time > recent[recent.length - 1].time
                 ? (recent[0].time - recent[recent.length - 1].time) / (recent.length - 1)
                 : 600;
-              const netGhs = (hashesPerBlock / Math.max(1, obsDt)) / 1e9;
-              const snapBlocksDay = ((ths * 1e12) * 86_400) / hashesPerBlock;
-              const snapLoveDay = snapBlocksDay * 50;
+              const netHs = hashesPerBlock / Math.max(1, obsDt);
+              const netGhs = netHs / 1e9;
+              const minerHs = ths * 1e12;
+              const postAsertShare = minerHs / (netHs + minerHs);
+              const postAsertLoveDay = postAsertShare * 7_200;
               return (
                 <div className="rounded-lg border border-amber-500/25 bg-amber-950/15 p-3 space-y-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-mono text-[10px] uppercase tracking-wider text-amber-300">
-                      Live AuxPoW Yield Snapshot (Zero Extra Electricity)
+                      Live AuxPoW Yield Calculator (Zero Extra Electricity)
                     </span>
                     <span className="font-mono text-[10px] text-slate-400">
                       Est. Net: {netGhs.toFixed(2)} GH/s · {mergePct.toFixed(0)}% merge-mined
@@ -1142,11 +1144,9 @@ docker compose up -d`;
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-[11px]">
                     <div className="rounded border border-slate-800/90 bg-slate-950/75 px-2.5 py-1.5">
-                      <div className="font-mono text-[9px] uppercase text-slate-500">Current-Diff Snapshot / Day</div>
+                      <div className="font-mono text-[9px] uppercase text-slate-500">Post-ASERT Share / 7,200 LOVE/Day</div>
                       <div className="font-mono text-xs font-bold text-amber-300">
-                        {snapLoveDay >= 1000
-                          ? `${Math.round(snapLoveDay).toLocaleString()} LOVE`
-                          : `${snapLoveDay.toFixed(1)} LOVE`}
+                        {postAsertLoveDay.toLocaleString(undefined, { maximumFractionDigits: 1 })} LOVE/day ({(postAsertShare * 100).toFixed(2)}%)
                       </div>
                     </div>
                     <div className="rounded border border-slate-800/90 bg-slate-950/75 px-2.5 py-1.5">
@@ -1157,7 +1157,7 @@ docker compose up -d`;
                     </div>
                   </div>
                   <div className="text-[10px] text-slate-400">
-                    Computed strictly from live Mainnet difficulty ({mainnet.difficulty.toFixed(2)}) × 50 LOVE/block before ASERT retargeting; adding hashrate increases difficulty dynamically.
+                    Steady-state share of 144 blocks/day × 50 LOVE (7,200 LOVE/day global emission) after ASERT retargeting against live Mainnet hashrate ({netGhs.toFixed(2)} GH/s).
                   </div>
                 </div>
               );
