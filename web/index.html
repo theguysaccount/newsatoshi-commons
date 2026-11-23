@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Newsatoshi Commons — Post-Quantum Machine Money (LOVE), Multi-Chain Atomic Swaps &amp; AI Agent Payments</title>
+    <title>Newsatoshi Commons — Post-Quantum Machine Money (LOVE), Multi-Chain Atomic Swaps &amp; AI Agent API</title>
     <meta
       name="description"
       content="Permissionless, post-quantum cryptocurrency (LOVE) infrastructure: trustless BTC, Lightning, Solana &amp; Base/EVM SHA-256 HTLC atomic swaps, AuxPoW merge-mining (chainid 20051), Streamable HTTP MCP, HTTP 402 PayWord micropayments, and Winterfell STARK spending covenants."
@@ -20,19 +20,21 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Newsatoshi Commons" />
     <meta property="og:url" content="https://commons.newsatoshi.org/" />
-    <meta property="og:title" content="Newsatoshi Commons — Post-Quantum Machine Money (LOVE), Atomic Swaps &amp; AI Agent Payments" />
+    <meta property="og:title" content="Newsatoshi Commons — Post-Quantum Machine Money (LOVE), Atomic Swaps &amp; AI Agent API" />
     <meta
       property="og:description"
       content="Trustless BTC, Lightning, Solana &amp; Base/EVM atomic swaps into Newsatoshi (LOVE), 1-command AuxPoW Bitcoin merge-mining, Streamable HTTP MCP, HTTP 402 PayWord micropayments, and Winterfell STARK covenants."
     />
+    <meta property="og:image" content="https://commons.newsatoshi.org/og-image.svg" />
 
     <!-- Twitter / X Card -->
-    <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="Newsatoshi Commons — Post-Quantum Machine Money (LOVE) &amp; AI Agent Payments" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Newsatoshi Commons — Post-Quantum Machine Money (LOVE) &amp; AI Agent API" />
     <meta
       name="twitter:description"
       content="Zero-KYC BTC/Lightning/Solana/Base HTLC atomic swaps, AuxPoW merge-mining, Streamable HTTP MCP (/mcp), HTTP 402 PayWord micropayments, and Winterfell STARK covenants."
     />
+    <meta name="twitter:image" content="https://commons.newsatoshi.org/og-image.svg" />
 
     <!-- Structured Data (Schema.org JSON-LD) -->
     <script type="application/ld+json">
@@ -40,10 +42,33 @@
         "@context": "https://schema.org",
         "@graph": [
           {
+            "@type": "Organization",
+            "@id": "https://commons.newsatoshi.org/#organization",
+            "name": "Newsatoshi Commons",
+            "url": "https://commons.newsatoshi.org/",
+            "logo": "https://commons.newsatoshi.org/og-image.svg",
+            "sameAs": [
+              "https://github.com/theguysaccount/newsatoshi-commons",
+              "https://github.com/theguysaccount/newsatoshi-rfc0021"
+            ],
+            "contactPoint": {
+              "@type": "ContactPoint",
+              "contactType": "technical support",
+              "url": "https://commons.newsatoshi.org/contact",
+              "email": "commons@newsatoshi.org"
+            },
+            "address": {
+              "@type": "PostalAddress",
+              "addressLocality": "Distributed Open-Source Network",
+              "addressCountry": "US"
+            }
+          },
+          {
             "@type": "WebSite",
             "@id": "https://commons.newsatoshi.org/#website",
             "url": "https://commons.newsatoshi.org/",
             "name": "Newsatoshi Commons",
+            "publisher": { "@id": "https://commons.newsatoshi.org/#organization" },
             "description": "Live post-quantum cryptographic telemetry mirror, multi-chain SHA-256 HTLC atomic swap cockpit, AuxPoW merge-mining hub, and AI Agent Transaction Interface (MCP + HTTP 402) for Newsatoshi (LOVE)."
           },
           {
@@ -51,18 +76,20 @@
             "@id": "https://commons.newsatoshi.org/#api",
             "name": "Newsatoshi Commons & Agent Transaction API",
             "url": "https://commons.newsatoshi.org/mcp",
-            "documentation": "https://commons.newsatoshi.org/llms-full.txt",
-            "termsOfService": "https://github.com/theguysaccount/newsatoshi-commons",
+            "documentation": "https://commons.newsatoshi.org/docs",
+            "provider": { "@id": "https://commons.newsatoshi.org/#organization" },
             "description": "Unauthenticated Streamable HTTP MCP server, OpenAPI 3.1 REST endpoints, HTTP 402 PayWord verifier, dual-chain Newsatoshi L1 lock verifier, and trustless BTC/Lightning/Solana/Base HTLC atomic swap compiler."
           },
           {
             "@type": "SoftwareApplication",
             "name": "Newsatoshi Commons (NEWSATOSHI/2.1)",
+            "description": "Open-source Rust post-quantum covenant verifier, multi-chain SHA-256 HTLC atomic swap compiler, AuxPoW Stratum v1 merge-mining server, and Streamable HTTP MCP + HTTP 402 agent payment gateway for Newsatoshi (LOVE).",
             "applicationCategory": "FinanceApplication",
-            "operatingSystem": "Cross-platform",
+            "operatingSystem": "Linux, macOS, Windows",
             "url": "https://commons.newsatoshi.org/",
             "codeRepository": "https://github.com/theguysaccount/newsatoshi-commons",
-            "softwareVersion": "0.7.2",
+            "softwareVersion": "0.7.3",
+            "author": { "@id": "https://commons.newsatoshi.org/#organization" },
             "offers": {
               "@type": "Offer",
               "price": "0",
@@ -81,34 +108,63 @@
     />
   </head>
   <body class="bg-[#06090f] text-slate-100 antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
-    <div id="root"></div>
-    <noscript>
-      <main style="max-width:860px;margin:2rem auto;padding:1.5rem;font-family:system-ui,sans-serif;line-height:1.6;color:#e2e8f0">
-        <h1>Newsatoshi Commons — Post-Quantum Machine Money (LOVE) &amp; AI Agent Transaction Interface</h1>
-        <p>
-          Newsatoshi (<code>LOVE</code>) is a permissionless, post-quantum, zero-KYC Layer-1 cryptocurrency with shielded
-          <code>nsd1…</code> delivery addresses, SHA-256 hash-locks, verifiable L1 Freivalds compute jobs, and Bitcoin
-          AuxPoW merge-mining (<code>chainid = 20051</code>, 50 LOVE/block).
-        </p>
-        <h2>Zero-Custody Multi-Chain Buy Roads (SHA-256 HTLC Atomic Swaps)</h2>
-        <ul>
-          <li><strong>Bitcoin L1:</strong> Canonical BIP-199 SegWit v0 P2WSH (<code>bc1q…</code>) HTLCs verified live via mempool.space.</li>
-          <li><strong>Lightning Network:</strong> Zero-delay BOLT-11 invoice decoding directly into Newsatoshi L1 hash-locks.</li>
-          <li><strong>Solana (SOL &amp; USDC):</strong> Deterministic PDA SHA-256 HTLC escrow for Phantom, Backpack, Solflare &amp; Jupiter routes.</li>
-          <li><strong>Base, Ethereum, Arbitrum, Optimism &amp; Polygon (ETH &amp; USDC):</strong> Immutable, ownerless <code>NewsatoshiHtlc.sol</code> using EVM native <code>sha256</code> precompile (<code>0x02</code>).</li>
-        </ul>
-        <h2>AI Agent Discovery &amp; Machine-Readable Interfaces</h2>
-        <ul>
-          <li><a href="/llms.txt">/llms.txt</a> and <a href="/llms-full.txt">/llms-full.txt</a> — LLM &amp; autonomous agent onboarding guide</li>
-          <li><a href="/mcp">/mcp</a> and <a href="/.well-known/mcp/server-card.json">/.well-known/mcp/server-card.json</a> — Streamable HTTP MCP Server (7 live tools, zero auth)</li>
-          <li><a href="/.well-known/agent.json">/.well-known/agent.json</a> — A2A Agent Card</li>
-          <li><a href="/.well-known/api-catalog">/.well-known/api-catalog</a> and <a href="/openapi.json">/openapi.json</a> — RFC 9727 API Catalog &amp; OpenAPI 3.1 Schema</li>
-          <li><a href="/.well-known/agent-skills/index.json">/.well-known/agent-skills/index.json</a> — Installable Newsatoshi Agent Payments Skill</li>
-          <li><a href="/api/agent/402-challenge">/api/agent/402-challenge</a> — HTTP 402 PayWord + L1 hash-lock micropayment challenge</li>
-          <li><a href="https://github.com/theguysaccount/newsatoshi-commons">GitHub: newsatoshi-commons</a> · <a href="https://github.com/theguysaccount/newsatoshi-rfc0021">GitHub: newsatoshi-rfc0021</a></li>
-        </ul>
+    <div id="root">
+      <main style="max-width:900px;margin:2rem auto;padding:1.5rem;font-family:Inter,system-ui,sans-serif;line-height:1.65;color:#e2e8f0">
+        <header style="margin-bottom:1.5rem">
+          <h1>Newsatoshi Commons — Post-Quantum Machine Money (LOVE), Atomic Swaps &amp; AI Agent API</h1>
+          <p>
+            Newsatoshi Commons is an open-source, zero-custody, verify-only cryptographic gateway for the
+            <strong>Newsatoshi (<code>LOVE</code>)</strong> Layer-1 blockchain: permissionless post-quantum money with
+            non-interactive shielded <code>nsd1…</code> delivery addresses, SHA-256 hash-locks, verifiable L1 Freivalds
+            compute jobs, NIST FIPS 205 SLH-DSA hardware attestations, Winterfell STARK spending covenants, and Bitcoin
+            AuxPoW merge-mining (<code>chainid = 20051</code>, 50 LOVE/block).
+          </p>
+          <nav aria-label="Primary links">
+            <a href="/docs">API &amp; MCP Docs</a> ·
+            <a href="/developers">Developer Portal</a> ·
+            <a href="/llms.txt">llms.txt</a> ·
+            <a href="/openapi.json">OpenAPI 3.1</a> ·
+            <a href="/mcp">MCP Server</a> ·
+            <a href="/about">About</a> ·
+            <a href="/contact">Contact</a> ·
+            <a href="/privacy">Privacy</a> ·
+            <a href="https://github.com/theguysaccount/newsatoshi-commons">GitHub</a>
+          </nav>
+        </header>
+
+        <section>
+          <h2>Zero-Custody Multi-Chain Buy Roads (SHA-256 HTLC Atomic Swaps)</h2>
+          <p>
+            Every swap rail shares the exact <code>SHA256(32-byte preimage) == payment_hash</code> cryptographic invariant
+            enforced natively by Newsatoshi L1 <code>lock --hash</code>, eliminating custodians, wrapped IOUs, and KYC gates:
+          </p>
+          <ul>
+            <li><strong>Bitcoin L1:</strong> Canonical BIP-199 SegWit v0 P2WSH (<code>bc1q…</code>) HTLC scripts verified live via mempool.space.</li>
+            <li><strong>Lightning Network:</strong> Zero-delay BOLT-11 invoice decoding directly into matching Newsatoshi L1 hash-locks.</li>
+            <li><strong>Solana (SOL &amp; USDC):</strong> Deterministic PDA SHA-256 HTLC escrow compatible with Phantom, Backpack, Solflare, and Jupiter swap routing.</li>
+            <li><strong>Base, Ethereum, Arbitrum, Optimism &amp; Polygon (ETH &amp; USDC):</strong> Immutable, ownerless <code>NewsatoshiHtlc.sol</code> using the EVM native <code>sha256</code> precompile (<code>0x02</code>).</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>AI Agent Transaction Interface (MCP + HTTP 402 PayWord)</h2>
+          <p>
+            Autonomous AI agents can connect to <code>https://commons.newsatoshi.org/mcp</code> (Streamable HTTP JSON-RPC 2.0,
+            7 live tools, zero authentication required) to inspect live Mainnet and Testnet chain state, compile multi-chain
+            atomic swaps, verify on-chain hash-locks, verify sub-millisecond post-quantum PayWord HTTP <code>402</code>
+            micropayments, and re-verify Winterfell STARK covenant proofs.
+          </p>
+          <ul>
+            <li><a href="/docs">Newsatoshi Commons API Documentation (/docs)</a></li>
+            <li><a href="/developers">Developer Portal &amp; CLI Tools (/developers)</a></li>
+            <li><a href="/llms.txt">Concise LLM Guide (/llms.txt)</a> and <a href="/llms-full.txt">Full Recipes (/llms-full.txt)</a></li>
+            <li><a href="/.well-known/mcp/server-card.json">MCP Server Card</a>, <a href="/.well-known/agent.json">A2A Agent Card</a>, and <a href="/.well-known/api-catalog">RFC 9727 API Catalog</a></li>
+            <li><a href="/.well-known/agent-skills/index.json">Installable Agent Skill Index</a> (<a href="/skills/newsatoshi-agent-payments/SKILL.md">SKILL.md</a>)</li>
+            <li><a href="/sitemap.xml">XML Sitemap</a> · <a href="https://github.com/theguysaccount/newsatoshi-commons">newsatoshi-commons</a> · <a href="https://github.com/theguysaccount/newsatoshi-rfc0021">newsatoshi-rfc0021</a></li>
+          </ul>
+        </section>
       </main>
-    </noscript>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

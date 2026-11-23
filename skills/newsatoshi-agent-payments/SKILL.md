@@ -1,11 +1,17 @@
 ---
 name: newsatoshi-agent-payments
-description: Transact autonomously with Newsatoshi (LOVE) as an AI agent — connect to the live Streamable HTTP MCP server, create zero-KYC shielded nsd1 delivery wallets, request free testnet LOVE from the faucet, execute trustless BTC-LOVE HTLC atomic swaps, pay or verify per-call HTTP 402 PayWord micropayments, and post verifiable L1 compute jobs.
+description: Use when an AI agent needs to pay or get paid without KYC or credit cards, check live Newsatoshi (LOVE) Mainnet/Testnet status, swap BTC/Lightning/Solana/Base into LOVE via trustless SHA-256 HTLCs, verify HTTP 402 PayWord micropayments, or verify Winterfell STARK spending covenants.
 ---
 
 # Newsatoshi Agent Payments (`LOVE` / `NEWSATOSHI/2.1`)
 
-Use this skill whenever an autonomous agent needs to **hold, send, receive, swap, stream, or escrow value without KYC, credit cards, bank accounts, or custodial bridges**, using post-quantum cryptography (pure SHA-256 STARKs + NIST FIPS 205 SLH-DSA).
+## When to use this skill
+
+Reach for this skill and the `https://commons.newsatoshi.org/mcp` server whenever an agent needs to:
+- **Check live Newsatoshi L1 state** (Mainnet/Testnet block heights, difficulty, AuxPoW `chainid = 20051`, issued supply, open locks).
+- **Acquire or bridge `LOVE` trustlessly** from Bitcoin L1 (BIP-199 P2WSH), Lightning (BOLT-11), Solana (SOL/USDC PDA HTLC), or Base/Ethereum/Arbitrum (ETH/USDC `NewsatoshiHtlc.sol`) with zero exchanges and zero KYC.
+- **Pay or verify per-call HTTP `402` API micropayments** using zero-gas, post-quantum pure-SHA-256 PayWord hash-chains (`SHA256^ticks(token) == tip`) or L1 hash-locks.
+- **Verify physical telemetry, land deeds, or Winterfell STARK spending covenants** without trusting a custodial server (`verify_only: true`, 0 server signing keys).
 
 ## 1. Connect to the Public MCP Server (Zero Auth Required)
 

@@ -1,9 +1,9 @@
 use crate::agent::{
     build_http_402_challenge, handle_mcp_jsonrpc, render_agent_card_json,
     render_agent_skills_index_json, render_api_catalog_json, render_llms_full_txt,
-    render_llms_txt, render_mcp_manifest_json, render_mcp_server_card_json, render_openapi_json,
-    render_robots_txt, render_sitemap_xml, verify_payword_token, AGENT_SKILL_MARKDOWN,
-    DEFAULT_PUBLIC_BASE_URL,
+    render_llms_txt, render_mcp_manifest_json, render_mcp_server_card_json, render_og_image_svg,
+    render_openapi_json, render_public_page, render_robots_txt, render_sitemap_xml,
+    verify_payword_token, AGENT_SKILL_MARKDOWN, DEFAULT_PUBLIC_BASE_URL,
 };
 use crate::crypto::{sha256, sha256_concat};
 use crate::hardware::{ExternalDeedPacket, ExternalTelemetryPacket};
@@ -383,7 +383,10 @@ fn respond_json<T: Serialize>(req: Request, status: u16, payload: &T) {
     let body = serde_json::to_vec(payload).unwrap_or_else(|_| b"{}".to_vec());
     let mut resp = Response::from_data(body)
         .with_status_code(StatusCode(status))
-        .with_header(Header::from_bytes("Content-Type", "application/json; charset=utf-8").unwrap());
+        .with_header(Header::from_bytes("Content-Type", "application/json; charset=utf-8").unwrap())
+        .with_header(Header::from_bytes("X-API-Version", "2026-11").unwrap())
+        .with_header(Header::from_bytes("RateLimit-Policy", "120;w=60").unwrap())
+        .with_header(Header::from_bytes("RateLimit-Limit", "120").unwrap());
     for h in cors_headers() {
         resp = resp.with_header(h);
     }
@@ -405,6 +408,30 @@ fn discovery_link_header() -> Header {
 }
 
 fn respond_problem_404(req: Request, path: &str, base_url: &str) {
+    if wants_markdown(&req) {
+        let md = format!(
+            "# 404 Not Found\n\n\
+             The requested resource `{path}` does not exist on Newsatoshi Commons (`{base_url}`).\n\n\
+             ## Recovery & Discovery Links\n\
+             - [LLM & AI Agent Guide]({base_url}/llms.txt)\n\
+             - [API Documentation]({base_url}/docs)\n\
+             - [Developer Portal]({base_url}/developers)\n\
+             - [OpenAPI 3.1 Schema]({base_url}/openapi.json)\n\
+             - [Streamable HTTP MCP]({base_url}/mcp)\n\
+             - [XML Sitemap]({base_url}/sitemap.xml)\n"
+        );
+        let mut resp = Response::from_string(md)
+            .with_status_code(StatusCode(404))
+            .with_header(Header::from_bytes("Content-Type", "text/markdown; charset=utf-8").unwrap())
+            .with_header(Header::from_bytes("Vary", "Accept").unwrap())
+            .with_header(discovery_link_header());
+        for h in cors_headers() {
+            resp = resp.with_header(h);
+        }
+        let _ = req.respond(resp);
+        return;
+    }
+
     let payload = json!({
         "type": "about:blank",
         "title": "Not Found",
@@ -412,6 +439,7 @@ fn respond_problem_404(req: Request, path: &str, base_url: &str) {
         "detail": format!("Route not found: {path}"),
         "discovery": {
             "llms_txt": format!("{base_url}/llms.txt"),
+            "docs": format!("{base_url}/docs"),
             "openapi": format!("{base_url}/openapi.json"),
             "api_catalog": format!("{base_url}/.well-known/api-catalog"),
             "mcp": format!("{base_url}/mcp"),
@@ -424,6 +452,8 @@ fn respond_problem_404(req: Request, path: &str, base_url: &str) {
         .with_header(
             Header::from_bytes("Content-Type", "application/problem+json; charset=utf-8").unwrap(),
         )
+        .with_header(Header::from_bytes("Vary", "Accept").unwrap())
+        .with_header(Header::from_bytes("X-API-Version", "2026-11").unwrap())
         .with_header(discovery_link_header());
     for h in cors_headers() {
         resp = resp.with_header(h);
@@ -520,13 +550,14 @@ fn handle_request(mut req: Request, state: &AppState) {
 
     if method == Method::Head {
         let head_ct = match path.as_str() {
-            "/" | "/index.html" => {
+            "/" | "/index.html" | "/docs" | "/developers" | "/about" | "/contact" | "/privacy" => {
                 if wants_markdown(&req) {
                     Some("text/markdown; charset=utf-8")
                 } else {
                     Some("text/html; charset=utf-8")
                 }
             }
+            "/og-image.svg" => Some("image/svg+xml"),
             "/robots.txt" => Some("text/plain; charset=utf-8"),
             "/sitemap.xml" => Some("application/xml; charset=utf-8"),
             "/llms.txt" | "/llms-full.txt" | "/skills/newsatoshi-agent-payments/SKILL.md" => {
@@ -566,6 +597,30 @@ fn handle_request(mut req: Request, state: &AppState) {
     }
 
     match (method, path.as_str()) {
+        (Method::Get, "/og-image.svg") => {
+            respond_text(
+                req,
+                200,
+                "image/svg+xml; charset=utf-8",
+                render_og_image_svg().to_string(),
+            );
+        }
+        (Method::Get, "/docs" | "/developers" | "/about" | "/contact" | "/privacy") => {
+            let base_url = infer_base_url(&req);
+            if let Some((ct, body)) = render_public_page(&path, &base_url, wants_markdown(&req)) {
+                let mut resp = Response::from_string(body)
+                    .with_status_code(StatusCode(200))
+                    .with_header(Header::from_bytes("Content-Type", ct).unwrap())
+                    .with_header(Header::from_bytes("Vary", "Accept").unwrap())
+                    .with_header(discovery_link_header());
+                for h in cors_headers() {
+                    resp = resp.with_header(h);
+                }
+                let _ = req.respond(resp);
+            } else {
+                respond_problem_404(req, &path, &base_url);
+            }
+        }
         (Method::Get, "/robots.txt") => {
             let base_url = infer_base_url(&req);
             respond_text(req, 200, "text/plain; charset=utf-8", render_robots_txt(&base_url));
