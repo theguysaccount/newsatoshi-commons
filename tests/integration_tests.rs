@@ -1824,7 +1824,6 @@ fn live_l1_anchor_verification_and_dual_chain_seed_polling() {
     let _ = l1_thread.join();
     let _ = std::fs::remove_dir_all(&tmp_dir);
 }
-
 #[test]
 fn http_api_atomic_swap_compile_publish_and_verify_on_l1() {
     use newsatoshi_commons::server::{spawn_server, ServerConfig};
@@ -1958,5 +1957,194 @@ fn http_api_atomic_swap_compile_publish_and_verify_on_l1() {
     srv.stop();
     stop.store(true, std::sync::atomic::Ordering::SeqCst);
     let _ = l1_thread.join();
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+}
+
+#[test]
+fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
+    use newsatoshi_commons::server::{spawn_server, ServerConfig};
+    use newsatoshi_commons::StreamingChannel;
+    use serde_json::{json, Value};
+
+    let tmp_dir = std::env::temp_dir().join(format!(
+        "newsatoshi_commons_agent_test_{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+    let state_file = tmp_dir.join("commons-ledger.json");
+
+    let srv = spawn_server(ServerConfig {
+        host: "127.0.0.1".to_string(),
+        port: 0,
+        state_file,
+        seed_url: "http://127.0.0.1:1/status".to_string(),
+        mainnet_seed_url: None,
+        static_dir: None,
+        admin_token: Some("agent-test-tok".to_string()),
+        verify_only: true,
+        external_public_keys: None,
+    })
+    .unwrap();
+    let base = srv.base_url();
+
+    // 1. /robots.txt, /llms.txt, /llms-full.txt, Accept: text/markdown on /
+    let robots = ureq::get(&format!("{base}/robots.txt"))
+        .call()
+        .unwrap()
+        .body_mut()
+        .read_to_string()
+        .unwrap();
+    assert!(robots.contains("/llms.txt"));
+    assert!(robots.contains("/mcp"));
+
+    let llms = ureq::get(&format!("{base}/llms.txt"))
+        .call()
+        .unwrap()
+        .body_mut()
+        .read_to_string()
+        .unwrap();
+    assert!(llms.contains("Newsatoshi Commons & Agent Transaction Interface"));
+    assert!(llms.contains("/mcp"));
+
+    let md_root = ureq::get(&format!("{base}/"))
+        .header("Accept", "text/markdown")
+        .call()
+        .unwrap()
+        .body_mut()
+        .read_to_string()
+        .unwrap();
+    assert!(md_root.contains("60-Second Agent Quickstart"));
+
+    // 2. /.well-known/agent.json, /.well-known/mcp.json, /openapi.json
+    let card: Value = serde_json::from_str(
+        &ureq::get(&format!("{base}/.well-known/agent.json"))
+            .call()
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(card["capabilities"]["mcp_streamable_http"], true);
+    assert_eq!(card["capabilities"]["http_402_payword_micropayments"], true);
+
+    let mcp_manifest: Value = serde_json::from_str(
+        &ureq::get(&format!("{base}/.well-known/mcp.json"))
+            .call()
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(mcp_manifest["transport"], "streamable-http");
+
+    let openapi: Value = serde_json::from_str(
+        &ureq::get(&format!("{base}/openapi.json"))
+            .call()
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(openapi["openapi"], "3.1.0");
+    assert!(openapi["paths"]["/mcp"].is_object());
+
+    // 3. Streamable HTTP MCP JSON-RPC 2.0: initialize, tools/list, tools/call (PayWord + quickstart)
+    let init: Value = serde_json::from_str(
+        &ureq::post(&format!("{base}/mcp"))
+            .header("Content-Type", "application/json")
+            .send(r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#)
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(init["result"]["serverInfo"]["name"], "newsatoshi-commons");
+
+    let tools: Value = serde_json::from_str(
+        &ureq::post(&format!("{base}/mcp"))
+            .header("Content-Type", "application/json")
+            .send(r#"{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}"#)
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 7);
+
+    // 4. HTTP 402 challenge returns genuine HTTP 402 status
+    let cfg = ureq::Agent::config_builder().http_status_as_error(false).build();
+    let agent: ureq::Agent = cfg.into();
+    let mut r402 = agent
+        .get(&format!("{base}/api/agent/402-challenge?resource=/api/infer&amount_love=0.05&network=mainnet"))
+        .call()
+        .unwrap();
+    assert_eq!(r402.status().as_u16(), 402);
+    let c402: Value = serde_json::from_str(&r402.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(c402["protocol"], "NEWSATOSHI-402/1.0");
+
+    // 5. PayWord SHA-256 hash-chain verification over REST AND MCP tools/call
+    let seed = sha256(b"agent_http_402_secret_seed");
+    let (ch, chain) = StreamingChannel::create_with_secret_chain(seed, 40, 2_500);
+    let tip_hex = hex::encode(ch.tip);
+    let tok_hex = hex::encode(chain[40 - 6]);
+
+    let rest_v: Value = serde_json::from_str(
+        &ureq::post(&format!("{base}/api/agent/402-verify"))
+            .header("Content-Type", "application/json")
+            .send(
+                json!({
+                    "tip_hex": tip_hex,
+                    "token_hex": tok_hex,
+                    "ticks": 6,
+                    "unit_price_base_units": 2500
+                })
+                .to_string()
+                .as_str(),
+            )
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(rest_v["valid"], true);
+    assert_eq!(rest_v["total_paid_base_units"], 15_000);
+
+    let mcp_v: Value = serde_json::from_str(
+        &ureq::post(&format!("{base}/mcp"))
+            .header("Content-Type", "application/json")
+            .send(
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "newsatoshi_verify_payword_402",
+                        "arguments": {
+                            "tip_hex": tip_hex,
+                            "token_hex": tok_hex,
+                            "ticks": 6,
+                            "unit_price_base_units": 2500
+                        }
+                    }
+                })
+                .to_string()
+                .as_str(),
+            )
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(mcp_v["result"]["isError"], false);
+    assert_eq!(mcp_v["result"]["structuredContent"]["valid"], true);
+
+    srv.stop();
     let _ = std::fs::remove_dir_all(&tmp_dir);
 }
