@@ -130,8 +130,12 @@ pub fn build_http_402_challenge(
     })
 }
 
+/// Embedded installable agent skill served directly at `/skills/newsatoshi-agent-payments/SKILL.md`.
+pub const AGENT_SKILL_MARKDOWN: &str =
+    include_str!("../skills/newsatoshi-agent-payments/SKILL.md");
+
 // ---------------------------------------------------------------------------
-// Agent Discovery Documents (/llms.txt, /llms-full.txt, /.well-known/*, /openapi.json)
+// Agent Discovery Documents (/robots.txt, /sitemap.xml, /llms.txt, /.well-known/*, /openapi.json)
 // ---------------------------------------------------------------------------
 
 pub fn render_robots_txt(base_url: &str) -> String {
@@ -139,15 +143,148 @@ pub fn render_robots_txt(base_url: &str) -> String {
         "\
 User-agent: *
 Allow: /
+Content-Signal: ai-train=yes, search=yes, ai-input=yes
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: {base_url}/sitemap.xml
 
 # AI Agent Discovery
 # llms.txt: {base_url}/llms.txt
 # llms-full.txt: {base_url}/llms-full.txt
 # MCP Streamable HTTP: {base_url}/mcp
+# MCP Server Card: {base_url}/.well-known/mcp/server-card.json
 # A2A Agent Card: {base_url}/.well-known/agent.json
+# RFC 9727 API Catalog: {base_url}/.well-known/api-catalog
+# Agent Skills Index: {base_url}/.well-known/agent-skills/index.json
 # OpenAPI 3.1: {base_url}/openapi.json
 "
     )
+}
+
+pub fn render_sitemap_xml(base_url: &str) -> String {
+    let urls = [
+        ("/", "1.0", "hourly"),
+        ("/llms.txt", "0.9", "hourly"),
+        ("/llms-full.txt", "0.9", "daily"),
+        ("/openapi.json", "0.8", "daily"),
+        ("/.well-known/agent.json", "0.8", "daily"),
+        ("/.well-known/mcp.json", "0.8", "daily"),
+        ("/.well-known/mcp/server-card.json", "0.8", "daily"),
+        ("/.well-known/api-catalog", "0.8", "daily"),
+        ("/.well-known/agent-skills/index.json", "0.8", "daily"),
+        ("/skills/newsatoshi-agent-payments/SKILL.md", "0.8", "weekly"),
+        ("/server.json", "0.7", "daily"),
+        ("/api/health", "0.6", "hourly"),
+        ("/api/state", "0.7", "hourly"),
+        ("/api/swaps", "0.7", "hourly"),
+    ];
+    let mut body = String::from(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n",
+    );
+    for (path, prio, freq) in urls {
+        body.push_str(&format!(
+            "  <url><loc>{base_url}{path}</loc><changefreq>{freq}</changefreq><priority>{prio}</priority></url>\n"
+        ));
+    }
+    body.push_str("</urlset>\n");
+    body
+}
+
+pub fn render_api_catalog_json(base_url: &str) -> Value {
+    json!({
+        "linkset": [
+            {
+                "anchor": format!("{base_url}/api"),
+                "service-desc": [
+                    { "href": format!("{base_url}/openapi.json"), "type": "application/openapi+json" }
+                ],
+                "service-doc": [
+                    { "href": format!("{base_url}/llms-full.txt"), "type": "text/markdown" }
+                ],
+                "status": [
+                    { "href": format!("{base_url}/api/health"), "type": "application/json" }
+                ]
+            },
+            {
+                "anchor": format!("{base_url}/mcp"),
+                "service-desc": [
+                    { "href": format!("{base_url}/.well-known/mcp/server-card.json"), "type": "application/json" }
+                ],
+                "service-doc": [
+                    { "href": format!("{base_url}/llms.txt"), "type": "text/markdown" }
+                ]
+            }
+        ]
+    })
+}
+
+pub fn render_mcp_server_card_json(base_url: &str) -> Value {
+    json!({
+        "schema_version": "1.0",
+        "name": "newsatoshi-commons",
+        "title": "Newsatoshi Commons & Agent Transaction Interface",
+        "description": "Post-quantum machine money (LOVE) MCP server: live Mainnet/Testnet chain status, trustless BTC/Lightning/Solana/Base HTLC atomic swap compiler, live dual-chain lock verifier, HTTP 402 PayWord verifier, and Winterfell STARK verifier.",
+        "version": env!("CARGO_PKG_VERSION"),
+        "transport": "streamable-http",
+        "endpoint": format!("{base_url}/mcp"),
+        "authentication": { "required": false, "type": "none" },
+        "documentation_url": format!("{base_url}/llms-full.txt"),
+        "repository": "https://github.com/theguysaccount/newsatoshi-commons",
+        "tools": [
+            "newsatoshi_get_network_status",
+            "newsatoshi_get_commons_state",
+            "newsatoshi_compile_btc_love_swap",
+            "newsatoshi_verify_onchain_lock",
+            "newsatoshi_verify_payword_402",
+            "newsatoshi_verify_stark_proof",
+            "newsatoshi_agent_quickstart"
+        ],
+        "resources": [
+            "newsatoshi://llms.txt",
+            "newsatoshi://network/status",
+            "newsatoshi://commons/state"
+        ],
+        "client_config_example": {
+            "mcpServers": {
+                "newsatoshi": {
+                    "url": format!("{base_url}/mcp")
+                }
+            }
+        }
+    })
+}
+
+pub fn render_agent_skills_index_json(base_url: &str) -> Value {
+    let digest = hex::encode(sha256(AGENT_SKILL_MARKDOWN.as_bytes()));
+    json!({
+        "schema_version": "1.0",
+        "provider": "Newsatoshi Commons",
+        "homepage": base_url,
+        "skills": [
+            {
+                "name": "newsatoshi-agent-payments",
+                "description": "Connect AI agents to Newsatoshi (LOVE) via Streamable HTTP MCP, HTTP 402 PayWord micropayments, non-interactive shielded nsd1 delivery addresses, and trustless BTC/Lightning/Solana/Base HTLC atomic swaps.",
+                "url": format!("{base_url}/skills/newsatoshi-agent-payments/SKILL.md"),
+                "sha256": digest,
+                "version": env!("CARGO_PKG_VERSION"),
+                "source_repository": "https://github.com/theguysaccount/newsatoshi-commons"
+            }
+        ]
+    })
 }
 
 pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot) -> String {
@@ -178,7 +315,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
         "\
 # Newsatoshi Commons & Agent Transaction Interface ({proto})
 
-> Permissionless, post-quantum, zero-KYC machine money (`LOVE`) for autonomous AI agents: shielded `nsd1…` delivery addresses, pure-SHA-256 PayWord HTTP 402 micropayments, trustless `BTC ↔ LOVE` HTLC atomic swaps, verifiable L1 Freivalds compute jobs, and Winterfell STARK spending covenants.
+> Permissionless, post-quantum, zero-KYC machine money (`LOVE`) for autonomous AI agents: shielded `nsd1…` delivery addresses, pure-SHA-256 PayWord HTTP 402 micropayments, trustless multi-chain HTLC atomic swaps (`BTC`, `Lightning`, `Solana SOL/USDC`, `Base/Ethereum/Arbitrum ETH/USDC`), Bitcoin AuxPoW merge-mining (`chainid = 20051`), verifiable L1 Freivalds compute jobs, and Winterfell STARK spending covenants.
 
 ## Live Network Status
 - {mainnet_line}
@@ -188,10 +325,12 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 
 ## Agent Interfaces (Zero Auth Required for All Reads, Compilers & Verifiers)
 - [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with 7 live tools.
+- [MCP Server Card]({base_url}/.well-known/mcp/server-card.json) & [MCP Registry Manifest]({base_url}/server.json): Standard MCP discovery cards.
 - [A2A Agent Card]({base_url}/.well-known/agent.json): Machine-readable Agent-to-Agent capability manifest.
-- [MCP Discovery Manifest]({base_url}/.well-known/mcp.json): Standard MCP server configuration snippet.
-- [OpenAPI 3.1 Schema]({base_url}/openapi.json): Complete REST API schema for swaps, dual-chain lock verification, HTTP 402 PayWord verification, STARK verification, and offline signed telemetry/deeds.
-- [Full Agent Transaction Guide]({base_url}/llms-full.txt): End-to-end 60-second setup recipes (wallet creation, free testnet faucet, BTC ↔ LOVE swaps, PayWord 402 streaming, L1 compute jobs, AuxPoW mining).
+- [RFC 9727 API Catalog]({base_url}/.well-known/api-catalog) & [OpenAPI 3.1 Schema]({base_url}/openapi.json): Complete REST API schema for multi-chain swaps, dual-chain lock verification, HTTP 402 PayWord verification, STARK verification, and offline signed telemetry/deeds.
+- [Agent Skills Index]({base_url}/.well-known/agent-skills/index.json): SHA-256 verified installable skill ([SKILL.md]({base_url}/skills/newsatoshi-agent-payments/SKILL.md)).
+- [Full Agent Transaction Guide]({base_url}/llms-full.txt): End-to-end 60-second setup recipes (wallet creation, free testnet faucet, BTC/Lightning/Solana/Base ↔ LOVE swaps, PayWord 402 streaming, L1 compute jobs, AuxPoW mining).
+- [XML Sitemap]({base_url}/sitemap.xml)
 
 ## 60-Second Agent Quickstart
 1. **Connect MCP:** point any MCP client at `{base_url}/mcp` (Streamable HTTP) and call `newsatoshi_agent_quickstart`.
@@ -199,8 +338,8 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
    `newsatoshi --net testnet address --delivery` (or `--net mainnet` for production).
 3. **Get free testnet LOVE for instant sandbox testing:**
    `curl -sS -X POST https://newsatoshi-seed.fly.dev/api/faucet -H 'Content-Type: application/json' -d '{{\"address\":\"<YOUR_NSD1_ADDRESS>\"}}'`
-4. **Acquire Mainnet LOVE trustlessly (zero exchanges/KYC):**
-   Call `POST {base_url}/api/swaps/compile` (or MCP tool `newsatoshi_compile_btc_love_swap`) to compile a BIP-199 Bitcoin P2WSH HTLC (`bc1q…`) or decode a Lightning BOLT-11 invoice into a Newsatoshi L1 hash-lock.
+4. **Acquire Mainnet LOVE trustlessly from Bitcoin, Lightning, Solana, or Base/EVM (zero exchanges/KYC):**
+   Call `POST {base_url}/api/swaps/compile` (or MCP tool `newsatoshi_compile_btc_love_swap`) with `rail`: `btc_onchain`, `lightning_bolt11`, `solana_htlc`, or `evm_htlc`.
 5. **Pay or charge per API call with HTTP 402 PayWord micropayments:**
    Request a challenge at `GET {base_url}/api/agent/402-challenge` and verify pure-SHA-256 PayWord tokens (`SHA256^ticks(token) == tip`) or live L1 hash-locks at `POST {base_url}/api/agent/402-verify`.
 
