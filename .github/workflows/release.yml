@@ -62,8 +62,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
         run: |
-          if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --title "$TAG" --generate-notes
+          if ! gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
+            gh release create "$TAG" -R "$REPO" --title "$TAG — Agent Commerce SDKs, Live Mainnet AuxPoW Mining Economics & 1-Line Installer" --generate-notes
           fi
-          gh release upload "$TAG" artifacts/newsatoshi-commons-*.tar.gz artifacts/SHA256SUMS.txt --clobber
+          gh release upload "$TAG" -R "$REPO" artifacts/newsatoshi-commons-*.tar.gz artifacts/SHA256SUMS.txt --clobber
