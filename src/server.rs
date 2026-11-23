@@ -13,6 +13,10 @@ use crate::storage::{
     load_or_init_state_with_mode, save_state_atomic, ApiStateView, CommonsEngine,
     ExternalPublicKeysConfig, FundingRecord, ParcelRecord, StreamingRecord, TelemetryRecord,
 };
+use crate::swap::{
+    compile_atomic_swap, verify_swap_on_chain, AtomicSwapContract, CompileSwapRequest,
+    DualChainSwapVerification,
+};
 use crate::{CheckedWorkProof, StreamingChannel};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -393,6 +397,93 @@ fn handle_request(mut req: Request, state: &AppState) {
             let force = raw_url.contains("refresh=1") || raw_url.contains("refresh=true");
             let snapshot = state.get_seed_snapshot(force);
             respond_json(req, 200, &snapshot);
+        }
+        (Method::Get, "/api/swaps") => {
+            let engine = state.engine.lock().unwrap();
+            respond_json(
+                req,
+                200,
+                &json!({
+                    "ok": true,
+                    "protocol": "NEWSATOSHI-HTLC-SWAP/1.0",
+                    "count": engine.swap_offers.len(),
+                    "swaps": engine.swap_offers,
+                }),
+            );
+        }
+        (Method::Post, "/api/swaps/compile") => {
+            // Public read-only BIP-199 P2WSH HTLC + BOLT-11 swap compiler (zero state mutation).
+            let body = match read_body_string(&mut req) {
+                Ok(b) => b,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": e }));
+                    return;
+                }
+            };
+            let parsed: CompileSwapRequest = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(e) => {
+                    respond_json(
+                        req,
+                        400,
+                        &json!({ "ok": false, "error": format!("invalid swap compile JSON: {e}") }),
+                    );
+                    return;
+                }
+            };
+            match compile_atomic_swap(&parsed) {
+                Ok(contract) => respond_json(req, 200, &json!({ "ok": true, "contract": contract })),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/swaps") => {
+            if !is_authorized_operator(&req, state) {
+                respond_unauthorized(req);
+                return;
+            }
+            let body = match read_body_string(&mut req) {
+                Ok(b) => b,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": e }));
+                    return;
+                }
+            };
+            let parsed: CompileSwapRequest = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(e) => {
+                    respond_json(
+                        req,
+                        400,
+                        &json!({ "ok": false, "error": format!("invalid swap JSON: {e}") }),
+                    );
+                    return;
+                }
+            };
+            let resp = handle_publish_swap(state, parsed);
+            respond_json(req, if resp.ok { 200 } else { 400 }, &resp);
+        }
+        (Method::Post, "/api/swaps/verify") => {
+            // Public live dual-chain verifier (Newsatoshi L1 /api/lock + mempool.space BTC UTXOs).
+            let body = match read_body_string(&mut req) {
+                Ok(b) => b,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": e }));
+                    return;
+                }
+            };
+            let parsed: VerifySwapRequest = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(e) => {
+                    respond_json(
+                        req,
+                        400,
+                        &json!({ "ok": false, "error": format!("invalid verify swap JSON: {e}") }),
+                    );
+                    return;
+                }
+            };
+            let resp = handle_verify_swap(state, parsed);
+            respond_json(req, if resp.ok { 200 } else { 400 }, &resp);
         }
         (Method::Post, "/api/actions/record-funding") => {
             if !is_authorized_operator(&req, state) {
@@ -2336,6 +2427,167 @@ fn handle_verify_stark(state: &AppState, proof_id: &str) -> VerifyStarkResponse 
             security_bits: artifact.security_bits,
             error: Some(e),
         },
+    }
+}
+
+#[derive(Serialize)]
+struct PublishSwapResponse {
+    ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    contract: Option<AtomicSwapContract>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+    state: ApiStateView,
+}
+
+fn handle_publish_swap(state: &AppState, req: CompileSwapRequest) -> PublishSwapResponse {
+    let contract = match compile_atomic_swap(&req) {
+        Ok(c) => c,
+        Err(e) => {
+            let engine = state.engine.lock().unwrap();
+            return PublishSwapResponse {
+                ok: false,
+                contract: None,
+                error: Some(e),
+                state: engine.to_api_state(),
+            };
+        }
+    };
+
+    let mut engine = state.engine.lock().unwrap();
+    if engine
+        .swap_offers
+        .iter()
+        .any(|s| s.payment_hash_hex == contract.payment_hash_hex)
+    {
+        return PublishSwapResponse {
+            ok: false,
+            contract: None,
+            error: Some(format!(
+                "swap with payment_hash '{}' already published",
+                contract.payment_hash_hex
+            )),
+            state: engine.to_api_state(),
+        };
+    }
+    engine.swap_offers.push(contract.clone());
+    let _ = save_state_atomic(&state.state_file, &engine.to_persisted());
+
+    PublishSwapResponse {
+        ok: true,
+        contract: Some(contract),
+        error: None,
+        state: engine.to_api_state(),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct VerifySwapRequest {
+    payment_hash_hex: String,
+    #[serde(default)]
+    love_network: Option<String>,
+    #[serde(default)]
+    btc_address: Option<String>,
+    #[serde(default)]
+    preimage_hex: Option<String>,
+}
+
+#[derive(Serialize)]
+struct VerifySwapResponse {
+    ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    verification: Option<DualChainSwapVerification>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+    state: ApiStateView,
+}
+
+fn handle_verify_swap(state: &AppState, req: VerifySwapRequest) -> VerifySwapResponse {
+    let (network, stored_btc_addr) = {
+        let engine = state.engine.lock().unwrap();
+        let existing = engine
+            .swap_offers
+            .iter()
+            .find(|s| s.payment_hash_hex.eq_ignore_ascii_case(req.payment_hash_hex.trim()));
+        let net = req
+            .love_network
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| *s == "mainnet" || *s == "testnet")
+            .map(ToOwned::to_owned)
+            .or_else(|| existing.map(|s| s.love_network.clone()))
+            .unwrap_or_else(|| "mainnet".to_string());
+        let btc = req
+            .btc_address
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(ToOwned::to_owned)
+            .or_else(|| existing.and_then(|s| s.btc_htlc.as_ref().map(|h| h.btc_p2wsh_address.clone())));
+        (net, btc)
+    };
+
+    let Some(client) = state.client_for_network(&network) else {
+        let engine = state.engine.lock().unwrap();
+        return VerifySwapResponse {
+            ok: false,
+            verification: None,
+            error: Some(format!("No live Newsatoshi L1 seed client configured for '{network}'")),
+            state: engine.to_api_state(),
+        };
+    };
+
+    let report = match verify_swap_on_chain(
+        client,
+        &network,
+        &req.payment_hash_hex,
+        stored_btc_addr.as_deref(),
+        req.preimage_hex.as_deref(),
+    ) {
+        Ok(r) => r,
+        Err(e) => {
+            let engine = state.engine.lock().unwrap();
+            return VerifySwapResponse {
+                ok: false,
+                verification: None,
+                error: Some(e),
+                state: engine.to_api_state(),
+            };
+        }
+    };
+
+    // Update persisted swap record if one matches this payment_hash.
+    let mut engine = state.engine.lock().unwrap();
+    if let Some(offer) = engine
+        .swap_offers
+        .iter_mut()
+        .find(|s| s.payment_hash_hex.eq_ignore_ascii_case(&report.payment_hash_hex))
+    {
+        offer.love_leg_verified = report.love_confirmed;
+        if let Some(ref lock) = report.love_lock {
+            offer.love_lock_id = Some(lock.id.clone());
+            offer.love_lock_state = Some(lock.state.clone());
+            offer.love_confirmed_height = if lock.at > 0 { Some(lock.at) } else { None };
+        }
+        offer.btc_leg_verified = report.btc_confirmed;
+        if let Some(first_utxo) = report.btc_utxos.first() {
+            offer.btc_funding_txid = Some(first_utxo.txid.clone());
+            offer.btc_funded_sats = Some(report.btc_total_sats);
+        }
+        if report.preimage_valid == Some(true) {
+            if let Some(ref p) = req.preimage_hex {
+                offer.verified_preimage_hex = Some(p.trim().to_string());
+            }
+        }
+        offer.last_verified_unix = Some(report.verified_at_unix);
+        let _ = save_state_atomic(&state.state_file, &engine.to_persisted());
+    }
+
+    VerifySwapResponse {
+        ok: true,
+        verification: Some(report),
+        error: None,
+        state: engine.to_api_state(),
     }
 }
 

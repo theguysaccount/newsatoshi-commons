@@ -1,0 +1,66 @@
+# 1-Command Newsatoshi AuxPoW Stratum v1 Merge-Mining Kit (chainid = 20051)
+#
+# Quickstart:
+#   1. Set NS_RPC_AUTH (and optionally NS_PAYOUT_ADDRESS / BTC_RPC_URL) in .env or shell
+#   2. Run: docker compose up -d
+#   3. Point any Bitaxe, NerdQAxe, Antminer S19/S21, or Stratum v1 ASIC at:
+#        stratum+tcp://<YOUR_HOST>:3333   (worker: any name, password: x)
+#   4. Inspect real-time mining stats (zero fake data):
+#        curl http://127.0.0.1:3334/status
+
+services:
+  newsatoshi-node:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    container_name: newsatoshi-l1-node
+    restart: unless-stopped
+    command:
+      - "--net"
+      - "${NS_NETWORK:-mainnet}"
+      - "--datadir"
+      - "/data"
+      - "node"
+      - "--rpc"
+      - "19556"
+      - "--rpcbind"
+      - "0.0.0.0"
+      - "--rpcauth"
+      - "${NS_RPC_AUTH:-auxpow:change-me-before-exposing}"
+      - "--status"
+      - "8080"
+      - "--statusbind"
+      - "0.0.0.0"
+    ports:
+      - "${NS_P2P_PORT:-8444}:8444"
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - newsatoshi-data:/data
+
+  auxpow-stratum:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: newsatoshi-auxpow-stratum
+    restart: unless-stopped
+    depends_on:
+      - newsatoshi-node
+    environment:
+      STRATUM_BIND: "0.0.0.0"
+      STRATUM_PORT: "3333"
+      STATUS_PORT: "3334"
+      NS_RPC_URL: "http://newsatoshi-node:19556/"
+      NS_RPC_AUTH: "${NS_RPC_AUTH:-auxpow:change-me-before-exposing}"
+      NS_PAYOUT_ADDRESS: "${NS_PAYOUT_ADDRESS:-}"
+      # Optional: connect your own bitcoind for simultaneous BTC + LOVE merge-mining
+      BTC_RPC_URL: "${BTC_RPC_URL:-}"
+      BTC_RPC_AUTH: "${BTC_RPC_AUTH:-}"
+      BTC_PAYOUT_SCRIPT_HEX: "${BTC_PAYOUT_SCRIPT_HEX:-51}"
+      COINBASE_TAG: "${COINBASE_TAG:-/newsatoshi-auxpow/}"
+      POLL_INTERVAL: "${POLL_INTERVAL:-2.0}"
+    ports:
+      - "${STRATUM_PORT:-3333}:3333"
+      - "127.0.0.1:${STATUS_PORT:-3334}:3334"
+
+volumes:
+  newsatoshi-data:

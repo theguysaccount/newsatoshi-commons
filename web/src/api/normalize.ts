@@ -273,6 +273,7 @@ export function normalizeCommonsState(raw: unknown): CommonsState {
     streaming_history: asArr(r.streaming_history).map(normalizeStreaming),
     stark_proofs: asArr(r.stark_proofs).map(normalizeStarkProof),
     anchor_receipts: asArr(r.anchor_receipts).map(normalizeAnchorReceipt),
+    swap_offers: asArr(r.swap_offers) as CommonsState['swap_offers'],
     telemetry_series: asArr(r.telemetry_series).map(normalizeSeriesPoint),
     keys: normalizeKeys(r.keys),
   };

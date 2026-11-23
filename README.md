@@ -16,21 +16,24 @@ Complete Client-Side Validated (CSV) Rust engine, NIST FIPS 205 SLH-DSA + XMSS p
 
 ```text
 newsatoshi-commons/
-├── Cargo.toml                         # v0.4.0: slh-dsa 0.2.0-rc.5, winterfell 0.13.1, tiny_http, ureq
+├── Cargo.toml                         # v0.5.0: slh-dsa 0.2.0-rc.5, winterfell 0.13.1, tiny_http, ureq
 ├── Dockerfile                         # 3-stage Node 22 + Rust + debian-slim production container (COMMONS_VERIFY_ONLY=1 + dual-chain polling)
 ├── fly.toml                           # Fly.io deployment config (persistent /data volume + /api/health check)
+├── auxpow-stratum/                    # 1-command Docker + zero-dep Python 3 Stratum v1 AuxPoW merge-mining kit (chainid = 20051, Bitaxe/ASIC/bitcoind)
 ├── src/
 │   ├── crypto.rs                      # Pure SHA-256 Lamport OTS, XMSS Merkle-Lamport (64–4,096 leaves), NIST FIPS 205 SLH-DSA-SHA2-128f
 │   ├── lib.rs                         # CommonsLedger, CovenantRule, CheckedWorkProof, PayWord StreamingChannel, UTXO consolidation
 │   ├── stark.rs                       # Real Winterfell 0.13 AIR prover & verifier (15-col x 64-row, 63-bit bit-decomp, 99-bit PQ security)
+│   ├── swap.rs                        # Trustless BTC <-> LOVE atomic swaps: BIP-199 P2WSH HTLCs, BIP-173 Bech32, BOLT-11 decoder, dual-chain verifier
 │   ├── storage.rs                     # Atomic fsync+rename JSON persistence + strict --verify-only key isolation (zero private seeds on server)
 │   ├── seed.rs                        # Live dual-chain HTTPS poller (testnet + mainnet /status) & live /api/lock?hash= on-chain verifier
 │   ├── rpc.rs                         # Deterministic AnchorCommitment bound to live L1 tip + on-chain lock verification metadata
 │   ├── hardware.rs                    # HardwareTelemetrySigner + ExternalTelemetryPacket + ExternalDeedPacket (offline XMSS/SLH-DSA)
-│   ├── server.rs                      # CORS HTTP API + COMMONS_ADMIN_TOKEN + --verify-only + POST /api/deeds + POST /api/actions/verify-anchor
-│   ├── main.rs                        # CLI (`serve`, `simulate`, `telemetry-sign`, `anchor`, `export-legal-schedule`)
-│   └── bin/newsatoshi-hw-signer.rs    # Standalone Pi / Linux / embedded hardware telemetry signer daemon (`provision`, `sign`, `daemon`)
-├── tests/integration_tests.rs         # 18 integration tests (+1 unit test = 19 total: SLH-DSA, STARKs, verify-only, dual-chain, L1 lock verify)
+│   ├── server.rs                      # CORS HTTP API + COMMONS_ADMIN_TOKEN + --verify-only + /api/deeds + /api/swaps* + /api/actions/verify-anchor
+│   ├── main.rs                        # CLI (`serve`, `simulate`, `telemetry-sign`, `anchor`, `derive-public-roots`, `export-legal-schedule`)
+│   ├── bin/newsatoshi-hw-signer.rs    # Zero-disk-secret field meter daemon (`provision --env-seeds`, `sign`, `daemon`, `poll-meter`, `sign-deed`)
+│   └── bin/newsatoshi-swap.rs         # Standalone trustless BTC <-> LOVE atomic swap CLI (`keygen`, `htlc`, `decode-bolt11`, `verify-preimage`, `watch`)
+├── tests/integration_tests.rs         # 26 Rust tests (SLH-DSA, STARKs, BIP-173/BOLT-11/BIP-199 swaps, verify-only, dual-chain, L1 lock verify)
 ├── docs/
 │   ├── RFC-0021-OP_VERIFY_COVENANT_STARK.md  # Formal NEWSATOSHI/2.1 soft-fork specification & AuxPoW signaling
 │   └── AUXPOW-MAINNET-MINING-GUIDE.md        # Live-verified Mainnet & Bitcoin AuxPoW merged-mining pool onboarding guide (chainid 20051)
@@ -39,7 +42,7 @@ newsatoshi-commons/
 │   ├── sp1-covenant-guest/            # SP1 Hypercube RISC-V guest & host prover/verifier driver
 │   ├── miden-covenant/                # Native Goldilocks STARK Miden Assembly (`covenant_transition.masm`)
 │   └── testnet-harness/               # 90-day soak & adversarial verification script (`adversarial_suite.sh`)
-├── web/                               # Live Thermodynamic Telemetry Mirror & Abundance Cockpit (Vite + React + Tailwind v4)
+├── web/                               # Live Thermodynamic Telemetry Mirror, Swaps & Mining Cockpit (Vite + React + Tailwind v4)
 └── legal/
     ├── perpetual-purpose-trust-charter.md     # Perpetual Purpose Trust Instrument (Section 4.2 Deterministic Cryptographic Execution)
     ├── wyoming-duna-clt-operating-agreement.md # Wyoming DUNA + 99-Year CLT Ground Lease + PayWord Offtake Addendum
@@ -56,8 +59,8 @@ newsatoshi-commons/
 
 | Network | Endpoint / Port | Genesis Hash | Status |
 |---|---|---|---|
-| **Testnet** (`auxpow_chainid = 20051`) | `https://newsatoshi-seed.fly.dev/status` (`:18444` P2P) | `00000fd814d823a0bc64a84135868402998cff81e28a85b2bede5f1125d0a394` | Live & mining (faucet enabled, height `22,100+`) |
-| **Mainnet** (`auxpow_chainid = 20051`) | `newsatoshi-seed.fly.dev:8444` (P2P) | `000000006ba30cc3c86ecaabcb962287e9d5fd0877c27f4b33661b4d1d3033f7` | Live genesis (`height = 0`, awaiting external SHA-256 merged-miners) |
+| **Testnet** (`auxpow_chainid = 20051`) | `https://newsatoshi-seed.fly.dev/status` (`:18444` P2P) | `00000fd814d823a0bc64a84135868402998cff81e28a85b2bede5f1125d0a394` | Live & mining (faucet enabled, height `22,500+`) |
+| **Mainnet** (`auxpow_chainid = 20051`) | `https://newsatoshi.org/mainnet/status` (`newsatoshi-seed.fly.dev:8444` P2P) | `000000006ba30cc3c86ecaabcb962287e9d5fd0877c27f4b33661b4d1d3033f7` | Live & merge-mined (`50 LOVE/block`, AuxPoW `chainid = 20051`) |
 
 ---
 
