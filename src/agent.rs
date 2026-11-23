@@ -178,6 +178,11 @@ Sitemap: {base_url}/sitemap.xml
 pub fn render_sitemap_xml(base_url: &str) -> String {
     let urls = [
         ("/", "1.0", "hourly"),
+        ("/docs", "0.9", "daily"),
+        ("/developers", "0.9", "daily"),
+        ("/about", "0.8", "weekly"),
+        ("/contact", "0.7", "monthly"),
+        ("/privacy", "0.7", "monthly"),
         ("/llms.txt", "0.9", "hourly"),
         ("/llms-full.txt", "0.9", "daily"),
         ("/openapi.json", "0.8", "daily"),
@@ -202,6 +207,232 @@ pub fn render_sitemap_xml(base_url: &str) -> String {
     }
     body.push_str("</urlset>\n");
     body
+}
+
+pub fn render_og_image_svg() -> &'static str {
+    r##"<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#06090f"/>
+  <rect x="44" y="44" width="1112" height="542" rx="24" fill="#0c1220" stroke="#10b981" stroke-opacity="0.35" stroke-width="2"/>
+  <text x="96" y="145" font-family="monospace" font-size="24" font-weight="700" fill="#10b981">NEWSATOSHI/2.1 · VERIFY-ONLY · AUXPOW CHAINID 20051</text>
+  <text x="96" y="245" font-family="system-ui,sans-serif" font-size="60" font-weight="800" fill="#f8fafc">Newsatoshi Commons</text>
+  <text x="96" y="315" font-family="system-ui,sans-serif" font-size="30" fill="#94a3b8">Post-Quantum Machine Money (LOVE) &amp; AI Agent API</text>
+  <text x="96" y="400" font-family="monospace" font-size="22" fill="#e2e8f0">• Trustless SHA-256 HTLC Swaps: BTC · Lightning · Solana · Base/EVM</text>
+  <text x="96" y="442" font-family="monospace" font-size="22" fill="#e2e8f0">• Streamable HTTP MCP (/mcp) · HTTP 402 PayWord Micropayments</text>
+  <text x="96" y="484" font-family="monospace" font-size="22" fill="#e2e8f0">• NIST FIPS 205 SLH-DSA · Winterfell 0.13 STARK Covenants</text>
+  <text x="96" y="548" font-family="monospace" font-size="20" fill="#34d399">https://commons.newsatoshi.org · github.com/theguysaccount/newsatoshi-commons</text>
+</svg>"##
+}
+
+fn wrap_public_html(
+    base_url: &str,
+    path: &str,
+    title: &str,
+    description: &str,
+    body_html: &str,
+) -> String {
+    format!(
+        "<!doctype html>\n\
+<html lang=\"en\">\n\
+<head>\n\
+  <meta charset=\"UTF-8\" />\n\
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n\
+  <title>{title}</title>\n\
+  <meta name=\"description\" content=\"{description}\" />\n\
+  <meta name=\"robots\" content=\"index, follow\" />\n\
+  <link rel=\"canonical\" href=\"{base_url}{path}\" />\n\
+  <link rel=\"alternate\" type=\"text/markdown\" href=\"{base_url}{path}\" />\n\
+  <meta property=\"og:type\" content=\"website\" />\n\
+  <meta property=\"og:title\" content=\"{title}\" />\n\
+  <meta property=\"og:description\" content=\"{description}\" />\n\
+  <meta property=\"og:url\" content=\"{base_url}{path}\" />\n\
+  <meta property=\"og:image\" content=\"{base_url}/og-image.svg\" />\n\
+  <style>body{{margin:0;background:#06090f;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;line-height:1.65}}main{{max-width:860px;margin:0 auto;padding:2.5rem 1.5rem}}a{{color:#34d399}}code,pre{{font-family:ui-monospace,monospace;background:#0f172a;padding:.15rem .35rem;border-radius:4px}}pre{{padding:1rem;overflow-x:auto}}nav{{margin-bottom:2rem;font-size:.95rem}}h1{{font-size:2rem;margin-bottom:.75rem}}h2{{margin-top:2rem;font-size:1.35rem;color:#f8fafc}}</style>\n\
+</head>\n\
+<body>\n\
+  <main>\n\
+    <nav aria-label=\"Site navigation\"><a href=\"/\">Home</a> · <a href=\"/docs\">API Docs</a> · <a href=\"/developers\">Developers</a> · <a href=\"/llms.txt\">llms.txt</a> · <a href=\"/openapi.json\">OpenAPI</a> · <a href=\"/about\">About</a> · <a href=\"/contact\">Contact</a> · <a href=\"/privacy\">Privacy</a></nav>\n\
+    {body_html}\n\
+  </main>\n\
+</body>\n\
+</html>\n"
+    )
+}
+
+/// Renders crawlable, zero-JS HTML or Markdown documentation and trust-anchor pages
+/// (`/docs`, `/developers`, `/about`, `/contact`, `/privacy`).
+pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<(&'static str, String)> {
+    match slug {
+        "/docs" => {
+            if wants_md {
+                let md = format!(
+                    "# Newsatoshi Commons API & MCP Documentation\n\n\
+                     Base URL: `{base_url}` | API Version Header: `X-API-Version: 2026-11` | Auth for Reads/Compilers/Verifiers: `None`\n\n\
+                     ## Authentication & Security Model\n\
+                     - Public read, compilation, and cryptographic verification endpoints require **zero authentication** and hold **zero private signing keys** (`verify_only: true`).\n\
+                     - Offline hardware telemetry (`POST /api/telemetry`) and land deeds (`POST /api/deeds`) self-authenticate via NIST FIPS 205 SLH-DSA or XMSS Merkle-Lamport signatures with payout/price binding.\n\
+                     - Operator-only state writes require `Authorization: Bearer <COMMONS_ADMIN_TOKEN>`.\n\n\
+                     ## Versioning & Deprecation Policy\n\
+                     - All REST responses include `X-API-Version: 2026-11` and `RateLimit-Policy: 120;w=60`.\n\
+                     - Breaking changes are introduced under a new versioned path or header with at least 90 days of advance notice via `Deprecation` and `Sunset` HTTP response headers.\n\n\
+                     ## Core Endpoints\n\
+                     - `POST {base_url}/mcp` — Streamable HTTP MCP JSON-RPC 2.0 server (7 live tools).\n\
+                     - `GET {base_url}/api/health` — Node version, verify-only posture, and uptime.\n\
+                     - `GET {base_url}/api/seed` — Live Newsatoshi Mainnet and Testnet block height, difficulty, issued LOVE, and peer count.\n\
+                     - `POST {base_url}/api/swaps/compile` — Compile zero-custody SHA-256 HTLC swaps for Bitcoin (`btc_onchain`), Lightning (`lightning_bolt11`), Solana (`solana_htlc`), and Base/Ethereum/Arbitrum (`evm_htlc`).\n\
+                     - `POST {base_url}/api/swaps/verify` — Live dual-chain verification across Newsatoshi L1 `/api/lock` and Bitcoin `mempool.space`.\n\
+                     - `GET {base_url}/api/agent/402-challenge` & `POST {base_url}/api/agent/402-verify` — HTTP 402 PayWord hash-chain & L1 lock micropayments.\n\n\
+                     ## Official CLI Tools\n\
+                     Build from source (`cargo install --git https://github.com/theguysaccount/newsatoshi-commons`): `newsatoshi-commons`, `newsatoshi-swap`, and `newsatoshi-hw-signer`.\n\n\
+                     See also: [OpenAPI 3.1]({base_url}/openapi.json), [Developer Portal]({base_url}/developers), [llms-full.txt]({base_url}/llms-full.txt).\n"
+                );
+                Some(("text/markdown; charset=utf-8", md))
+            } else {
+                let html = wrap_public_html(
+                    base_url,
+                    "/docs",
+                    "Newsatoshi Commons API & MCP Documentation",
+                    "Official REST API, Streamable HTTP MCP, HTTP 402 PayWord, and multi-chain SHA-256 HTLC atomic swap documentation for Newsatoshi (LOVE).",
+                    &format!(
+                        "<h1>Newsatoshi Commons API &amp; MCP Documentation</h1>\n\
+                         <p>Complete reference for integrating autonomous AI agents, wallets, liquidity makers, and field hardware with the live Newsatoshi (<code>LOVE</code>) Layer-1 network via <code>{base_url}</code>. All read, swap compilation, and cryptographic verification endpoints require zero authentication and run in strict verify-only mode with zero server signing keys.</p>\n\
+                         <h2>Authentication &amp; Error Format</h2>\n\
+                         <p>Public reads, MCP calls, HTTP 402 verification, STARK verification, and multi-chain HTLC swap compilation require no API keys. Offline hardware packets submitted to <code>POST /api/telemetry</code> and <code>POST /api/deeds</code> authenticate cryptographically via NIST FIPS 205 SLH-DSA or XMSS Merkle-Lamport signatures with payout/price binding. All 4xx/5xx error responses return typed RFC 9457 <code>application/problem+json</code> (or Markdown when requesting <code>Accept: text/markdown</code>).</p>\n\
+                         <h2>Versioning, Deprecation &amp; Rate Limits</h2>\n\
+                         <p>Every API response includes <code>X-API-Version: 2026-11</code> and <code>RateLimit-Policy: 120;w=60</code>. Non-breaking additions roll out continuously; any breaking contract change is published with a minimum 90-day deprecation window signaled via standard HTTP <code>Deprecation</code> and <code>Sunset</code> headers.</p>\n\
+                         <h2>Quickstart Example</h2>\n\
+                         <pre>curl -sS -X POST {base_url}/mcp -H 'Content-Type: application/json' -d '{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\",\"params\":{{}}}}'</pre>\n\
+                         <h2>Machine-Readable Specifications</h2>\n\
+                         <ul><li><a href=\"/openapi.json\">OpenAPI 3.1 Specification (/openapi.json)</a></li><li><a href=\"/.well-known/mcp/server-card.json\">MCP Server Card</a></li><li><a href=\"/.well-known/api-catalog\">RFC 9727 API Catalog</a></li><li><a href=\"/developers\">Developer Portal &amp; CLI Tools (/developers)</a></li><li><a href=\"/llms-full.txt\">Full LLM Agent Guide (/llms-full.txt)</a></li></ul>"
+                    ),
+                );
+                Some(("text/html; charset=utf-8", html))
+            }
+        }
+        "/developers" => {
+            if wants_md {
+                let md = format!(
+                    "# Newsatoshi Commons Developer Portal\n\n\
+                     Build trustless post-quantum payment flows, AI agent billing, multi-chain atomic swaps, and AuxPoW merge-mining infrastructure on Newsatoshi (`LOVE`).\n\n\
+                     ## 1. Streamable HTTP MCP Endpoint (Zero Auth)\n\
+                     Connect Claude Desktop, Cursor, Codex, Antigravity, or any MCP host directly to `{base_url}/mcp`.\n\n\
+                     ## 2. Sandbox Testnet & Free Faucet\n\
+                     Create a shielded `nsd1…` delivery address (`newsatoshi --net testnet address --delivery`) and request free testnet `LOVE` at `https://newsatoshi-seed.fly.dev/api/faucet`.\n\n\
+                     ## 3. Official CLI & Open-Source Kits\n\
+                     - `newsatoshi-commons` — Rust HTTP/MCP verifier & Winterfell STARK engine\n\
+                     - `newsatoshi-swap` — Local CSPRNG preimage generator & BTC/Lightning/Solana/EVM HTLC compiler\n\
+                     - `newsatoshi-hw-signer` — Offline NIST FIPS 205 SLH-DSA & XMSS hardware telemetry/deed signer\n\
+                     - `auxpow-stratum/` — 1-command Bitcoin SHA-256 ASIC AuxPoW merge-mining server (`chainid = 20051`)\n\
+                     - `bridges/evm/NewsatoshiHtlc.sol` & `bridges/solana/` — Immutable ownerless EVM & Solana SHA-256 HTLC contracts\n\
+                     - Installable Agent Skill: `{base_url}/skills/newsatoshi-agent-payments/SKILL.md`\n\n\
+                     Source repositories: https://github.com/theguysaccount/newsatoshi-commons and https://github.com/theguysaccount/newsatoshi-rfc0021\n"
+                );
+                Some(("text/markdown; charset=utf-8", md))
+            } else {
+                let html = wrap_public_html(
+                    base_url,
+                    "/developers",
+                    "Newsatoshi Commons Developer Portal — MCP, CLI, Bridges & Sandbox",
+                    "Developer quickstart, sandbox testnet faucet, Streamable HTTP MCP server, Rust CLI tools, AuxPoW Stratum merge-mining kit, and EVM/Solana HTLC bridges for Newsatoshi (LOVE).",
+                    &format!(
+                        "<h1>Newsatoshi Commons Developer Portal</h1>\n\
+                         <p>Everything developers and autonomous AI agents need to integrate Newsatoshi (<code>LOVE</code>) — from zero-auth MCP tools and OpenAPI schemas to Rust CLIs, AuxPoW merge-mining servers, and immutable multi-chain SHA-256 HTLC bridge contracts.</p>\n\
+                         <h2>1. Connect Streamable HTTP MCP</h2>\n\
+                         <pre>{{\"mcpServers\":{{\"newsatoshi\":{{\"url\":\"{base_url}/mcp\"}}}}}}</pre>\n\
+                         <h2>2. Free Testnet Sandbox</h2>\n\
+                         <p>Generate a non-interactive shielded delivery address with <code>newsatoshi --net testnet address --delivery</code> and fund it instantly from the live testnet faucet at <code>https://newsatoshi-seed.fly.dev/api/faucet</code>.</p>\n\
+                         <h2>3. Official Rust CLIs &amp; Multi-Chain Kits</h2>\n\
+                         <ul><li><strong>Rust CLIs:</strong> <code>cargo install --git https://github.com/theguysaccount/newsatoshi-commons</code> installs <code>newsatoshi-commons</code>, <code>newsatoshi-swap</code>, and <code>newsatoshi-hw-signer</code>.</li><li><strong>AuxPoW Merge-Mining Kit:</strong> Zero-dependency Stratum v1 server in <code>auxpow-stratum/</code> (<code>chainid = 20051</code>, 50 LOVE/block).</li><li><strong>Multi-Chain HTLC Bridges:</strong> Immutable <code>bridges/evm/NewsatoshiHtlc.sol</code> (Base, Ethereum, Arbitrum, Optimism, Polygon) and <code>bridges/solana/</code> (SOL &amp; SPL-USDC).</li><li><strong>Installable Agent Skill:</strong> <a href=\"/skills/newsatoshi-agent-payments/SKILL.md\">newsatoshi-agent-payments/SKILL.md</a> (<a href=\"/.well-known/agent-skills/index.json\">SHA-256 index</a>).</li></ul>\n\
+                         <p>Read the full <a href=\"/docs\">API Documentation</a> or inspect the live <a href=\"/openapi.json\">OpenAPI 3.1 schema</a>.</p>"
+                    ),
+                );
+                Some(("text/html; charset=utf-8", html))
+            }
+        }
+        "/about" => {
+            if wants_md {
+                let md = format!(
+                    "# About Newsatoshi Commons\n\n\
+                     Newsatoshi Commons (`{base_url}`) is an open-source, MIT-licensed public verification gateway and protocol toolkit built for the **Newsatoshi (`LOVE`)** post-quantum Layer-1 network.\n\n\
+                     ## Architecture & Design Principles\n\
+                     - **Zero Custody & Zero Server Keys:** Production runs in strict `--verify-only` mode with zero private signing keys on server hardware.\n\
+                     - **Post-Quantum Cryptography End-to-End:** Uses NIST FIPS 205 SLH-DSA, stateful XMSS Merkle-Lamport trees, pure-SHA-256 PayWord hash-chains, and Winterfell 0.13 transparent STARK proofs with zero trusted setup.\n\
+                     - **Honest Zero-Fake-Data Telemetry:** Every block height, difficulty, supply counter, lock verification, and treasury balance comes strictly from live cryptographic proofs and live L1 RPC/seed responses.\n\
+                     - **Open Source & Auditable:** Full source code, CI test suites, legal-cryptographic airlock templates, and RFC-0021 L1 soft-fork code are published openly on GitHub.\n"
+                );
+                Some(("text/markdown; charset=utf-8", md))
+            } else {
+                let html = wrap_public_html(
+                    base_url,
+                    "/about",
+                    "About Newsatoshi Commons",
+                    "Mission, zero-custody verify-only architecture, post-quantum cryptography, and open-source transparency of Newsatoshi Commons.",
+                    "<h1>About Newsatoshi Commons</h1>\n\
+                     <p>Newsatoshi Commons is an open-source, MIT-licensed cryptographic verification gateway and developer toolkit built for the <strong>Newsatoshi (<code>LOVE</code>)</strong> post-quantum Layer-1 cryptocurrency. Its mission is to make permissionless, quantum-resistant machine money directly usable by autonomous AI agents, Bitcoin merge-miners, multi-chain liquidity makers, and real-world physical infrastructure.</p>\n\
+                     <h2>Zero-Custody, Verify-Only Architecture</h2>\n\
+                     <p>The live public deployment at <code>commons.newsatoshi.org</code> runs in strict <code>--verify-only</code> mode and holds zero private signing keys on server disks or memory. All land deed attestations and physical energy telemetry packets are signed offline using NIST FIPS 205 SLH-DSA or stateful XMSS keys and verified cryptographically alongside Winterfell 0.13 transparent STARK proofs.</p>\n\
+                     <h2>Verifiable Open Source</h2>\n\
+                     <p>All server code, smart contracts, Solana escrow codecs, AuxPoW Stratum merge-mining tools, and RFC-0021 L1 STARK soft-fork prototypes are published openly at <a href=\"https://github.com/theguysaccount/newsatoshi-commons\">github.com/theguysaccount/newsatoshi-commons</a> and <a href=\"https://github.com/theguysaccount/newsatoshi-rfc0021\">github.com/theguysaccount/newsatoshi-rfc0021</a>. Every counter starts at genuine zero and reflects real on-chain and cryptographic state only.</p>",
+                );
+                Some(("text/html; charset=utf-8", html))
+            }
+        }
+        "/contact" => {
+            if wants_md {
+                let md = "# Contact Newsatoshi Commons\n\n\
+                     Newsatoshi Commons is maintained openly on GitHub.\n\n\
+                     ## Technical Support, Integrations & Bug Reports\n\
+                     - GitHub Issues: https://github.com/theguysaccount/newsatoshi-commons/issues\n\
+                     - RFC-0021 L1 Soft-Fork Issues: https://github.com/theguysaccount/newsatoshi-rfc0021/issues\n\
+                     - Contact Email: commons@newsatoshi.org\n\n\
+                     ## Security Disclosures\n\
+                     If you discover a cryptographic, consensus, HTTP API, or bridge vulnerability, please open a private GitHub Security Advisory on `theguysaccount/newsatoshi-commons` or email `commons@newsatoshi.org` with reproduction steps and affected commit hashes so we can verify, patch, and add regression tests promptly.\n".to_string();
+                Some(("text/markdown; charset=utf-8", md))
+            } else {
+                let html = wrap_public_html(
+                    base_url,
+                    "/contact",
+                    "Contact Newsatoshi Commons",
+                    "Technical support, integration inquiries, GitHub issue trackers, and responsible security disclosure channels for Newsatoshi Commons.",
+                    "<h1>Contact Newsatoshi Commons</h1>\n\
+                     <p>Newsatoshi Commons is developed and operated in the open. Developers, AI agent builders, Bitcoin merge-miners, and liquidity makers can reach the maintainers directly through our public engineering channels or email.</p>\n\
+                     <h2>Engineering &amp; Integration Support</h2>\n\
+                     <ul><li><strong>Commons, MCP &amp; Bridges Repository:</strong> <a href=\"https://github.com/theguysaccount/newsatoshi-commons/issues\">github.com/theguysaccount/newsatoshi-commons/issues</a></li><li><strong>RFC-0021 L1 STARK Soft-Fork Repository:</strong> <a href=\"https://github.com/theguysaccount/newsatoshi-rfc0021/issues\">github.com/theguysaccount/newsatoshi-rfc0021/issues</a></li><li><strong>Direct Contact Email:</strong> <a href=\"mailto:commons@newsatoshi.org\">commons@newsatoshi.org</a></li></ul>\n\
+                     <h2>Responsible Security Disclosure</h2>\n\
+                     <p>We welcome independent cryptographic, smart-contract, Stratum, and HTTP API security reviews. Please report suspected vulnerabilities via a private GitHub Security Advisory on <code>theguysaccount/newsatoshi-commons</code> or by emailing <code>commons@newsatoshi.org</code> with affected file paths, commit hashes, and minimal reproduction steps.</p>",
+                );
+                Some(("text/html; charset=utf-8", html))
+            }
+        }
+        "/privacy" => {
+            if wants_md {
+                let md = "# Privacy Policy — Newsatoshi Commons\n\n\
+                     Effective Date: 2026-11-23\n\n\
+                     ## Zero Tracking & Zero Personal Data Collection\n\
+                     - Newsatoshi Commons (`commons.newsatoshi.org`) does **not** require user accounts, KYC documents, cookies, analytics trackers, or advertising pixels.\n\
+                     - All public read APIs, MCP tools, HTTP 402 verifiers, and multi-chain atomic swap compilers operate statelessly without storing caller identities or IP profiles.\n\
+                     - Private keys and swap preimages are never transmitted to or stored on this server (`verify_only: true`, zero server signing keys).\n\n\
+                     ## Public Blockchain & Cryptographic Data\n\
+                     Any transaction IDs, public hash-locks (`SHA256(preimage)`), public keys, STARK proofs, or signed hardware telemetry explicitly submitted to public endpoints become part of the transparent public audit log or underlying public blockchains (Newsatoshi, Bitcoin, Solana, EVM).\n\n\
+                     Questions regarding privacy may be sent to `commons@newsatoshi.org` or opened on https://github.com/theguysaccount/newsatoshi-commons.\n".to_string();
+                Some(("text/markdown; charset=utf-8", md))
+            } else {
+                let html = wrap_public_html(
+                    base_url,
+                    "/privacy",
+                    "Privacy Policy — Newsatoshi Commons",
+                    "Zero-cookie, zero-tracking, zero-KYC privacy policy for Newsatoshi Commons (commons.newsatoshi.org).",
+                    "<h1>Privacy Policy — Newsatoshi Commons</h1>\n\
+                     <p><strong>Effective Date:</strong> November 23, 2026. Newsatoshi Commons (<code>commons.newsatoshi.org</code>) is designed around cryptographic verification and data minimization rather than surveillance or user profiling.</p>\n\
+                     <h2>Zero Cookies, Trackers, or Account PII</h2>\n\
+                     <p>We do not set tracking cookies, run third-party ad or behavioral analytics scripts, collect names, require sign-up accounts, or request KYC identity documents. Public API reads, Streamable HTTP MCP tool invocations, HTTP 402 PayWord verifications, and stateless HTLC swap compilations are processed in memory without building caller profiles. Private keys and atomic swap preimages should never be sent to this server and are never stored by it.</p>\n\
+                     <h2>Public Cryptographic Records &amp; Operational Logs</h2>\n\
+                     <p>Data intentionally published to public endpoints — such as public hash-lock digests, verified L1 anchor hashes, STARK proofs, or offline-signed hardware attestations — is public by design for independent verification. Standard transient infrastructure request logs may be retained briefly by the hosting network strictly for DDoS mitigation and uptime reliability. For privacy inquiries, contact <a href=\"mailto:commons@newsatoshi.org\">commons@newsatoshi.org</a>.</p>",
+                );
+                Some(("text/html; charset=utf-8", html))
+            }
+        }
+        _ => None,
+    }
 }
 
 pub fn render_api_catalog_json(base_url: &str) -> Value {
@@ -316,6 +547,10 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 # Newsatoshi Commons & Agent Transaction Interface ({proto})
 
 > Permissionless, post-quantum, zero-KYC machine money (`LOVE`) for autonomous AI agents: shielded `nsd1…` delivery addresses, pure-SHA-256 PayWord HTTP 402 micropayments, trustless multi-chain HTLC atomic swaps (`BTC`, `Lightning`, `Solana SOL/USDC`, `Base/Ethereum/Arbitrum ETH/USDC`), Bitcoin AuxPoW merge-mining (`chainid = 20051`), verifiable L1 Freivalds compute jobs, and Winterfell STARK spending covenants.
+
+## When to use Newsatoshi Commons
+- Use `{base_url}/mcp` or `{base_url}/api/*` when an agent needs to **check live Newsatoshi Mainnet/Testnet state**, **bridge BTC/Lightning/Solana/Base into LOVE trustlessly**, **issue or verify HTTP 402 PayWord micropayments**, or **cryptographically verify Winterfell STARK covenant proofs and L1 hash-locks**.
+- Human & developer documentation: [API Docs]({base_url}/docs), [Developer Portal]({base_url}/developers), [About]({base_url}/about), [Contact]({base_url}/contact), [Privacy]({base_url}/privacy).
 
 ## Live Network Status
 - {mainnet_line}
@@ -531,58 +766,356 @@ pub fn render_mcp_manifest_json(base_url: &str) -> Value {
 }
 
 pub fn render_openapi_json(base_url: &str) -> Value {
+    let err_ref = json!({
+        "description": "RFC 9457 Problem Details error",
+        "content": {
+            "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+            }
+        }
+    });
+    let api_ver_param = json!({
+        "name": "X-API-Version",
+        "in": "header",
+        "required": false,
+        "description": "Optional API version pin (current: 2026-11). Breaking changes carry a 90-day Deprecation/Sunset window.",
+        "schema": { "type": "string", "default": "2026-11" }
+    });
+    let json_ok = |desc: &str, schema_ref: &str| {
+        json!({
+            "description": desc,
+            "headers": {
+                "X-API-Version": { "schema": { "type": "string" }, "description": "API version identifier (2026-11)" },
+                "RateLimit-Policy": { "schema": { "type": "string" }, "description": "RFC RateLimit policy (120;w=60)" }
+            },
+            "content": {
+                "application/json": {
+                    "schema": { "$ref": schema_ref }
+                }
+            }
+        })
+    };
+
     json!({
         "openapi": "3.1.0",
         "info": {
             "title": "Newsatoshi Commons & Agent Transaction API",
             "version": env!("CARGO_PKG_VERSION"),
-            "description": "Machine-readable REST + MCP + HTTP 402 PayWord + BTC-LOVE HTLC Atomic Swap interface for Newsatoshi (LOVE) and NEWSATOSHI/2.1 STARK covenants."
+            "description": "Machine-readable REST + Streamable HTTP MCP + HTTP 402 PayWord + Multi-Chain (BTC, Lightning, Solana, Base/EVM) SHA-256 HTLC Atomic Swap interface for Newsatoshi (LOVE) and NEWSATOSHI/2.1 STARK covenants.",
+            "contact": {
+                "name": "Newsatoshi Commons",
+                "url": format!("{base_url}/contact"),
+                "email": "commons@newsatoshi.org"
+            },
+            "license": {
+                "name": "MIT",
+                "url": "https://github.com/theguysaccount/newsatoshi-commons/blob/main/LICENSE"
+            },
+            "x-versioning-policy": format!("{base_url}/docs#versioning"),
+            "x-deprecation-policy": "Minimum 90-day advance notice via HTTP Deprecation and Sunset headers before retiring any endpoint or schema field."
         },
-        "servers": [{ "url": base_url }],
+        "servers": [{ "url": base_url, "description": "Production verify-only Newsatoshi Commons gateway" }],
+        "components": {
+            "schemas": {
+                "ProblemDetails": {
+                    "type": "object",
+                    "required": ["type", "title", "status", "detail"],
+                    "properties": {
+                        "type": { "type": "string", "format": "uri" },
+                        "title": { "type": "string" },
+                        "status": { "type": "integer" },
+                        "detail": { "type": "string" },
+                        "error": { "type": "string" }
+                    }
+                },
+                "HealthResponse": {
+                    "type": "object",
+                    "required": ["ok", "version", "protocol_version", "verify_only", "signing_keys_loaded", "uptime_secs"],
+                    "properties": {
+                        "ok": { "type": "boolean" },
+                        "version": { "type": "string" },
+                        "protocol_version": { "type": "string" },
+                        "verify_only": { "type": "boolean" },
+                        "signing_keys_loaded": { "type": "boolean" },
+                        "auth_required": { "type": "boolean" },
+                        "uptime_secs": { "type": "integer" }
+                    }
+                },
+                "GenericApiResponse": {
+                    "type": "object",
+                    "properties": {
+                        "ok": { "type": "boolean" },
+                        "error": { "type": "string" }
+                    },
+                    "additionalProperties": true
+                },
+                "McpRpcRequest": {
+                    "type": "object",
+                    "required": ["jsonrpc", "method"],
+                    "properties": {
+                        "jsonrpc": { "type": "string", "const": "2.0" },
+                        "id": { "oneOf": [{ "type": "string" }, { "type": "integer" }] },
+                        "method": { "type": "string", "enum": ["initialize", "ping", "tools/list", "tools/call", "resources/list", "resources/read"] },
+                        "params": { "type": "object" }
+                    }
+                },
+                "SwapCompileRequest": {
+                    "type": "object",
+                    "required": ["rail", "payment_hash_hex", "amount_love", "love_claim_address"],
+                    "properties": {
+                        "rail": { "type": "string", "enum": ["btc_onchain", "lightning_bolt11", "solana_htlc", "evm_htlc"] },
+                        "direction": { "type": "string", "enum": ["btc_to_love", "love_to_btc"] },
+                        "love_network": { "type": "string", "enum": ["mainnet", "testnet"] },
+                        "payment_hash_hex": { "type": "string", "minLength": 64, "maxLength": 64 },
+                        "amount_love": { "type": "string" },
+                        "love_claim_address": { "type": "string" },
+                        "love_timeout_blocks": { "type": "integer", "minimum": 12 }
+                    }
+                },
+                "SwapVerifyRequest": {
+                    "type": "object",
+                    "required": ["payment_hash_hex"],
+                    "properties": {
+                        "payment_hash_hex": { "type": "string", "minLength": 64, "maxLength": 64 },
+                        "love_network": { "type": "string", "enum": ["mainnet", "testnet"] },
+                        "btc_address": { "type": "string" },
+                        "preimage_hex": { "type": "string" }
+                    }
+                },
+                "Http402ChallengeResponse": {
+                    "type": "object",
+                    "required": ["status", "protocol", "resource", "network", "amount_love", "payment_hash_hex", "rails"],
+                    "properties": {
+                        "status": { "type": "integer", "const": 402 },
+                        "protocol": { "type": "string" },
+                        "resource": { "type": "string" },
+                        "network": { "type": "string", "enum": ["mainnet", "testnet"] },
+                        "amount_love": { "type": "string" },
+                        "payment_hash_hex": { "type": "string" },
+                        "rails": { "type": "object" }
+                    }
+                },
+                "Http402VerifyRequest": {
+                    "type": "object",
+                    "properties": {
+                        "tip_hex": { "type": "string" },
+                        "token_hex": { "type": "string" },
+                        "ticks": { "type": "integer" },
+                        "unit_price_base_units": { "type": "integer" },
+                        "payment_hash_hex": { "type": "string" },
+                        "network": { "type": "string", "enum": ["mainnet", "testnet"] }
+                    }
+                }
+            }
+        },
         "paths": {
             "/mcp": {
                 "post": {
+                    "operationId": "invokeMcpRpc",
                     "summary": "Streamable HTTP MCP JSON-RPC 2.0 endpoint",
-                    "description": "Supports initialize, ping, tools/list, tools/call, resources/list, and resources/read with zero authentication required.",
-                    "responses": { "200": { "description": "JSON-RPC 2.0 response" } }
+                    "description": "Executes MCP JSON-RPC 2.0 methods (initialize, ping, tools/list, tools/call, resources/list, resources/read) with zero authentication required.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/McpRpcRequest" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("JSON-RPC 2.0 response", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
                 }
             },
             "/api/health": {
-                "get": { "summary": "Server health, version, and verify-only key-isolation status", "responses": { "200": { "description": "OK" } } }
+                "get": {
+                    "operationId": "getHealth",
+                    "summary": "Server health, version, and verify-only key-isolation status",
+                    "description": "Returns server version, uptime, and cryptographic verify-only key-isolation flags.",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "200": json_ok("Health status", "#/components/schemas/HealthResponse"),
+                        "500": err_ref.clone()
+                    }
+                }
             },
             "/api/seed": {
-                "get": { "summary": "Live dual-chain Newsatoshi L1 Testnet + Mainnet status", "responses": { "200": { "description": "Live chain telemetry" } } }
+                "get": {
+                    "operationId": "getNetworkSeed",
+                    "summary": "Live dual-chain Newsatoshi L1 Testnet + Mainnet status",
+                    "description": "Returns live block height, tip hash, difficulty, issued LOVE, open locks, peers, and AuxPoW chainid 20051 for Mainnet and Testnet.",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "200": json_ok("Live chain telemetry", "#/components/schemas/GenericApiResponse"),
+                        "500": err_ref.clone()
+                    }
+                }
             },
             "/api/state": {
-                "get": { "summary": "Live Commons ledger state, public roots, STARK proofs, anchors, and swap board", "responses": { "200": { "description": "Commons state" } } }
+                "get": {
+                    "operationId": "getCommonsState",
+                    "summary": "Live Commons ledger state, public roots, STARK proofs, anchors, and swap board",
+                    "description": "Returns current treasury state, covenant rule hash, XMSS/SLH-DSA public roots, verified STARKs, and L1 anchor receipts.",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "200": json_ok("Commons ledger snapshot", "#/components/schemas/GenericApiResponse"),
+                        "500": err_ref.clone()
+                    }
+                }
             },
             "/api/swaps": {
-                "get": { "summary": "List persisted non-custodial BTC-LOVE atomic swap contracts", "responses": { "200": { "description": "Swap list" } } },
-                "post": { "summary": "Publish a verified swap contract (operator bearer auth required)", "responses": { "200": { "description": "Published" }, "401": { "description": "Unauthorized" } } }
+                "get": {
+                    "operationId": "listSwaps",
+                    "summary": "List persisted non-custodial multi-chain atomic swap contracts",
+                    "description": "Returns all published zero-custody SHA-256 HTLC swap offers.",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "200": json_ok("Swap board list", "#/components/schemas/GenericApiResponse"),
+                        "500": err_ref.clone()
+                    }
+                },
+                "post": {
+                    "operationId": "publishSwap",
+                    "summary": "Publish a verified swap contract (operator bearer auth required)",
+                    "description": "Persists a compiled atomic swap contract to the public board.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SwapCompileRequest" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Published swap contract", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone(),
+                        "401": err_ref.clone()
+                    }
+                }
             },
             "/api/swaps/compile": {
-                "post": { "summary": "Public stateless BIP-199 Bitcoin P2WSH HTLC & Lightning BOLT-11 swap compiler", "responses": { "200": { "description": "Compiled swap contract" } } }
+                "post": {
+                    "operationId": "compileAtomicSwap",
+                    "summary": "Public stateless multi-chain SHA-256 HTLC swap compiler (BTC, Lightning, Solana, Base/EVM)",
+                    "description": "Compiles deterministic BIP-199 Bitcoin P2WSH scripts, BOLT-11 Lightning invoices, Solana PDA escrows, or Base/Ethereum/Arbitrum NewsatoshiHtlc.sol swap payloads paired with Newsatoshi L1 lock CLI commands.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SwapCompileRequest" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Compiled swap contract", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
             },
             "/api/swaps/verify": {
-                "post": { "summary": "Public live dual-chain verifier (Newsatoshi L1 /api/lock + Bitcoin mempool.space + preimage)", "responses": { "200": { "description": "Verification report" } } }
+                "post": {
+                    "operationId": "verifySwapOnChain",
+                    "summary": "Public live dual-chain verifier (Newsatoshi L1 /api/lock + Bitcoin mempool.space + preimage)",
+                    "description": "Verifies SHA-256 hash-locks live across Newsatoshi L1 and Bitcoin mempool.space plus optional preimage verification.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SwapVerifyRequest" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Live verification report", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
             },
             "/api/agent/402-challenge": {
-                "get": { "summary": "Emit an HTTP 402 Payment Required dual-rail challenge (L1 hash-lock + PayWord hash-chain)", "responses": { "402": { "description": "Payment Required challenge" } } }
+                "get": {
+                    "operationId": "getHttp402Challenge",
+                    "summary": "Emit an HTTP 402 Payment Required dual-rail challenge",
+                    "description": "Generates an HTTP 402 Payment Required challenge supporting both Newsatoshi L1 hash-locks and sub-millisecond post-quantum PayWord hash-chain streaming.",
+                    "parameters": [
+                        api_ver_param.clone(),
+                        { "name": "resource", "in": "query", "schema": { "type": "string", "default": "/api/inference" } },
+                        { "name": "amount_love", "in": "query", "schema": { "type": "string", "default": "0.01" } },
+                        { "name": "network", "in": "query", "schema": { "type": "string", "enum": ["mainnet", "testnet"], "default": "mainnet" } }
+                    ],
+                    "responses": {
+                        "402": json_ok("Payment Required challenge", "#/components/schemas/Http402ChallengeResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
             },
             "/api/agent/402-verify": {
-                "post": { "summary": "Verify a PayWord SHA-256 micropayment token or live Newsatoshi L1 hash-lock payment", "responses": { "200": { "description": "Cryptographic payment verification result" } } }
+                "post": {
+                    "operationId": "verifyHttp402Payment",
+                    "summary": "Verify a PayWord SHA-256 micropayment token or live Newsatoshi L1 hash-lock payment",
+                    "description": "Cryptographically verifies SHA256^ticks(token) == tip or checks live L1 lock settlement.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Http402VerifyRequest" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Payment verification result", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
             },
             "/api/telemetry": {
-                "post": { "summary": "Submit offline-signed post-quantum XMSS or NIST FIPS 205 SLH-DSA hardware energy telemetry", "responses": { "200": { "description": "Verified & STARK-proven" } } }
+                "post": {
+                    "operationId": "submitSignedTelemetry",
+                    "summary": "Submit offline-signed post-quantum XMSS or NIST FIPS 205 SLH-DSA hardware energy telemetry",
+                    "description": "Verifies payout-bound post-quantum hardware signatures and generates a Winterfell STARK covenant transition proof.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Telemetry verification & STARK result", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
             },
             "/api/deeds": {
-                "post": { "summary": "Submit offline-signed post-quantum trustee land deed attestation", "responses": { "200": { "description": "Verified & STARK-proven" } } }
+                "post": {
+                    "operationId": "submitSignedDeed",
+                    "summary": "Submit offline-signed post-quantum trustee land deed attestation",
+                    "description": "Verifies price-bound XMSS or NIST FIPS 205 SLH-DSA land deed attestations and proves recursive covenant continuity.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Deed verification & STARK result", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
             },
             "/api/actions/verify-anchor": {
-                "post": { "summary": "Public live L1 cross-check of a Commons state-root anchor against /api/lock?hash=", "responses": { "200": { "description": "On-chain anchor verification" } } }
+                "post": {
+                    "operationId": "verifyL1Anchor",
+                    "summary": "Public live L1 cross-check of a Commons state-root anchor against /api/lock?hash=",
+                    "description": "Cross-checks a recorded Commons anchor hash against live Newsatoshi L1 seed nodes.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": false,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("On-chain anchor verification", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
             },
             "/api/actions/verify-stark": {
-                "post": { "summary": "Public cryptographic re-verification of any Winterfell STARK proof", "responses": { "200": { "description": "STARK verify result" } } }
+                "post": {
+                    "operationId": "verifyStarkProof",
+                    "summary": "Public cryptographic re-verification of any Winterfell STARK proof",
+                    "description": "Re-runs Winterfell 0.13 FRI verification on a stored STARK proof artifact with pre-verify integer domain bounds.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("STARK verification result", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
             }
         }
     })
