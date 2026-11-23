@@ -2006,6 +2006,86 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
         .unwrap();
     assert!(robots.contains("/llms.txt"));
     assert!(robots.contains("/mcp"));
+    assert!(robots.contains("Sitemap:"));
+
+    let sitemap = ureq::get(&format!("{base}/sitemap.xml"))
+        .call()
+        .unwrap()
+        .body_mut()
+        .read_to_string()
+        .unwrap();
+    assert!(sitemap.contains("<urlset"));
+    assert!(sitemap.contains("/llms.txt"));
+    assert!(sitemap.contains("/.well-known/api-catalog"));
+
+    let catalog: Value = serde_json::from_str(
+        &ureq::get(&format!("{base}/.well-known/api-catalog"))
+            .call()
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert!(catalog["linkset"].as_array().unwrap().len() >= 2);
+
+    let mcp_card: Value = serde_json::from_str(
+        &ureq::get(&format!("{base}/.well-known/mcp/server-card.json"))
+            .call()
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 7);
+
+    let skills_idx: Value = serde_json::from_str(
+        &ureq::get(&format!("{base}/.well-known/agent-skills/index.json"))
+            .call()
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(skills_idx["skills"][0]["name"], "newsatoshi-agent-payments");
+    assert_eq!(
+        skills_idx["skills"][0]["sha256"].as_str().unwrap().len(),
+        64
+    );
+
+    let skill_md = ureq::get(&format!("{base}/skills/newsatoshi-agent-payments/SKILL.md"))
+        .call()
+        .unwrap()
+        .body_mut()
+        .read_to_string()
+        .unwrap();
+    assert!(skill_md.contains("newsatoshi-agent-payments"));
+
+    let head_root = ureq::head(&format!("{base}/")).call().unwrap();
+    assert_eq!(head_root.status().as_u16(), 200);
+    assert!(head_root.headers().get("Link").is_some());
+    assert_eq!(
+        head_root
+            .headers()
+            .get("Vary")
+            .and_then(|v| v.to_str().ok()),
+        Some("Accept")
+    );
+
+    let agent_404: ureq::Agent = ureq::Agent::config_builder()
+        .http_status_as_error(false)
+        .build()
+        .into();
+    let mut r404 = agent_404
+        .get(&format!("{base}/definitely-not-a-real-route"))
+        .call()
+        .unwrap();
+    assert_eq!(r404.status().as_u16(), 404);
+    let err404: Value = serde_json::from_str(&r404.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(err404["status"], 404);
+    assert!(err404["discovery"]["llms_txt"].as_str().unwrap().contains("/llms.txt"));
 
     let llms = ureq::get(&format!("{base}/llms.txt"))
         .call()

@@ -11,6 +11,7 @@ FROM rust:bookworm AS rust-builder
 WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY src/ ./src/
+COPY skills/ ./skills/
 RUN cargo build --release --bins
 
 # Stage 3: Minimal production runtime with CA certs for live HTTPS newsatoshi-seed polling

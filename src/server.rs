@@ -1,7 +1,9 @@
 use crate::agent::{
-    build_http_402_challenge, handle_mcp_jsonrpc, render_agent_card_json, render_llms_full_txt,
-    render_llms_txt, render_mcp_manifest_json, render_openapi_json, render_robots_txt,
-    verify_payword_token, DEFAULT_PUBLIC_BASE_URL,
+    build_http_402_challenge, handle_mcp_jsonrpc, render_agent_card_json,
+    render_agent_skills_index_json, render_api_catalog_json, render_llms_full_txt,
+    render_llms_txt, render_mcp_manifest_json, render_mcp_server_card_json, render_openapi_json,
+    render_robots_txt, render_sitemap_xml, verify_payword_token, AGENT_SKILL_MARKDOWN,
+    DEFAULT_PUBLIC_BASE_URL,
 };
 use crate::crypto::{sha256, sha256_concat};
 use crate::hardware::{ExternalDeedPacket, ExternalTelemetryPacket};
@@ -388,6 +390,58 @@ fn respond_json<T: Serialize>(req: Request, status: u16, payload: &T) {
     let _ = req.respond(resp);
 }
 
+fn discovery_link_header() -> Header {
+    Header::from_bytes(
+        "Link",
+        concat!(
+            "</llms.txt>; rel=\"alternate\"; type=\"text/markdown\", ",
+            "</openapi.json>; rel=\"service-desc\"; type=\"application/openapi+json\", ",
+            "</.well-known/api-catalog>; rel=\"api-catalog\"; type=\"application/linkset+json\", ",
+            "</.well-known/agent.json>; rel=\"describedby\"; type=\"application/json\", ",
+            "</.well-known/mcp/server-card.json>; rel=\"https://modelcontextprotocol.io/rel/server-card\"; type=\"application/json\""
+        ),
+    )
+    .unwrap()
+}
+
+fn respond_problem_404(req: Request, path: &str, base_url: &str) {
+    let payload = json!({
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": format!("Route not found: {path}"),
+        "discovery": {
+            "llms_txt": format!("{base_url}/llms.txt"),
+            "openapi": format!("{base_url}/openapi.json"),
+            "api_catalog": format!("{base_url}/.well-known/api-catalog"),
+            "mcp": format!("{base_url}/mcp"),
+            "sitemap": format!("{base_url}/sitemap.xml")
+        }
+    });
+    let body = serde_json::to_vec(&payload).unwrap_or_else(|_| b"{}".to_vec());
+    let mut resp = Response::from_data(body)
+        .with_status_code(StatusCode(404))
+        .with_header(
+            Header::from_bytes("Content-Type", "application/problem+json; charset=utf-8").unwrap(),
+        )
+        .with_header(discovery_link_header());
+    for h in cors_headers() {
+        resp = resp.with_header(h);
+    }
+    let _ = req.respond(resp);
+}
+
+fn respond_json_with_ct<T: Serialize>(req: Request, status: u16, content_type: &str, payload: &T) {
+    let body = serde_json::to_vec(payload).unwrap_or_else(|_| b"{}".to_vec());
+    let mut resp = Response::from_data(body)
+        .with_status_code(StatusCode(status))
+        .with_header(Header::from_bytes("Content-Type", content_type).unwrap());
+    for h in cors_headers() {
+        resp = resp.with_header(h);
+    }
+    let _ = req.respond(resp);
+}
+
 fn respond_empty(req: Request, status: u16) {
     let mut resp = Response::empty(StatusCode(status));
     for h in cors_headers() {
@@ -464,10 +518,66 @@ fn handle_request(mut req: Request, state: &AppState) {
         return;
     }
 
+    if method == Method::Head {
+        let head_ct = match path.as_str() {
+            "/" | "/index.html" => {
+                if wants_markdown(&req) {
+                    Some("text/markdown; charset=utf-8")
+                } else {
+                    Some("text/html; charset=utf-8")
+                }
+            }
+            "/robots.txt" => Some("text/plain; charset=utf-8"),
+            "/sitemap.xml" => Some("application/xml; charset=utf-8"),
+            "/llms.txt" | "/llms-full.txt" | "/skills/newsatoshi-agent-payments/SKILL.md" => {
+                Some("text/markdown; charset=utf-8")
+            }
+            "/.well-known/api-catalog" => Some("application/linkset+json; charset=utf-8"),
+            "/.well-known/agent.json"
+            | "/.well-known/mcp.json"
+            | "/.well-known/mcp/server-card.json"
+            | "/.well-known/agent-skills/index.json"
+            | "/server.json"
+            | "/openapi.json"
+            | "/mcp"
+            | "/api/health"
+            | "/api/state"
+            | "/api/seed"
+            | "/api/swaps" => Some("application/json; charset=utf-8"),
+            _ => None,
+        };
+        if let Some(ct) = head_ct {
+            let mut resp = Response::empty(StatusCode(200))
+                .with_header(Header::from_bytes("Content-Type", ct).unwrap())
+                .with_header(Header::from_bytes("Vary", "Accept").unwrap())
+                .with_header(discovery_link_header());
+            for h in cors_headers() {
+                resp = resp.with_header(h);
+            }
+            let _ = req.respond(resp);
+        } else {
+            let mut resp = Response::empty(StatusCode(404)).with_header(discovery_link_header());
+            for h in cors_headers() {
+                resp = resp.with_header(h);
+            }
+            let _ = req.respond(resp);
+        }
+        return;
+    }
+
     match (method, path.as_str()) {
         (Method::Get, "/robots.txt") => {
             let base_url = infer_base_url(&req);
             respond_text(req, 200, "text/plain; charset=utf-8", render_robots_txt(&base_url));
+        }
+        (Method::Get, "/sitemap.xml") => {
+            let base_url = infer_base_url(&req);
+            respond_text(
+                req,
+                200,
+                "application/xml; charset=utf-8",
+                render_sitemap_xml(&base_url),
+            );
         }
         (Method::Get, "/llms.txt") => {
             let base_url = infer_base_url(&req);
@@ -499,6 +609,31 @@ fn handle_request(mut req: Request, state: &AppState) {
         (Method::Get, "/.well-known/mcp.json") => {
             let base_url = infer_base_url(&req);
             respond_json(req, 200, &render_mcp_manifest_json(&base_url));
+        }
+        (Method::Get, "/.well-known/mcp/server-card.json") | (Method::Get, "/server.json") => {
+            let base_url = infer_base_url(&req);
+            respond_json(req, 200, &render_mcp_server_card_json(&base_url));
+        }
+        (Method::Get, "/.well-known/api-catalog") => {
+            let base_url = infer_base_url(&req);
+            respond_json_with_ct(
+                req,
+                200,
+                "application/linkset+json; charset=utf-8",
+                &render_api_catalog_json(&base_url),
+            );
+        }
+        (Method::Get, "/.well-known/agent-skills/index.json") => {
+            let base_url = infer_base_url(&req);
+            respond_json(req, 200, &render_agent_skills_index_json(&base_url));
+        }
+        (Method::Get, "/skills/newsatoshi-agent-payments/SKILL.md") => {
+            respond_text(
+                req,
+                200,
+                "text/markdown; charset=utf-8",
+                AGENT_SKILL_MARKDOWN.to_string(),
+            );
         }
         (Method::Get, "/openapi.json") => {
             let base_url = infer_base_url(&req);
@@ -1050,34 +1185,33 @@ fn handle_request(mut req: Request, state: &AppState) {
             respond_json(req, 200, &resp);
         }
         (Method::Get, _) => {
-            if path == "/" && wants_markdown(&req) {
-                let base_url = infer_base_url(&req);
+            let base_url = infer_base_url(&req);
+            if (path == "/" || path == "/index.html") && wants_markdown(&req) {
                 let seed = state.get_seed_snapshot(false);
                 let api_state = state.engine.lock().unwrap_or_else(|e| e.into_inner()).to_api_state();
-                respond_text(
-                    req,
-                    200,
-                    "text/markdown; charset=utf-8",
-                    render_llms_txt(&base_url, &api_state, &seed),
-                );
+                let body = render_llms_txt(&base_url, &api_state, &seed);
+                let mut resp = Response::from_string(body)
+                    .with_status_code(StatusCode(200))
+                    .with_header(
+                        Header::from_bytes("Content-Type", "text/markdown; charset=utf-8").unwrap(),
+                    )
+                    .with_header(Header::from_bytes("Vary", "Accept").unwrap())
+                    .with_header(discovery_link_header());
+                for h in cors_headers() {
+                    resp = resp.with_header(h);
+                }
+                let _ = req.respond(resp);
                 return;
             }
             if let Some(ref static_dir) = state.static_dir {
-                serve_static_file(req, static_dir, &path);
+                serve_static_file(req, static_dir, &path, &base_url);
             } else {
-                respond_json(
-                    req,
-                    404,
-                    &json!({ "ok": false, "error": format!("route not found: {path}") }),
-                );
+                respond_problem_404(req, &path, &base_url);
             }
         }
         _ => {
-            respond_json(
-                req,
-                404,
-                &json!({ "ok": false, "error": format!("unsupported route: {path}") }),
-            );
+            let base_url = infer_base_url(&req);
+            respond_problem_404(req, &path, &base_url);
         }
     }
 }
@@ -2947,18 +3081,15 @@ fn normalize_scheme(scheme: Option<&str>) -> String {
     }
 }
 
-fn serve_static_file(req: Request, static_dir: &Path, req_path: &str) {
+fn serve_static_file(req: Request, static_dir: &Path, req_path: &str, base_url: &str) {
     let Ok(root_canon) = fs::canonicalize(static_dir) else {
-        respond_json(
-            req,
-            404,
-            &json!({ "ok": false, "error": "static directory not found" }),
-        );
+        respond_problem_404(req, req_path, base_url);
         return;
     };
 
     let rel = req_path.trim_start_matches('/');
-    let candidate = if rel.is_empty() {
+    let is_root = rel.is_empty() || rel == "index.html";
+    let candidate = if is_root {
         root_canon.join("index.html")
     } else {
         root_canon.join(rel)
@@ -2967,14 +3098,9 @@ fn serve_static_file(req: Request, static_dir: &Path, req_path: &str) {
     let resolved = match fs::canonicalize(&candidate) {
         Ok(p) if p.starts_with(&root_canon) && p.is_file() => p,
         _ => {
-            // SPA fallback to index.html for client-side routes
-            let fallback = root_canon.join("index.html");
-            if fallback.is_file() {
-                fallback
-            } else {
-                respond_json(req, 404, &json!({ "ok": false, "error": "file not found" }));
-                return;
-            }
+            // Return genuine RFC 9457 404 (prevents SEO / agent soft-404s on nonexistent paths)
+            respond_problem_404(req, req_path, base_url);
+            return;
         }
     };
 
@@ -2982,9 +3108,14 @@ fn serve_static_file(req: Request, static_dir: &Path, req_path: &str) {
         Ok(bytes) => {
             let mime = content_type_for_path(&resolved);
             let len = bytes.len();
+            let mut headers = vec![Header::from_bytes("Content-Type", mime).unwrap()];
+            if is_root {
+                headers.push(Header::from_bytes("Vary", "Accept").unwrap());
+                headers.push(discovery_link_header());
+            }
             let mut resp = Response::new(
                 StatusCode(200),
-                vec![Header::from_bytes("Content-Type", mime).unwrap()],
+                headers,
                 Cursor::new(bytes),
                 Some(len),
                 None,
