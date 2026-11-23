@@ -1,8 +1,8 @@
 [package]
 name = "newsatoshi-commons"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2021"
-description = "Newsatoshi 2.1 Autonomous Abundance Loops: NIST FIPS 205 SLH-DSA, Merkleized SHA-256 Lamport signatures, real Winterfell 0.13 STARK covenants, persistent ledger, hardware telemetry signer, and live L1 seed bridge."
+description = "Newsatoshi 2.1 Autonomous Abundance Loops: NIST FIPS 205 SLH-DSA, Merkleized SHA-256 Lamport signatures, real Winterfell 0.13 STARK covenants, persistent ledger, hardware telemetry signer, trustless BTC-LOVE HTLC swaps, and live L1 seed bridge."
 
 [[bin]]
 name = "newsatoshi-commons"
@@ -11,6 +11,10 @@ path = "src/main.rs"
 [[bin]]
 name = "newsatoshi-hw-signer"
 path = "src/bin/newsatoshi-hw-signer.rs"
+
+[[bin]]
+name = "newsatoshi-swap"
+path = "src/bin/newsatoshi-swap.rs"
 
 [dependencies]
 sha2 = "0.10"

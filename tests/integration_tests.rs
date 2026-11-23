@@ -1824,3 +1824,139 @@ fn live_l1_anchor_verification_and_dual_chain_seed_polling() {
     let _ = l1_thread.join();
     let _ = std::fs::remove_dir_all(&tmp_dir);
 }
+
+#[test]
+fn http_api_atomic_swap_compile_publish_and_verify_on_l1() {
+    use newsatoshi_commons::server::{spawn_server, ServerConfig};
+    use newsatoshi_commons::swap::generate_swap_secret;
+    use serde_json::{json, Value};
+
+    let secret = generate_swap_secret().unwrap();
+    let mock_hash = secret.payment_hash_hex.clone();
+
+    let mock_l1 = tiny_http::Server::http("127.0.0.1:0").unwrap();
+    let l1_addr = mock_l1.server_addr().to_ip().unwrap().to_string();
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let stop_c = std::sync::Arc::clone(&stop);
+    let expected_h = mock_hash.clone();
+    let l1_thread = thread::spawn(move || {
+        while !stop_c.load(std::sync::atomic::Ordering::SeqCst) {
+            if let Ok(Some(req)) = mock_l1.recv_timeout(Duration::from_millis(50)) {
+                let url = req.url().to_string();
+                let body = if url.contains("/api/lock?hash=") {
+                    json!({
+                        "locks": [{
+                            "found": true,
+                            "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                            "state": "open",
+                            "confirmed": true,
+                            "amount": 25_000_000_000u64,
+                            "hash": expected_h,
+                            "timeout": 3231,
+                            "claim": "ns1bc03485c35c661a5f6685a52f19351a143b44994df2943c20285b2e9876f68fa10452da1",
+                            "refund": "ns1bc03485c35c661a5f6685a52f19351a143b44994df2943c20285b2e9876f68fa10452da1",
+                            "at": 3088,
+                            "confirmations": 2,
+                            "height": 3089
+                        }]
+                    })
+                    .to_string()
+                } else {
+                    r#"{"network":"mainnet","proofs":"main","fee":600000,"version":"0.1.0","genesis":"000000006ba30cc3c86ecaabcb962287e9d5fd0877c27f4b33661b4d1d3033f7","height":3089,"tip":"5d30269dd50b614a47bd84bf7b5d6653a45f45a3f7b804b2837b9af4ef1bb6c2","tip_time":1795405200,"now":1795405210,"bits":"1c0b8af4","difficulty":22.17,"chainwork":"0000","peers":4,"known_peers":1,"best_header":3089,"mempool":0,"issued":15445000000000,"notes":2989,"nullifiers":0,"locks":1,"conditions":0,"auxpow_chainid":20051,"recent":[]}"#.to_string()
+                };
+                let _ = req.respond(tiny_http::Response::from_string(body));
+            }
+        }
+    });
+
+    let tmp_dir = std::env::temp_dir().join(format!(
+        "newsatoshi_commons_swap_test_{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+    let state_file = tmp_dir.join("commons-ledger.json");
+
+    let srv = spawn_server(ServerConfig {
+        host: "127.0.0.1".to_string(),
+        port: 0,
+        state_file,
+        seed_url: format!("http://{l1_addr}/status"),
+        mainnet_seed_url: Some(format!("http://{l1_addr}/mainnet/status")),
+        static_dir: None,
+        admin_token: Some("swap-op-tok".to_string()),
+        verify_only: true,
+        external_public_keys: None,
+    })
+    .unwrap();
+    let base = srv.base_url();
+
+    // 0. Honest empty initial swap board (zero fake swaps)
+    let mut g0 = ureq::get(&format!("{base}/api/swaps")).call().unwrap();
+    let list0: Value = serde_json::from_str(&g0.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(list0["count"], 0);
+
+    // 1. Public stateless HTLC compile (no auth required, zero state mutation)
+    let claim_pk = "02".to_string() + &"11".repeat(32);
+    let refund_pk = "03".to_string() + &"22".repeat(32);
+    let compile_body = json!({
+        "rail": "btc_onchain",
+        "direction": "btc_to_love",
+        "love_network": "mainnet",
+        "btc_network": "mainnet",
+        "payment_hash_hex": mock_hash,
+        "amount_love": "250",
+        "amount_btc_sats": 500000,
+        "love_claim_address": "ns1bc03485c35c661a5f6685a52f19351a143b44994df2943c20285b2e9876f68fa10452da1",
+        "love_timeout_blocks": 144,
+        "btc_claim_pubkey_hex": claim_pk,
+        "btc_refund_pubkey_hex": refund_pk,
+        "btc_locktime": 900036,
+        "btc_current_height": 900000
+    });
+    let mut c_resp = ureq::post(&format!("{base}/api/swaps/compile"))
+        .header("Content-Type", "application/json")
+        .send(compile_body.to_string().as_str())
+        .unwrap();
+    let compiled: Value = serde_json::from_str(&c_resp.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(compiled["ok"], true);
+    assert_eq!(compiled["contract"]["timelock_safe"], true);
+    assert!(compiled["contract"]["btc_htlc"]["btc_p2wsh_address"]
+        .as_str()
+        .unwrap()
+        .starts_with("bc1q"));
+
+    // 2. Publish requires auth; with Bearer token persists cleanly
+    let mut p_resp = ureq::post(&format!("{base}/api/swaps"))
+        .header("Content-Type", "application/json")
+        .header("Authorization", "Bearer swap-op-tok")
+        .send(compile_body.to_string().as_str())
+        .unwrap();
+    let published: Value = serde_json::from_str(&p_resp.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(published["ok"], true);
+    assert_eq!(published["state"]["swap_offers"].as_array().unwrap().len(), 1);
+
+    // 3. Public live verify against mock mainnet L1 + preimage check (skipping external mempool.space)
+    let mut v_resp = ureq::post(&format!("{base}/api/swaps/verify"))
+        .header("Content-Type", "application/json")
+        .send(
+            json!({
+                "payment_hash_hex": mock_hash,
+                "love_network": "mainnet",
+                "btc_address": "",
+                "preimage_hex": secret.preimage_hex
+            })
+            .to_string()
+            .as_str(),
+        )
+        .unwrap();
+    let verified: Value = serde_json::from_str(&v_resp.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(verified["ok"], true);
+    assert_eq!(verified["verification"]["love_found"], true);
+    assert_eq!(verified["verification"]["love_confirmed"], true);
+    assert_eq!(verified["verification"]["preimage_valid"], true);
+
+    srv.stop();
+    stop.store(true, std::sync::atomic::Ordering::SeqCst);
+    let _ = l1_thread.join();
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+}

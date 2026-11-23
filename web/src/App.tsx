@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Activity,
+  ArrowLeftRight,
   Calculator,
   CheckCircle2,
   Flame,
@@ -36,6 +37,7 @@ import { ChainExplorerTab } from './components/ChainExplorerTab';
 import { CockpitTab } from './components/CockpitTab';
 import { EconomicsTab } from './components/EconomicsTab';
 import { LegalAirlockTab } from './components/LegalAirlockTab';
+import { SwapsMiningTab } from './components/SwapsMiningTab';
 import { TopL1Rail } from './components/TopL1Rail';
 import type {
   AcquireParcelPayload,
@@ -271,6 +273,7 @@ export default function App() {
   const tabs: { id: WorkspaceTab; label: string; icon: typeof Activity }[] = [
     { id: 'cockpit', label: 'Commons Ledger', icon: Activity },
     { id: 'explorer', label: 'Live L1 Explorer', icon: Globe },
+    { id: 'swaps', label: 'Swaps & Mining', icon: ArrowLeftRight },
     { id: 'economics', label: 'Unit Economics Calculator', icon: Calculator },
     { id: 'legal', label: 'Legal Airlock', icon: Scale },
   ];
@@ -473,6 +476,14 @@ export default function App() {
             anchorReceipts={state?.anchor_receipts ?? []}
             refreshing={seedRefreshing}
             onRefresh={() => void refreshSeed(true)}
+          />
+        ) : activeTab === 'swaps' ? (
+          <SwapsMiningTab
+            state={state}
+            seed={seed}
+            hasOperatorToken={hasOperatorToken}
+            onStateUpdated={setState}
+            onNotice={showToast}
           />
         ) : activeTab === 'economics' ? (
           <EconomicsTab />

@@ -5,6 +5,7 @@ use crate::crypto::{
 use crate::rpc::{AnchorReceipt, PROTOCOL_VERSION};
 use crate::seed::{AUXPOW_CHAIN_ID, MAINNET_GENESIS_HASH, TESTNET_GENESIS_HASH};
 use crate::stark::StarkProofArtifact;
+use crate::swap::AtomicSwapContract;
 use crate::{CommonsLedger, CovenantRule, Utxo};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -407,6 +408,8 @@ pub struct PersistedEngineState {
     pub stark_proofs: Vec<StarkProofArtifact>,
     pub anchor_receipts: Vec<AnchorReceipt>,
     #[serde(default)]
+    pub swap_offers: Vec<AtomicSwapContract>,
+    #[serde(default)]
     pub telemetry_series: Vec<TelemetrySeriesPoint>,
     #[serde(default)]
     pub total_energy_bounty_love: u64,
@@ -462,6 +465,8 @@ pub struct ApiStateView {
     pub streaming_history: Vec<StreamingRecord>,
     pub stark_proofs: Vec<StarkProofArtifact>,
     pub anchor_receipts: Vec<AnchorReceipt>,
+    #[serde(default)]
+    pub swap_offers: Vec<AtomicSwapContract>,
     pub telemetry_series: Vec<TelemetrySeriesPoint>,
     pub keys: PublicKeysView,
 }
@@ -513,6 +518,7 @@ pub struct CommonsEngine {
     pub streaming_history: Vec<StreamingRecord>,
     pub stark_proofs: Vec<StarkProofArtifact>,
     pub anchor_receipts: Vec<AnchorReceipt>,
+    pub swap_offers: Vec<AtomicSwapContract>,
     pub telemetry_series: Vec<TelemetrySeriesPoint>,
     pub total_energy_bounty_love: u64,
     pub total_streaming_gross_love: u64,
@@ -573,6 +579,7 @@ impl CommonsEngine {
             streaming_history: Vec::new(),
             stark_proofs: Vec::new(),
             anchor_receipts: Vec::new(),
+            swap_offers: Vec::new(),
             telemetry_series: Vec::new(),
             total_energy_bounty_love: 0,
             total_streaming_gross_love: 0,
@@ -639,6 +646,7 @@ impl CommonsEngine {
             streaming_history: Vec::new(),
             stark_proofs: Vec::new(),
             anchor_receipts: Vec::new(),
+            swap_offers: Vec::new(),
             telemetry_series: Vec::new(),
             total_energy_bounty_love: 0,
             total_streaming_gross_love: 0,
@@ -806,6 +814,7 @@ impl CommonsEngine {
             streaming_history: p.streaming_history.clone(),
             stark_proofs: p.stark_proofs.clone(),
             anchor_receipts: p.anchor_receipts.clone(),
+            swap_offers: p.swap_offers.clone(),
             telemetry_series: p.telemetry_series.clone(),
             total_energy_bounty_love: p.total_energy_bounty_love,
             total_streaming_gross_love: p.total_streaming_gross_love,
@@ -847,6 +856,7 @@ impl CommonsEngine {
             streaming_history: self.streaming_history.clone(),
             stark_proofs: self.stark_proofs.clone(),
             anchor_receipts: self.anchor_receipts.clone(),
+            swap_offers: self.swap_offers.clone(),
             telemetry_series: self.telemetry_series.clone(),
             total_energy_bounty_love: self.total_energy_bounty_love,
             total_streaming_gross_love: self.total_streaming_gross_love,
@@ -941,6 +951,7 @@ impl CommonsEngine {
             streaming_history: self.streaming_history.clone(),
             stark_proofs: self.stark_proofs.clone(),
             anchor_receipts: self.anchor_receipts.clone(),
+            swap_offers: self.swap_offers.clone(),
             telemetry_series: self.telemetry_series.clone(),
             keys: PublicKeysView {
                 deed_oracle_merkle_root: hex::encode(self.rule.authorized_deed_oracle_pk),

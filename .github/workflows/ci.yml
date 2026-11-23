@@ -62,3 +62,14 @@ jobs:
       - run: |
           python3 legal/render_airlock.py --schedule legal/schedule-generated.json --out-dir /tmp/rendered-check
           ! grep -rn "{{" /tmp/rendered-check/*.md
+
+  auxpow-stratum:
+    name: AuxPoW Stratum v1 Merge-Mining Kit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - working-directory: auxpow-stratum
+        run: python3 -m unittest -v test_stratum_auxpow.py

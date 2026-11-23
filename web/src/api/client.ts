@@ -2,9 +2,12 @@ import type {
   AcquireParcelPayload,
   AcquireParcelResponse,
   AnchorResponse,
+  AtomicSwapContract,
   CommonsState,
+  CompileSwapPayload,
   ConfirmAnchorPayload,
   ConfirmAnchorResponse,
+  DualChainSwapVerification,
   HealthResponse,
   RecordFundingPayload,
   RecordFundingResponse,
@@ -15,6 +18,7 @@ import type {
   TelemetryResponse,
   VerifyAnchorResponse,
   VerifyStarkResponse,
+  VerifySwapPayload,
 } from '../types';
 import {
   normalizeAnchorReceipt,
@@ -320,5 +324,57 @@ export async function actionResetLedger(): Promise<{ ok: boolean; state: Commons
   return {
     ok: Boolean(raw.ok),
     state: normalizeCommonsState(raw.state),
+  };
+}
+
+export async function actionCompileSwap(
+  payload: CompileSwapPayload
+): Promise<{ ok: boolean; contract?: AtomicSwapContract; error?: string }> {
+  const { data: raw } = await fetchJson<Record<string, unknown>>(
+    '/api/swaps/compile',
+    { method: 'POST', body: JSON.stringify(payload) },
+    12000
+  );
+  return {
+    ok: Boolean(raw.ok),
+    contract: raw.contract as AtomicSwapContract | undefined,
+    error: typeof raw.error === 'string' ? raw.error : undefined,
+  };
+}
+
+export async function actionPublishSwap(
+  payload: CompileSwapPayload
+): Promise<{ ok: boolean; contract?: AtomicSwapContract; state?: CommonsState; error?: string }> {
+  const { data: raw } = await fetchJson<Record<string, unknown>>(
+    '/api/swaps',
+    { method: 'POST', body: JSON.stringify(payload) },
+    12000
+  );
+  return {
+    ok: Boolean(raw.ok),
+    contract: raw.contract as AtomicSwapContract | undefined,
+    state: raw.state ? normalizeCommonsState(raw.state) : undefined,
+    error: typeof raw.error === 'string' ? raw.error : undefined,
+  };
+}
+
+export async function actionVerifySwap(
+  payload: VerifySwapPayload
+): Promise<{
+  ok: boolean;
+  verification?: DualChainSwapVerification;
+  state?: CommonsState;
+  error?: string;
+}> {
+  const { data: raw } = await fetchJson<Record<string, unknown>>(
+    '/api/swaps/verify',
+    { method: 'POST', body: JSON.stringify(payload) },
+    15000
+  );
+  return {
+    ok: Boolean(raw.ok),
+    verification: raw.verification as DualChainSwapVerification | undefined,
+    state: raw.state ? normalizeCommonsState(raw.state) : undefined,
+    error: typeof raw.error === 'string' ? raw.error : undefined,
   };
 }

@@ -5,6 +5,7 @@ pub mod seed;
 pub mod server;
 pub mod stark;
 pub mod storage;
+pub mod swap;
 
 pub use crypto::{
     derive_leaf_seed, hash32_from_hex, merkle_leaf_hash, merkle_node_hash, sha256, sha256_concat,

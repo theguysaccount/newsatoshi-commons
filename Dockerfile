@@ -21,6 +21,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=rust-builder /build/target/release/newsatoshi-commons /usr/local/bin/newsatoshi-commons
 COPY --from=rust-builder /build/target/release/newsatoshi-hw-signer /usr/local/bin/newsatoshi-hw-signer
+COPY --from=rust-builder /build/target/release/newsatoshi-swap /usr/local/bin/newsatoshi-swap
 COPY --from=web-builder /build/web/dist /app/web/dist
 RUN mkdir -p /data
 EXPOSE 8080
