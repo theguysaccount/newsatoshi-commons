@@ -36,6 +36,7 @@ import {
 import { ChainExplorerTab } from './components/ChainExplorerTab';
 import { CockpitTab } from './components/CockpitTab';
 import { EconomicsTab } from './components/EconomicsTab';
+import { InnovationHero } from './components/InnovationHero';
 import { LegalAirlockTab } from './components/LegalAirlockTab';
 import { SwapsMiningTab } from './components/SwapsMiningTab';
 import { TopL1Rail } from './components/TopL1Rail';
@@ -298,7 +299,7 @@ export default function App() {
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                Client-Side Validated Covenant Engine &amp; Live L1 Telemetry
+                Quantum-Proof Sound Money · Free Bitcoin Security · AI Agent Payments
               </p>
             </div>
           </div>
@@ -465,6 +466,7 @@ export default function App() {
       )}
 
       <main className="mx-auto w-full max-w-[1480px] flex-1 px-4 py-6 sm:px-6">
+        <InnovationHero seed={seed} onNavigateTab={setActiveTab} />
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-20 text-xs text-slate-400">
             <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
