@@ -1,9 +1,9 @@
 use crate::agent::{
-    build_http_402_challenge, handle_mcp_jsonrpc, render_agent_card_json,
+    build_http_402_challenge, compute_network_metrics, handle_mcp_jsonrpc, render_agent_card_json,
     render_agent_skills_index_json, render_api_catalog_json, render_llms_full_txt,
     render_llms_txt, render_mcp_manifest_json, render_mcp_server_card_json, render_og_image_svg,
     render_openapi_json, render_public_page, render_robots_txt, render_sitemap_xml,
-    verify_payword_token, AGENT_SKILL_MARKDOWN, DEFAULT_PUBLIC_BASE_URL,
+    verify_payword_token, AGENT_SKILL_MARKDOWN, DEFAULT_PUBLIC_BASE_URL, INSTALL_SCRIPT_SH,
 };
 use crate::crypto::{sha256, sha256_concat};
 use crate::hardware::{ExternalDeedPacket, ExternalTelemetryPacket};
@@ -558,6 +558,7 @@ fn handle_request(mut req: Request, state: &AppState) {
                 }
             }
             "/og-image.svg" => Some("image/svg+xml"),
+            "/install.sh" => Some("text/x-shellscript; charset=utf-8"),
             "/robots.txt" => Some("text/plain; charset=utf-8"),
             "/sitemap.xml" => Some("application/xml; charset=utf-8"),
             "/llms.txt" | "/llms-full.txt" | "/skills/newsatoshi-agent-payments/SKILL.md" => {
@@ -574,6 +575,7 @@ fn handle_request(mut req: Request, state: &AppState) {
             | "/api/health"
             | "/api/state"
             | "/api/seed"
+            | "/api/network/metrics"
             | "/api/swaps" => Some("application/json; charset=utf-8"),
             _ => None,
         };
@@ -603,6 +605,14 @@ fn handle_request(mut req: Request, state: &AppState) {
                 200,
                 "image/svg+xml; charset=utf-8",
                 render_og_image_svg().to_string(),
+            );
+        }
+        (Method::Get, "/install.sh") => {
+            respond_text(
+                req,
+                200,
+                "text/x-shellscript; charset=utf-8",
+                INSTALL_SCRIPT_SH.to_string(),
             );
         }
         (Method::Get, "/docs" | "/developers" | "/about" | "/contact" | "/privacy") => {
@@ -884,6 +894,14 @@ fn handle_request(mut req: Request, state: &AppState) {
             let force = raw_url.contains("refresh=1") || raw_url.contains("refresh=true");
             let snapshot = state.get_seed_snapshot(force);
             respond_json(req, 200, &snapshot);
+        }
+        (Method::Get, "/api/network/metrics") => {
+            let force = raw_url.contains("refresh=1") || raw_url.contains("refresh=true");
+            let ths = query_param(&raw_url, "hashrate_ths")
+                .and_then(|v| v.parse::<f64>().ok())
+                .unwrap_or(1.2);
+            let snapshot = state.get_seed_snapshot(force);
+            respond_json(req, 200, &compute_network_metrics(&snapshot, ths));
         }
         (Method::Get, "/api/swaps") => {
             let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());

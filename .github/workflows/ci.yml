@@ -86,3 +86,19 @@ jobs:
         run: |
           cargo test
           cargo clippy --all-targets -- -D warnings
+
+  agent-commerce-sdks:
+    name: Agent Commerce HTTP 402 SDKs (Node 22 + Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          node --test sdk/js/test_newsatoshi_402.mjs
+          (cd sdk/python && python3 -m unittest -v test_newsatoshi_402.py)
+          sh -n scripts/install.sh

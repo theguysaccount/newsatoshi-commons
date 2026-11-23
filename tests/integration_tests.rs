@@ -2038,7 +2038,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 7);
+    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 9);
 
     let skills_idx: Value = serde_json::from_str(
         &ureq::get(&format!("{base}/.well-known/agent-skills/index.json"))
@@ -2164,7 +2164,46 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 7);
+    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 9);
+
+    let install_sh = ureq::get(&format!("{base}/install.sh"))
+        .call()
+        .unwrap()
+        .body_mut()
+        .read_to_string()
+        .unwrap();
+    assert!(install_sh.contains("newsatoshi-commons"));
+    assert!(install_sh.contains("SHA256SUMS.txt"));
+
+    let metrics: Value = serde_json::from_str(
+        &ureq::get(&format!("{base}/api/network/metrics?hashrate_ths=1.2"))
+            .call()
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(metrics["ok"], true);
+    assert_eq!(metrics["auxpow_chainid"], 20051);
+
+    let mcp_402_gen: Value = serde_json::from_str(
+        &ureq::post(&format!("{base}/mcp"))
+            .header("Content-Type", "application/json")
+            .send(
+                r#"{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"newsatoshi_create_402_challenge","arguments":{"resource":"/api/gpu","amount_love":"0.05","network":"mainnet"}}}"#,
+            )
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(mcp_402_gen["result"]["isError"], false);
+    assert_eq!(
+        mcp_402_gen["result"]["structuredContent"]["protocol"],
+        "NEWSATOSHI-402/1.0"
+    );
 
     // 4. HTTP 402 challenge returns genuine HTTP 402 status
     let cfg = ureq::Agent::config_builder().http_status_as_error(false).build();

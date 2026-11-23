@@ -82,6 +82,9 @@ export function SwapsMiningTab({
   const [verifyResult, setVerifyResult] = useState<DualChainSwapVerification | null>(null);
   const [verifyError, setVerifyError] = useState<string | null>(null);
 
+  // Live AuxPoW Merge-Mining Yield Calculator state (100% live Mainnet difficulty math, zero fake USD prices)
+  const [minerThs, setMinerThs] = useState<string>('1.2');
+
   const handleGenerateLocalSecret = async () => {
     try {
       const preimage = new Uint8Array(32);
@@ -289,12 +292,40 @@ docker compose up -d`;
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-[11px] text-slate-300">
               <span>
+                Install CLI (macOS/Linux):{' '}
+                <code className="font-mono text-emerald-300">
+                  curl -fsSL https://commons.newsatoshi.org/install.sh | sh
+                </code>
+              </span>
+              <CopyButton value="curl -fsSL https://commons.newsatoshi.org/install.sh | sh" label="Copy" />
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-[11px] text-slate-300">
+              <span>
                 Install Agent Skill:{' '}
                 <code className="font-mono text-emerald-300">
                   npx skills add theguysaccount/newsatoshi-commons
                 </code>
               </span>
               <CopyButton value="npx skills add theguysaccount/newsatoshi-commons" label="Copy" />
+            </div>
+            <div className="rounded-lg border border-slate-800 bg-[#04080f] px-3 py-2 text-[11px] text-slate-300">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-[10px] uppercase text-sky-300">
+                  Zero-Dep HTTP 402 PayWord SDKs (Node/Edge &amp; Python)
+                </span>
+                <a
+                  href="/developers"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono text-[10px] text-emerald-400 hover:underline"
+                >
+                  /developers →
+                </a>
+              </div>
+              <div className="mt-1 font-mono text-[10px] text-slate-400">
+                JS/Edge: <code className="text-slate-200">sdk/js/newsatoshi-402.mjs</code> · Python:{' '}
+                <code className="text-slate-200">sdk/python/newsatoshi_402.py</code> · 9 Live MCP Tools
+              </div>
             </div>
           </div>
         </div>
@@ -1054,6 +1085,83 @@ docker compose up -d`;
                 </div>
               </div>
             </div>
+
+            {mainnet && (() => {
+              const ths = Math.max(0.001, Number(minerThs) || 1.2);
+              const hashesPerBlock = Math.max(1e-9, mainnet.difficulty) * 4_294_967_296;
+              const recent = mainnet.recent ?? [];
+              const mergePct = recent.length > 0
+                ? (recent.filter((b) => b.merge_mined).length / recent.length) * 100
+                : 0;
+              const obsDt = recent.length >= 2 && recent[0].time > recent[recent.length - 1].time
+                ? (recent[0].time - recent[recent.length - 1].time) / (recent.length - 1)
+                : 600;
+              const netGhs = (hashesPerBlock / Math.max(1, obsDt)) / 1e9;
+              const snapBlocksDay = ((ths * 1e12) * 86_400) / hashesPerBlock;
+              const snapLoveDay = snapBlocksDay * 50;
+              return (
+                <div className="rounded-lg border border-amber-500/25 bg-amber-950/15 p-3 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-amber-300">
+                      Live AuxPoW Yield Snapshot (Zero Extra Electricity)
+                    </span>
+                    <span className="font-mono text-[10px] text-slate-400">
+                      Est. Net: {netGhs.toFixed(2)} GH/s · {mergePct.toFixed(0)}% merge-mined
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[
+                      { label: 'Bitaxe (1.2 TH/s)', v: '1.2' },
+                      { label: 'NerdQAxe++ (4.8)', v: '4.8' },
+                      { label: 'S19 (110)', v: '110' },
+                      { label: 'S21 (200)', v: '200' },
+                    ].map((preset) => (
+                      <button
+                        key={preset.v}
+                        type="button"
+                        onClick={() => setMinerThs(preset.v)}
+                        className={`rounded border px-2 py-0.5 font-mono text-[10px] transition cursor-pointer ${
+                          minerThs === preset.v
+                            ? 'border-amber-400/70 bg-amber-500/20 text-amber-200'
+                            : 'border-slate-700 bg-slate-900/70 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                    <input
+                      type="number"
+                      min="0.001"
+                      step="0.1"
+                      value={minerThs}
+                      onChange={(e) => setMinerThs(e.target.value)}
+                      aria-label="Miner hashrate in TH/s"
+                      className="w-20 rounded border border-slate-700 bg-slate-950 px-2 py-0.5 font-mono text-[11px] text-slate-100"
+                    />
+                    <span className="font-mono text-[10px] text-slate-400">TH/s</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="rounded border border-slate-800/90 bg-slate-950/75 px-2.5 py-1.5">
+                      <div className="font-mono text-[9px] uppercase text-slate-500">Current-Diff Snapshot / Day</div>
+                      <div className="font-mono text-xs font-bold text-amber-300">
+                        {snapLoveDay >= 1000
+                          ? `${Math.round(snapLoveDay).toLocaleString()} LOVE`
+                          : `${snapLoveDay.toFixed(1)} LOVE`}
+                      </div>
+                    </div>
+                    <div className="rounded border border-slate-800/90 bg-slate-950/75 px-2.5 py-1.5">
+                      <div className="font-mono text-[9px] uppercase text-slate-500">Supply Issued / 21M Cap</div>
+                      <div className="font-mono text-xs font-bold text-emerald-300">
+                        {Math.round(mainnet.issued / 1e8).toLocaleString()} LOVE ({((mainnet.issued / 1e8 / 21_000_000) * 100).toFixed(3)}%)
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    Computed strictly from live Mainnet difficulty ({mainnet.difficulty.toFixed(2)}) × 50 LOVE/block before ASERT retargeting; adding hashrate increases difficulty dynamically.
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="rounded-lg border border-slate-800 bg-[#04080f] p-3">
               <div className="mb-1.5 flex items-center justify-between">
