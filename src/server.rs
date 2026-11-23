@@ -1,3 +1,8 @@
+use crate::agent::{
+    build_http_402_challenge, handle_mcp_jsonrpc, render_agent_card_json, render_llms_full_txt,
+    render_llms_txt, render_mcp_manifest_json, render_openapi_json, render_robots_txt,
+    verify_payword_token, DEFAULT_PUBLIC_BASE_URL,
+};
 use crate::crypto::{sha256, sha256_concat};
 use crate::hardware::{ExternalDeedPacket, ExternalTelemetryPacket};
 use crate::rpc::{AnchorReceipt, JsonRpcAnchorClient, PROTOCOL_VERSION};
@@ -287,8 +292,74 @@ fn cors_headers() -> Vec<Header> {
     vec![
         Header::from_bytes("Access-Control-Allow-Origin", "*").unwrap(),
         Header::from_bytes("Access-Control-Allow-Methods", "GET, POST, OPTIONS").unwrap(),
-        Header::from_bytes("Access-Control-Allow-Headers", "Content-Type, Authorization").unwrap(),
+        Header::from_bytes(
+            "Access-Control-Allow-Headers",
+            "Content-Type, Authorization, Accept, Mcp-Session-Id, X-Newsatoshi-Payment, X-Newsatoshi-PayWord",
+        )
+        .unwrap(),
     ]
+}
+
+fn respond_text(req: Request, status: u16, content_type: &str, body: String) {
+    let mut resp = Response::from_data(body.into_bytes())
+        .with_status_code(StatusCode(status))
+        .with_header(Header::from_bytes("Content-Type", content_type).unwrap())
+        .with_header(Header::from_bytes("Vary", "Accept").unwrap());
+    for h in cors_headers() {
+        resp = resp.with_header(h);
+    }
+    let _ = req.respond(resp);
+}
+
+fn infer_base_url(req: &Request) -> String {
+    let host = req
+        .headers()
+        .iter()
+        .find(|h| h.field.equiv("Host"))
+        .map(|h| h.value.as_str().trim())
+        .filter(|h| !h.is_empty());
+    let proto = req
+        .headers()
+        .iter()
+        .find(|h| h.field.equiv("X-Forwarded-Proto"))
+        .map(|h| h.value.as_str().trim())
+        .filter(|p| *p == "http" || *p == "https");
+    match host {
+        Some(h) => {
+            let scheme = proto.unwrap_or_else(|| {
+                if h.starts_with("127.0.0.1") || h.starts_with("localhost") {
+                    "http"
+                } else {
+                    "https"
+                }
+            });
+            format!("{scheme}://{h}")
+        }
+        None => DEFAULT_PUBLIC_BASE_URL.to_string(),
+    }
+}
+
+fn wants_markdown(req: &Request) -> bool {
+    req.headers()
+        .iter()
+        .find(|h| h.field.equiv("Accept"))
+        .map(|h| {
+            let v = h.value.as_str().to_ascii_lowercase();
+            v.contains("text/markdown") && !v.contains("text/html")
+        })
+        .unwrap_or(false)
+}
+
+fn query_param(raw_url: &str, key: &str) -> Option<String> {
+    let query = raw_url.split_once('?')?.1;
+    for pair in query.split('&') {
+        if let Some((k, v)) = pair.split_once('=') {
+            if k == key {
+                return Some(v.replace("%2F", "/").replace("%2f", "/"));
+            }
+        }
+    }
+    None
 }
 
 fn respond_json<T: Serialize>(req: Request, status: u16, payload: &T) {
@@ -365,6 +436,181 @@ fn handle_request(mut req: Request, state: &AppState) {
     }
 
     match (method, path.as_str()) {
+        (Method::Get, "/robots.txt") => {
+            let base_url = infer_base_url(&req);
+            respond_text(req, 200, "text/plain; charset=utf-8", render_robots_txt(&base_url));
+        }
+        (Method::Get, "/llms.txt") => {
+            let base_url = infer_base_url(&req);
+            let seed = state.get_seed_snapshot(false);
+            let api_state = state.engine.lock().unwrap().to_api_state();
+            respond_text(
+                req,
+                200,
+                "text/markdown; charset=utf-8",
+                render_llms_txt(&base_url, &api_state, &seed),
+            );
+        }
+        (Method::Get, "/llms-full.txt") => {
+            let base_url = infer_base_url(&req);
+            let seed = state.get_seed_snapshot(false);
+            let api_state = state.engine.lock().unwrap().to_api_state();
+            respond_text(
+                req,
+                200,
+                "text/markdown; charset=utf-8",
+                render_llms_full_txt(&base_url, &api_state, &seed),
+            );
+        }
+        (Method::Get, "/.well-known/agent.json") => {
+            let base_url = infer_base_url(&req);
+            let api_state = state.engine.lock().unwrap().to_api_state();
+            respond_json(req, 200, &render_agent_card_json(&base_url, &api_state));
+        }
+        (Method::Get, "/.well-known/mcp.json") => {
+            let base_url = infer_base_url(&req);
+            respond_json(req, 200, &render_mcp_manifest_json(&base_url));
+        }
+        (Method::Get, "/openapi.json") => {
+            let base_url = infer_base_url(&req);
+            respond_json(req, 200, &render_openapi_json(&base_url));
+        }
+        (Method::Get, "/mcp") => {
+            let base_url = infer_base_url(&req);
+            respond_json(req, 200, &render_mcp_manifest_json(&base_url));
+        }
+        (Method::Post, "/mcp") => {
+            let base_url = infer_base_url(&req);
+            let body = match read_body_string(&mut req) {
+                Ok(b) => b,
+                Err(e) => {
+                    respond_json(
+                        req,
+                        400,
+                        &json!({"jsonrpc": "2.0", "id": null, "error": {"code": -32700, "message": e}}),
+                    );
+                    return;
+                }
+            };
+            let rpc_val: Value = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(e) => {
+                    respond_json(
+                        req,
+                        400,
+                        &json!({"jsonrpc": "2.0", "id": null, "error": {"code": -32700, "message": format!("parse error: {e}")}}),
+                    );
+                    return;
+                }
+            };
+            let force_refresh = rpc_val
+                .get("params")
+                .and_then(|p| p.get("arguments"))
+                .and_then(|a| a.get("refresh"))
+                .and_then(|b| b.as_bool())
+                .unwrap_or(false);
+            let seed = state.get_seed_snapshot(force_refresh);
+            let engine = state.engine.lock().unwrap();
+            let (status, maybe_body) = handle_mcp_jsonrpc(
+                &rpc_val,
+                &base_url,
+                &engine,
+                &seed,
+                &state.seed_client,
+                state.mainnet_seed_client.as_ref(),
+            );
+            drop(engine);
+            match maybe_body {
+                Some(resp_json) => respond_json(req, status, &resp_json),
+                None => respond_empty(req, status),
+            }
+        }
+        (Method::Get, "/api/agent/402-challenge") => {
+            let resource = query_param(&raw_url, "resource").unwrap_or_else(|| "/api/inference".to_string());
+            let amount = query_param(&raw_url, "amount_love").unwrap_or_else(|| "0.01".to_string());
+            let network = query_param(&raw_url, "network").unwrap_or_else(|| "mainnet".to_string());
+            let recipient = query_param(&raw_url, "to").unwrap_or_default();
+            let unit_price = query_param(&raw_url, "unit_price")
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(1_000);
+            let challenge = build_http_402_challenge(&resource, &amount, &network, &recipient, unit_price);
+            let body = serde_json::to_vec(&challenge).unwrap_or_else(|_| b"{}".to_vec());
+            let mut resp = Response::from_data(body)
+                .with_status_code(StatusCode(402))
+                .with_header(Header::from_bytes("Content-Type", "application/json; charset=utf-8").unwrap())
+                .with_header(
+                    Header::from_bytes(
+                        "WWW-Authenticate",
+                        format!("Newsatoshi-402 realm=\"newsatoshi\", network=\"{network}\", amount=\"{amount}\""),
+                    )
+                    .unwrap(),
+                );
+            for h in cors_headers() {
+                resp = resp.with_header(h);
+            }
+            let _ = req.respond(resp);
+        }
+        (Method::Post, "/api/agent/402-verify") => {
+            let body = match read_body_string(&mut req) {
+                Ok(b) => b,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": e }));
+                    return;
+                }
+            };
+            let parsed: Value = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(e) => {
+                    respond_json(
+                        req,
+                        400,
+                        &json!({ "ok": false, "error": format!("invalid JSON: {e}") }),
+                    );
+                    return;
+                }
+            };
+            if parsed.get("tip_hex").is_some() && parsed.get("token_hex").is_some() {
+                let tip = parsed.get("tip_hex").and_then(|v| v.as_str()).unwrap_or("");
+                let tok = parsed.get("token_hex").and_then(|v| v.as_str()).unwrap_or("");
+                let ticks = parsed.get("ticks").and_then(|v| v.as_u64()).unwrap_or(0);
+                let unit = parsed
+                    .get("unit_price_base_units")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(1_000);
+                match verify_payword_token(tip, tok, ticks, unit) {
+                    Ok(res) => respond_json(req, 200, &res),
+                    Err(e) => respond_json(req, 400, &json!({ "ok": false, "valid": false, "error": e })),
+                }
+            } else if let Some(hash) = parsed.get("payment_hash_hex").and_then(|v| v.as_str()) {
+                let net = parsed
+                    .get("network")
+                    .or_else(|| parsed.get("love_network"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("mainnet");
+                let preimage = parsed.get("preimage_hex").and_then(|v| v.as_str());
+                let Some(client) = state.client_for_network(net) else {
+                    respond_json(
+                        req,
+                        400,
+                        &json!({ "ok": false, "error": format!("no L1 client for network '{net}'") }),
+                    );
+                    return;
+                };
+                match crate::swap::verify_swap_on_chain(client, net, hash, None, preimage) {
+                    Ok(report) => respond_json(req, 200, &report),
+                    Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+                }
+            } else {
+                respond_json(
+                    req,
+                    400,
+                    &json!({
+                        "ok": false,
+                        "error": "provide either {tip_hex, token_hex, ticks} for PayWord 402 or {payment_hash_hex, network?} for L1 lock verification"
+                    }),
+                );
+            }
+        }
         (Method::Get, "/api/health") => {
             let uptime_secs = state.started_at.elapsed().as_secs();
             let signing_keys_loaded = {
@@ -753,6 +999,18 @@ fn handle_request(mut req: Request, state: &AppState) {
             respond_json(req, 200, &resp);
         }
         (Method::Get, _) => {
+            if path == "/" && wants_markdown(&req) {
+                let base_url = infer_base_url(&req);
+                let seed = state.get_seed_snapshot(false);
+                let api_state = state.engine.lock().unwrap().to_api_state();
+                respond_text(
+                    req,
+                    200,
+                    "text/markdown; charset=utf-8",
+                    render_llms_txt(&base_url, &api_state, &seed),
+                );
+                return;
+            }
             if let Some(ref static_dir) = state.static_dir {
                 serve_static_file(req, static_dir, &path);
             } else {

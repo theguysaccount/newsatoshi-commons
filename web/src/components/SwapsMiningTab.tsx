@@ -210,8 +210,84 @@ docker compose up -d`;
     --soil 92 --love-per-kwh 10 --scheme slh_dsa \\
     --endpoint https://commons.newsatoshi.org/api/telemetry`;
 
+  const mcpSnippet = JSON.stringify(
+    {
+      mcpServers: {
+        newsatoshi: {
+          url: 'https://commons.newsatoshi.org/mcp',
+        },
+      },
+    },
+    null,
+    2
+  );
+
   return (
     <div className="space-y-6">
+      {/* Section 0: AI Agent Transaction Interface (MCP, HTTP 402 PayWord, /llms.txt) */}
+      <Panel
+        title="AI Agent Transaction Interface (MCP · HTTP 402 PayWord · /llms.txt)"
+        subtitle="Zero-KYC, post-quantum machine money: connect any Claude, Codex, Gemini, Cursor, or custom MCP agent in under 60 seconds"
+        icon={<Zap className="h-4 w-4 text-emerald-400" />}
+        accent="emerald"
+        badge={
+          <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-emerald-300">
+            MCP STREAMABLE HTTP · 7 LIVE TOOLS
+          </span>
+        }
+      >
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+          <div className="space-y-2.5 lg:col-span-5">
+            <div className="rounded-lg border border-slate-800 bg-[#04080f] p-3">
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="font-mono text-[10px] uppercase text-emerald-300">
+                  MCP Client Config (Zero Auth for Reads &amp; Verifiers)
+                </span>
+                <CopyButton value={mcpSnippet} label="Copy MCP" />
+              </div>
+              <pre className="overflow-x-auto font-mono text-[11px] leading-relaxed text-slate-200">
+                {mcpSnippet}
+              </pre>
+            </div>
+          </div>
+
+          <div className="space-y-2.5 lg:col-span-7">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {[
+                { label: 'MCP Endpoint', href: '/mcp', path: 'POST /mcp' },
+                { label: 'LLM Guide', href: '/llms.txt', path: '/llms.txt' },
+                { label: 'Full Recipes', href: '/llms-full.txt', path: '/llms-full.txt' },
+                { label: 'A2A Agent Card', href: '/.well-known/agent.json', path: '/.well-known/agent.json' },
+                { label: 'OpenAPI 3.1', href: '/openapi.json', path: '/openapi.json' },
+                { label: 'HTTP 402 Challenge', href: '/api/agent/402-challenge', path: '/api/agent/402-challenge' },
+              ].map((item) => (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-lg border border-slate-800 bg-slate-950/75 px-3 py-2 transition hover:border-emerald-500/45"
+                >
+                  <div className="text-[11px] font-semibold text-slate-200">{item.label}</div>
+                  <div className="mt-0.5 truncate font-mono text-[10px] text-emerald-400">
+                    {item.path}
+                  </div>
+                </a>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-[11px] text-slate-300">
+              <span>
+                Install Agent Skill:{' '}
+                <code className="font-mono text-emerald-300">
+                  npx skills add theguysaccount/newsatoshi-commons
+                </code>
+              </span>
+              <CopyButton value="npx skills add theguysaccount/newsatoshi-commons" label="Copy" />
+            </div>
+          </div>
+        </div>
+      </Panel>
+
       {/* Section A: Trustless BTC <-> LOVE Atomic Swap Compiler & Verifier */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
         <div className="xl:col-span-7">
