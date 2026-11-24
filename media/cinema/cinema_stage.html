@@ -201,7 +201,7 @@
 
   <div id="finale-lockup">
     <div id="fin-brand">NEWSATOSHI</div>
-    <div id="fin-tag">Sovereign money, made alive.</div>
+    <div id="fin-tag">Money that keeps its promise.</div>
     <div id="fin-url">commons.newsatoshi.org</div>
   </div>
 </div>
@@ -1115,28 +1115,30 @@ scene.add(world7);
 // 5. RULE-OF-ONE MINIMAL APPLE KINETIC TYPOGRAPHY CHOREOGRAPHY
 // ---------------------------------------------------------------------------
 const STRIKES = [
-  // Shot 1
-  { t0: 1.40, t1: 5.80,  html: `FROZEN IN A <span class="grad-gold">VAULT.</span>`, sub: '', size: 68, y: '76%' },
-  { t0: 6.80, t1: 11.08, html: `CUSTODY BREAKS THE PROMISE.`, sub: '', size: 58, y: '76%' },
-  // Shot 2 (Awakening!)
-  { t0: 12.15, t1: 14.35, html: `WAKE <span class="grad-em">UP.</span>`, sub: '', size: 102, y: '75%' },
-  { t0: 14.55, t1: 16.40, html: `NEWSATOSHI`, sub: 'LOVE', size: 84, y: '75%' },
-  // Shot 3 (Conscience)
-  { t0: 16.85, t1: 21.40, html: `UNBREAKABLE <span class="grad-em">CONSCIENCE.</span>`, sub: '', size: 66, y: '76%' },
-  { t0: 21.85, t1: 23.95, html: `EVERY COIN OF CHANGE.`, sub: '', size: 66, y: '76%' },
-  { t0: 24.10, t1: 26.25, html: `<span class="grad-em">SAME LAW. FOREVER.</span>`, sub: 'OP_VERIFY_COVENANT_STARK · <10MS · $5 CHIP', size: 66, y: '75%' },
-  // Shot 4 (Abundance — 3 Percussive Beat Hits!)
+  // Shot 1 — Clear Problem Pitch
+  { t0: 1.05, t1: 2.95,  html: `STORING WAS <span class="grad-gold">SOLVED.</span>`, sub: '', size: 68, y: '76%' },
+  { t0: 3.05, t1: 4.85,  html: `SPENDING <span class="grad-gold">WASN'T.</span>`, sub: '', size: 74, y: '76%' },
+  { t0: 5.05, t1: 11.05, html: `HUMANS TAKE CONTROL.`, sub: 'AND CAN STEAL THE REST', size: 62, y: '76%' },
+  // Shot 2 — Clear Solution Reveal
+  { t0: 12.00, t1: 14.20, html: `FIXED WITH <span class="grad-em">MATH.</span>`, sub: 'NEWSATOSHI · LOVE', size: 88, y: '75%' },
+  { t0: 14.35, t1: 16.40, html: `ONE RULE. <span class="grad-em">LOCKED.</span>`, sub: '', size: 82, y: '75%' },
+  // Shot 3 — Exact Mechanism (How Recursive Covenants Actually Work!)
+  { t0: 16.95, t1: 19.95, html: `PROVE WORK TO <span class="grad-em">UNLOCK.</span>`, sub: '', size: 66, y: '76%' },
+  { t0: 20.10, t1: 22.95, html: `CHANGE CAN'T BE <span class="grad-em">STOLEN.</span>`, sub: 'CONSENSUS BLOCKS IT', size: 64, y: '76%' },
+  { t0: 23.15, t1: 26.15, html: `SAME RULE. <span class="grad-em">FOREVER.</span>`, sub: 'STARK PROOF · <10MS · $5 CHIP', size: 68, y: '75%' },
+  // Shot 4 — The Real-World + AI Flywheel
   { t0: 26.60, t1: 27.14, html: `<span class="grad-em">LAND.</span>`, sub: '', size: 118, y: '50%' },
   { t0: 27.16, t1: 27.74, html: `<span class="grad-gold">SOLAR.</span>`, sub: '', size: 118, y: '50%' },
-  { t0: 27.76, t1: 29.80, html: `<span class="grad-em">COMPUTE.</span>`, sub: 'HARDWARE PROVES REAL WORK', size: 110, y: '50%' },
-  { t0: 30.50, t1: 32.65, html: `<span class="grad-em">&lt; 1 ms</span>`, sub: 'HTTP 402 PAYWORDS · $0 GAS', size: 116, y: '72%' },
-  { t0: 32.85, t1: 35.15, html: `ZERO <span class="grad-em">CEO.</span>`, sub: 'SURPLUS BUYS THE NEXT ACRE', size: 84, y: '74%' },
-  // Shot 5 (Blind Bitcoin Fortress)
-  { t0: 35.55, t1: 38.25, html: `<span class="grad-gold">21,000,000.</span>`, sub: 'BLIND BASE LAYER · 50 LOVE / BLOCK', size: 96, y: '74%' },
-  { t0: 38.45, t1: 41.55, html: `<span class="grad-em">0 EXTRA WATTS.</span>`, sub: 'BITCOIN AUXPOW · CHAIN ID 20051', size: 82, y: '75%' },
-  // Shot 6 (Sovereignty & Vaultless Gravity)
-  { t0: 42.05, t1: 44.35, html: `PRIVATE LIKE <span class="grad-em">CASH.</span>`, sub: 'PURE HASH MATH · ZERO ELLIPTIC CURVES', size: 70, y: '75%' },
-  { t0: 46.60, t1: 48.35, html: `<span class="grad-em">ZERO VAULTS.</span>`, sub: 'ATOMIC SHA-256 RAILS · SWAP OR 100% REFUND', size: 86, y: '74%' },
+  { t0: 27.76, t1: 28.50, html: `<span class="grad-em">COMPUTE.</span>`, sub: '', size: 112, y: '50%' },
+  { t0: 28.45, t1: 30.35, html: `SIGNED BY <span class="grad-gold">HARDWARE.</span>`, sub: 'REAL METERED OUTPUT', size: 68, y: '75%' },
+  { t0: 30.45, t1: 34.25, html: `<span class="grad-em">&lt; 1 ms</span> · $0 GAS`, sub: 'AI AGENTS PAY PER CALL', size: 88, y: '73%' },
+  { t0: 34.40, t1: 36.55, html: `PROFITS <span class="grad-em">AUTO-COMPOUND.</span>`, sub: 'BUYS THE NEXT ASSET · ZERO CEO', size: 60, y: '74%' },
+  // Shot 5 — Why It's Unhackable (Bitcoin AuxPoW Explained Clearly!)
+  { t0: 36.70, t1: 37.60, html: `WHY IT'S <span class="grad-gold">UNHACKABLE.</span>`, sub: '21,000,000 FIXED CAP', size: 68, y: '75%' },
+  { t0: 37.68, t1: 41.50, html: `BITCOIN'S MINERS. <span class="grad-em">0 EXTRA WATTS.</span>`, sub: 'SAME ELECTRICITY · MERGE-MINED', size: 52, y: '75%' },
+  // Shot 6 — Centuries-Grade Crypto + Direct No-Custodian Swaps
+  { t0: 41.65, t1: 44.45, html: `QUANTUM-PROOF. <span class="grad-em">PRIVATE.</span>`, sub: 'PURE HASH MATH · LIKE CASH', size: 64, y: '75%' },
+  { t0: 44.58, t1: 48.30, html: `NO BRIDGE <span class="grad-em">CUSTODIAN.</span>`, sub: 'SWAP DIRECTLY · BITCOIN · SOLANA · BASE', size: 64, y: '74%' },
 ];
 
 const heroEl = document.getElementById('hero-strike');
