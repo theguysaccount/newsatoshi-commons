@@ -1,0 +1,1528 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Newsatoshi — Sovereign Money, Made Alive (3D WebGL2 Cinema)</title>
+<style>
+  :root {
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Inter, system-ui, sans-serif;
+    --mono: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #020408;
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+  }
+  #gl-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    display: block;
+  }
+
+  /* Rule-of-One Minimal Apple-Keynote Optical Typography Layer (ZERO boxes, ZERO chrome) */
+  #type-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .title-strike {
+    position: absolute;
+    text-align: center;
+    color: #ffffff;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.04;
+    text-shadow:
+      0 2px 12px rgba(2, 4, 8, 0.98),
+      0 8px 34px rgba(2, 4, 8, 0.95),
+      0 0 64px rgba(2, 4, 8, 0.90);
+    opacity: 0;
+    will-change: opacity, transform, filter;
+    white-space: nowrap;
+  }
+
+  .title-micro {
+    display: block;
+    margin-top: 14px;
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: rgba(209, 250, 229, 0.95);
+    text-shadow: 0 2px 14px rgba(2, 4, 8, 0.98), 0 0 32px rgba(2, 4, 8, 0.92);
+  }
+  body.vertical .title-micro { font-size: 17px; letter-spacing: 0.18em; }
+
+  .grad-em {
+    color: #5eead4;
+    text-shadow:
+      0 2px 14px rgba(2, 4, 8, 0.98),
+      0 6px 32px rgba(2, 4, 8, 0.95),
+      0 0 36px rgba(52, 211, 153, 0.42);
+  }
+  .grad-gold {
+    color: #fde047;
+    text-shadow:
+      0 2px 14px rgba(2, 4, 8, 0.98),
+      0 6px 32px rgba(2, 4, 8, 0.95),
+      0 0 36px rgba(251, 191, 36, 0.42);
+  }
+
+  /* Pure floating Shot 6 chain river whispers (zero boxes!) */
+  .river-lbl {
+    position: absolute;
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.95);
+    opacity: 0;
+  }
+  body.vertical .river-lbl { font-size: 16px; }
+
+  /* Pure floating Shot 7 live Mainnet telemetry numerals (zero boxes!) */
+  #live-telemetry {
+    position: absolute;
+    bottom: 14%;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 54px;
+    opacity: 0;
+    width: 90vw;
+  }
+  body.vertical #live-telemetry {
+    bottom: 20%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px 20px;
+    width: 82vw;
+  }
+  .t-metric { text-align: center; }
+  .t-val {
+    font-family: var(--mono);
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #f8fafc;
+    text-shadow: 0 0 24px rgba(52, 211, 153, 0.45);
+  }
+  body.vertical .t-val { font-size: 34px; }
+  .t-lbl {
+    margin-top: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    color: rgba(148, 163, 184, 0.85);
+  }
+
+  /* Iconic Finale Monument Typography (zero pill rectangle!) */
+  #finale-lockup {
+    position: absolute;
+    bottom: 11%;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    opacity: 0;
+    width: 92vw;
+  }
+  body.vertical #finale-lockup { bottom: 18%; }
+  #fin-brand {
+    font-size: 86px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    color: #f8fafc;
+    text-shadow: 0 0 42px rgba(52, 211, 153, 0.35), 0 12px 36px rgba(0, 0, 0, 0.85);
+  }
+  body.vertical #fin-brand { font-size: 68px; letter-spacing: 0.10em; }
+  #fin-tag {
+    margin-top: 10px;
+    font-size: 28px;
+    font-weight: 300;
+    letter-spacing: 0.08em;
+    color: rgba(226, 232, 240, 0.92);
+  }
+  body.vertical #fin-tag { font-size: 26px; }
+  #fin-url {
+    margin-top: 22px;
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    color: #34d399;
+    text-shadow: 0 0 24px rgba(52, 211, 153, 0.55);
+  }
+  body.vertical #fin-url { font-size: 21px; }
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="gl-canvas"></canvas>
+
+<div id="type-layer">
+  <div id="hero-strike" class="title-strike"></div>
+  <div id="river-btc" class="river-lbl" style="color:#fbbf24;">BITCOIN</div>
+  <div id="river-ln"  class="river-lbl" style="color:#fef08a;">LIGHTNING</div>
+  <div id="river-sol" class="river-lbl" style="color:#c084fc;">SOLANA</div>
+  <div id="river-ev"  class="river-lbl" style="color:#60a5fa;">BASE</div>
+
+  <div id="live-telemetry">
+    <div class="t-metric"><div class="t-val" id="tm-height">#4,203</div><div class="t-lbl">LIVE MAINNET BLOCK</div></div>
+    <div class="t-metric"><div class="t-val" id="tm-issued" style="color:#fbbf24;">210,150 LOVE</div><div class="t-lbl">FAIR-MINTED SUPPLY</div></div>
+    <div class="t-metric"><div class="t-val" id="tm-diff" style="color:#38bdf8;">216.6</div><div class="t-lbl">AUXPOW DIFFICULTY</div></div>
+    <div class="t-metric"><div class="t-val" id="tm-merge" style="color:#34d399;">100%</div><div class="t-lbl">BITCOIN MERGE-MINED</div></div>
+  </div>
+
+  <div id="finale-lockup">
+    <div id="fin-brand">NEWSATOSHI</div>
+    <div id="fin-tag">Sovereign money, made alive.</div>
+    <div id="fin-url">commons.newsatoshi.org</div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const params = new URLSearchParams(location.search);
+const VERTICAL = params.get('aspect') === '9x16';
+if (VERTICAL) document.body.classList.add('vertical');
+
+const W = VERTICAL ? 1080 : 1920;
+const H = VERTICAL ? 1920 : 1080;
+
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+const lerp = (a, b, u) => a + (b - a) * u;
+const smoothstep = (e0, e1, x) => {
+  const t = clamp01((x - e0) / (e1 - e0));
+  return t * t * (3 - 2 * t);
+};
+const easeOutCubic = (x) => { x = clamp01(x); return 1 - Math.pow(1 - x, 3); };
+const easeInOutQuart = (x) => { x = clamp01(x); return x < 0.5 ? 8*x*x*x*x : 1 - Math.pow(-2*x+2, 4)/2; };
+
+// Deterministic PRNG so every particle, shard, and grain frame is 100% reproducible!
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(20051);
+
+// ---------------------------------------------------------------------------
+// 1. WebGL2 Renderer + Hardware Metal Verification + Studio Environment
+// ---------------------------------------------------------------------------
+const canvas = document.getElementById('gl-canvas');
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: true,
+  powerPreference: 'high-performance',
+  alpha: false,
+});
+renderer.setSize(W, H, false);
+renderer.setPixelRatio(1);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.18;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const gl = renderer.getContext();
+const dbgInfo = gl.getExtension('WEBGL_debug_renderer_info');
+window.__GPU_INFO = {
+  version: gl.getParameter(gl.VERSION),
+  renderer: dbgInfo ? gl.getParameter(dbgInfo.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+  vendor: dbgInfo ? gl.getParameter(dbgInfo.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR),
+};
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x020408);
+scene.fog = new THREE.FogExp2(0x02050b, 0.022);
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.75;
+
+const camera = new THREE.PerspectiveCamera(VERTICAL ? 52 : 36, W / H, 0.1, 180);
+camera.position.set(0, 0, 12);
+
+// Cinematic studio 3-point + dynamic hero lights
+const ambLight = new THREE.AmbientLight(0x162438, 0.55);
+scene.add(ambLight);
+
+const keyLight = new THREE.DirectionalLight(0xfff5e0, 2.6);
+keyLight.position.set(8, 12, 10);
+scene.add(keyLight);
+
+const rimLight = new THREE.DirectionalLight(0x38bdf8, 1.9);
+rimLight.position.set(-10, 6, -8);
+scene.add(rimLight);
+
+const heroPoint = new THREE.PointLight(0x34d399, 6.0, 42, 1.6);
+heroPoint.position.set(0, 0, 0);
+scene.add(heroPoint);
+
+const accentPoint = new THREE.PointLight(0xfbbf24, 3.0, 36, 1.6);
+accentPoint.position.set(-6, 3, 4);
+scene.add(accentPoint);
+
+// ---------------------------------------------------------------------------
+// 2. Post-Processing Stack: HalfFloat HDR + UnrealBloom + Cinema Optics Pass
+// ---------------------------------------------------------------------------
+const rt = new THREE.WebGLRenderTarget(W, H, {
+  type: THREE.HalfFloatType,
+  samples: 4,
+});
+const composer = new EffectComposer(renderer, rt);
+composer.addPass(new RenderPass(scene, camera));
+
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(W, H), 0.72, 0.62, 0.76);
+composer.addPass(bloomPass);
+
+// Custom GLSL Cinema Optics Pass: Volumetric Radial God-Rays + Chromatic Aberration + Anamorphic Glaze + 35mm Grain + Vignette + Flash
+const CinemaOpticsShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    uTime: { value: 0 },
+    uSeed: { value: 0 },
+    uChromatic: { value: 0.0012 },
+    uGodRay: { value: 0.0 },
+    uSunUV: { value: new THREE.Vector2(0.5, 0.5) },
+    uFlash: { value: 0.0 },
+    uFlashColor: { value: new THREE.Color(0xd1fae5) },
+    uVignette: { value: 0.52 },
+    uFade: { value: 1.0 },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uTime;
+    uniform float uSeed;
+    uniform float uChromatic;
+    uniform float uGodRay;
+    uniform vec2 uSunUV;
+    uniform float uFlash;
+    uniform vec3 uFlashColor;
+    uniform float uVignette;
+    uniform float uFade;
+    varying vec2 vUv;
+
+    float hash12(vec2 p) {
+      vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+      p3 += dot(p3, p3.yzx + 33.33);
+      return fract((p3.x + p3.y) * p3.z);
+    }
+
+    void main() {
+      vec2 dir = vUv - vec2(0.5);
+      float dist = length(dir);
+
+      // Velocity-driven radial chromatic aberration
+      vec2 ca = dir * uChromatic * (0.6 + dist * 1.8);
+      float r = texture2D(tDiffuse, vUv + ca).r;
+      float g = texture2D(tDiffuse, vUv).g;
+      float b = texture2D(tDiffuse, vUv - ca).b;
+      vec3 col = vec3(r, g, b);
+
+      // Screen-space volumetric radial god-rays (dithered 32-tap -> zero concentric banding!)
+      if (uGodRay > 0.005) {
+        vec2 delta = (vUv - uSunUV) * (1.0 / 34.0) * 0.82;
+        float jitter = hash12(gl_FragCoord.xy + vec2(uSeed * 11.7, uSeed * 23.1));
+        vec2 suv = vUv - delta * jitter;
+        float decay = 1.0;
+        vec3 rays = vec3(0.0);
+        for (int i = 0; i < 32; i++) {
+          suv -= delta;
+          vec3 s = texture2D(tDiffuse, clamp(suv, 0.001, 0.999)).rgb;
+          float lum = dot(s, vec3(0.2126, 0.7152, 0.0722));
+          rays += s * smoothstep(0.68, 1.75, lum) * decay;
+          decay *= 0.935;
+        }
+        col += rays * (uGodRay * 0.022);
+      }
+
+      // Subtle horizontal anamorphic highlight glaze
+      vec3 anam = vec3(0.0);
+      for (int i = -4; i <= 4; i++) {
+        vec2 off = vec2(float(i) * 0.0075, 0.0);
+        vec3 s = texture2D(tDiffuse, clamp(vUv + off, 0.001, 0.999)).rgb;
+        float lum = dot(s, vec3(0.299, 0.587, 0.114));
+        anam += s * smoothstep(0.95, 2.2, lum) * (1.0 - abs(float(i)) / 5.0);
+      }
+      col += anam * vec3(0.22, 0.55, 0.48) * 0.06;
+
+      // Climax white-emerald flash bloom
+      col = mix(col, uFlashColor * 1.45, clamp(uFlash, 0.0, 1.0));
+
+      // Subtle deterministic 35mm organic film grain (tuned for clean 1080p60 H.264 compression!)
+      float grain = (hash12(gl_FragCoord.xy + vec2(uSeed * 17.3, uSeed * 31.7)) - 0.5) * 0.011;
+      col += grain;
+
+      // Smooth optical lens vignette
+      float vig = smoothstep(0.96, 0.28, dist * (0.95 + uVignette * 0.45));
+      col *= mix(1.0, vig, uVignette);
+      col *= uFade;
+
+      gl_FragColor = vec4(max(col, 0.0), 1.0);
+    }
+  `,
+};
+const opticsPass = new ShaderPass(CinemaOpticsShader);
+composer.addPass(opticsPass);
+composer.addPass(new OutputPass());
+
+// ---------------------------------------------------------------------------
+// 3. 65,000-PARTICLE GPU CURL-NOISE UNIVERSE (Morphs seamlessly across ALL 7 Shots!)
+// ---------------------------------------------------------------------------
+const P_COUNT = 65000;
+const pPos = new Float32Array(P_COUNT * 3);
+const pSeed = new Float32Array(P_COUNT * 3);
+const pRand = new Float32Array(P_COUNT);
+
+for (let i = 0; i < P_COUNT; i++) {
+  // Spherical seed distribution
+  const u = rand() * 2 - 1;
+  const th = rand() * Math.PI * 2;
+  const rad = Math.cbrt(rand());
+  const s = Math.sqrt(1 - u * u);
+  pPos[i * 3 + 0] = rad * s * Math.cos(th);
+  pPos[i * 3 + 1] = rad * u;
+  pPos[i * 3 + 2] = rad * s * Math.sin(th);
+  pSeed[i * 3 + 0] = rand() * 2 - 1;
+  pSeed[i * 3 + 1] = rand() * 2 - 1;
+  pSeed[i * 3 + 2] = rand() * 2 - 1;
+  pRand[i] = rand();
+}
+
+const pGeo = new THREE.BufferGeometry();
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+pGeo.setAttribute('aSeed', new THREE.BufferAttribute(pSeed, 3));
+pGeo.setAttribute('aRand', new THREE.BufferAttribute(pRand, 1));
+
+const particleUniforms = {
+  uTime: { value: 0 },
+  uMode: { value: 0 },      // 0..6 shot index
+  uLocalT: { value: 0 },    // seconds inside shot
+  uKick: { value: 0 },      // 0..1 audio beat pulse
+  uVertical: { value: VERTICAL ? 1.0 : 0.0 },
+  uPixelRatio: { value: 1.0 },
+};
+
+const particleMat = new THREE.ShaderMaterial({
+  uniforms: particleUniforms,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  vertexShader: `
+    attribute vec3 aSeed;
+    attribute float aRand;
+    uniform float uTime;
+    uniform float uMode;
+    uniform float uLocalT;
+    uniform float uKick;
+    uniform float uVertical;
+    uniform float uPixelRatio;
+    varying vec3 vColor;
+    varying float vAlpha;
+
+    // Fast 3D curl-like trig turbulence
+    vec3 curlField(vec3 p, float t) {
+      return vec3(
+        sin(p.y * 1.7 + t * 1.1) + cos(p.z * 1.3 - t * 0.9),
+        sin(p.z * 1.6 + t * 0.8) + cos(p.x * 1.5 + t * 1.2),
+        sin(p.x * 1.4 - t * 1.0) + cos(p.y * 1.8 + t * 0.7)
+      );
+    }
+
+    void main() {
+      vec3 pos = position * 12.0;
+      vec3 col = vec3(0.20, 0.85, 0.60);
+      float alpha = 0.45;
+      float size = mix(1.4, 4.4, aRand);
+
+      if (uMode < 0.5) {
+        // SHOT 1: Frozen Vault — obsidian motes + VIVID golden ribbon ripped into crimson ash at 6.6s!
+        float leak = smoothstep(6.2, 7.6, uLocalT);
+        if (aRand < 0.42 && leak > 0.01) {
+          float u = fract(aSeed.x * 0.5 + 0.5 + uLocalT * 0.24);
+          float x = mix(1.2, 8.8, u);
+          vec3 turb = curlField(vec3(x * 0.7, aSeed.y * 2.4, aSeed.z * 2.4), uTime * 1.9);
+          pos = vec3(x, aSeed.y * 0.55 + turb.y * u * 1.55, aSeed.z * 0.55 + turb.z * u * 1.35);
+          col = mix(vec3(1.45, 1.05, 0.22), vec3(1.55, 0.16, 0.34), smoothstep(0.10, 0.58, u));
+          alpha = leak * (1.0 - u * 0.45) * 0.98;
+          size = mix(3.4, 7.8, aRand * 2.4);
+        } else {
+          pos = position * vec3(14.0, 10.0, 14.0) + curlField(position * 2.5, uTime * 0.22) * 0.45;
+          col = mix(vec3(0.38, 0.48, 0.65), vec3(1.25, 0.88, 0.26), step(0.76, aRand));
+          alpha = 0.38 * (1.0 - smoothstep(11.05, 11.2, uLocalT));
+          size = mix(2.0, 5.0, aRand);
+        }
+      } else if (uMode < 1.5) {
+        // SHOT 2: Awakening — EXPLOSIVE shockwave ignition -> swirling bioluminescent Living Core vortex!
+        float expT = max(0.0, uLocalT);
+        float burst = 1.0 - exp(-expT * 3.8);
+        float ang = atan(position.z, position.x) + expT * (0.8 + aRand * 0.9);
+        float r = mix(0.6, 13.5, pow(aRand, 0.65)) * (0.35 + burst * 1.05);
+        float spiralY = position.y * 7.5 * (0.4 + burst * 0.7) + sin(ang * 3.0 + uTime * 2.0) * 0.8;
+        pos = vec3(cos(ang) * r, spiralY, sin(ang) * r) + curlField(position * 3.0, uTime * 0.9) * 0.55;
+        col = mix(vec3(0.08, 0.92, 0.58), vec3(0.22, 0.76, 0.98), aSeed.y * 0.5 + 0.5);
+        if (aRand > 0.88) col = vec3(0.98, 0.86, 0.42);
+        alpha = (0.35 + 0.55 * exp(-expT * 0.45)) * (0.75 + uKick * 0.5);
+        size = mix(1.8, 6.2, aRand) * (1.0 + uKick * 0.35);
+      } else if (uMode < 2.5) {
+        // SHOT 3: Conscience — luminous emerald orbital streams around the Möbius conduit + shield sparks!
+        float ang = aRand * 6.28318 * 4.0 + uTime * 0.85;
+        float p = 2.0, q = 3.0;
+        float rr = 2.5 + 0.85 * cos(q * ang);
+        vec3 knot = vec3(rr * cos(p * ang), rr * sin(p * ang), 0.95 * sin(q * ang));
+        if (aRand < 0.62) {
+          pos = knot + aSeed * 0.55;
+          col = mix(vec3(0.15, 0.92, 0.62), vec3(0.22, 0.78, 0.98), fract(aRand * 7.0));
+          alpha = 0.62;
+        } else {
+          pos = position * vec3(18.0, 12.0, 14.0) + curlField(position * 2.0, uTime * 0.4) * 0.6;
+          col = vec3(0.15, 0.65, 0.85);
+          alpha = 0.22;
+        }
+        // Rogue crimson spark shower around shield repel (uLocalT ~ 4.35s)
+        float repel = exp(-pow((uLocalT - 4.35) * 2.8, 2.0));
+        if (aRand > 0.82 && repel > 0.05) {
+          pos = vec3(3.1, 0.5, 0.2) + aSeed * (0.4 + (uLocalT - 4.0) * 3.8);
+          col = mix(vec3(0.98, 0.24, 0.38), vec3(0.20, 0.96, 0.65), aRand);
+          alpha = repel * 0.95;
+          size = 5.5;
+        }
+      } else if (uMode < 3.5) {
+        // SHOT 4: Abundance — glowing terrain fireflies + SUPERSONIC CYAN PAYWORD LASER RAIN!
+        float rainOn = smoothstep(3.8, 4.6, uLocalT);
+        if (aRand < 0.45 && rainOn > 0.01) {
+          // Supersonic electric-cyan PayWord vertical streaks raining onto terrain!
+          float fall = fract(aSeed.y * 0.5 + 0.5 - uLocalT * (1.2 + aRand * 1.4));
+          float x = aSeed.x * 16.0;
+          float z = aSeed.z * 16.0;
+          pos = vec3(x, mix(-1.8, 12.0, fall), z);
+          col = mix(vec3(0.18, 0.82, 1.0), vec3(0.45, 0.98, 0.82), fall);
+          alpha = rainOn * (0.45 + 0.55 * (1.0 - fall));
+          size = mix(2.5, 6.2, aRand * 2.0);
+        } else {
+          // Bioluminescent emerald & gold motes rising from basalt landscape
+          float x = aSeed.x * 20.0;
+          float z = aSeed.z * 20.0;
+          float rise = fract(aRand + uLocalT * 0.14);
+          pos = vec3(x, -2.2 + rise * 7.0, z);
+          col = mix(vec3(0.10, 0.86, 0.55), vec3(0.98, 0.78, 0.24), step(0.75, aRand));
+          alpha = 0.42 * sin(rise * 3.14159);
+        }
+      } else if (uMode < 4.5) {
+        // SHOT 5: Blind Bitcoin Fortress — ROARING GOLDEN SHA-256 RIVER splitting into twin Gold & Emerald corridors!
+        float u = fract(aSeed.x * 0.5 + 0.5 + uLocalT * (0.45 + aRand * 0.35));
+        float spread = aSeed.y * 0.55;
+        float zOff = aSeed.z * 0.75;
+        if (u < 0.44) {
+          // Incoming molten gold SHA-256 plasma stream
+          float tIn = u / 0.44;
+          float x = mix(-14.0, -0.4, tIn);
+          pos = vec3(x, spread * (1.2 - tIn * 0.5), zOff);
+          col = mix(vec3(0.98, 0.64, 0.08), vec3(1.0, 0.92, 0.55), aRand);
+        } else {
+          // Refracted cleanly through Diamond Prism into Upper Gold (Bitcoin) + Lower Emerald (Newsatoshi)
+          float tOut = (u - 0.44) / 0.56;
+          float branch = aRand > 0.5 ? 1.0 : -1.0;
+          float x = mix(0.4, 15.0, tOut);
+          float y = branch * smoothstep(0.0, 0.35, tOut) * 3.1 + spread * 0.75;
+          pos = vec3(x, y, zOff);
+          col = branch > 0.0
+            ? mix(vec3(0.98, 0.72, 0.15), vec3(1.0, 0.90, 0.50), aRand)
+            : mix(vec3(0.06, 0.88, 0.55), vec3(0.35, 0.98, 0.78), aRand);
+        }
+        if (uVertical > 0.5) {
+          // Rotate river vertically for native 9:16 top-down cascade!
+          pos = vec3(pos.y * 0.95, -pos.x * 0.82, pos.z);
+        }
+        alpha = 0.72 * (0.75 + uKick * 0.4);
+        size = mix(1.8, 5.2, aRand);
+      } else if (uMode < 5.5) {
+        // SHOT 6: 4 Chromatic Chain Rivers spiraling into weightless Atomic Ring!
+        float lane = floor(aRand * 4.0); // 0=BTC, 1=LN, 2=SOL, 3=BASE
+        float u = fract(aSeed.x * 0.5 + 0.5 + uLocalT * (0.34 + 0.14 * fract(aRand * 9.0)));
+        float baseAng = lane * 1.570796 + (1.0 - u) * 1.65 + uLocalT * 0.35;
+        float rad = mix(14.5, 0.45, pow(u, 0.82));
+        vec3 p = vec3(cos(baseAng) * rad, sin(baseAng) * rad * (uVertical > 0.5 ? 1.35 : 0.78), mix(-6.5, 0.2, u));
+        pos = p + aSeed * mix(0.95, 0.16, u);
+        if (lane < 0.5) col = vec3(0.98, 0.72, 0.16);       // Bitcoin Gold
+        else if (lane < 1.5) col = vec3(1.0, 0.94, 0.48);  // Lightning White-Gold
+        else if (lane < 2.5) col = vec3(0.75, 0.48, 0.98); // Solana Amethyst
+        else col = vec3(0.28, 0.62, 1.0);                  // Base Cobalt
+        // Fuse into white-emerald radiance near the weightless center ring!
+        col = mix(col, vec3(0.45, 1.0, 0.80), smoothstep(0.75, 0.98, u));
+        alpha = 0.78 * smoothstep(0.0, 0.15, u);
+        size = mix(1.8, 5.6, fract(aRand * 4.0));
+      } else {
+        // SHOT 7: Living Mainnet Heartbeat & Museum Stillness
+        float hbRing = fract(uLocalT / 0.96774); // 62 BPM physical heartbeat!
+        if (aRand < 0.32) {
+          // Volumetric horizon heartbeat laser plane rippling radially!
+          float ang = aSeed.x * 3.14159;
+          float rr = mix(1.6, 16.0, fract(aRand * 3.1));
+          float wave = exp(-pow((rr - hbRing * 16.0) * 0.9, 2.0));
+          pos = vec3(cos(ang) * rr, -1.6 + wave * 0.95 * (0.4 + uKick), sin(ang) * rr);
+          col = mix(vec3(0.06, 0.48, 0.38), vec3(0.35, 1.0, 0.78), wave);
+          alpha = 0.18 + wave * 0.82;
+          size = 2.0 + wave * 4.2;
+        } else {
+          // Serene golden-emerald cathedral dust motes floating in stillness
+          pos = position * vec3(17.0, 12.0, 14.0) + vec3(0.0, uLocalT * 0.18, 0.0);
+          col = mix(vec3(0.20, 0.88, 0.62), vec3(0.98, 0.82, 0.35), step(0.68, aRand));
+          alpha = 0.32 * (1.0 - smoothstep(8.2, 9.6, uLocalT));
+        }
+      }
+
+      vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+      gl_Position = projectionMatrix * mv;
+      gl_PointSize = clamp(size * (14.0 / max(1.8, -mv.z)) * uPixelRatio, 1.3, 14.0);
+      vColor = col * 0.72;
+      vAlpha = alpha * 0.36;
+    }
+  `,
+  fragmentShader: `
+    varying vec3 vColor;
+    varying float vAlpha;
+    void main() {
+      vec2 d = gl_PointCoord - vec2(0.5);
+      float r2 = dot(d, d);
+      if (r2 > 0.25) discard;
+      float glow = exp(-r2 * 11.5);
+      gl_FragColor = vec4(vColor * (1.15 + glow * 0.9), glow * vAlpha);
+    }
+  `,
+});
+const particleSystem = new THREE.Points(pGeo, particleMat);
+particleSystem.frustumCulled = false; // Critical: GPU shader displaces particles far beyond unit-sphere bbox!
+scene.add(particleSystem);
+
+// ---------------------------------------------------------------------------
+// 4. BESPOKE 3D PBR SCULPTURAL WORLDS (7 Shots — ZERO Rounded-Rectangle Cards!)
+// ---------------------------------------------------------------------------
+const matObsidian = new THREE.MeshPhysicalMaterial({
+  color: 0x0c1322,
+  metalness: 0.22,
+  roughness: 0.08,
+  transparent: true,
+  opacity: 0.34,
+  clearcoat: 1.0,
+  clearcoatRoughness: 0.06,
+  side: THREE.DoubleSide,
+});
+const matGold = new THREE.MeshStandardMaterial({
+  color: 0xf5c447,
+  metalness: 0.92,
+  roughness: 0.14,
+  emissive: 0xd97706,
+  emissiveIntensity: 1.15,
+});
+const matEmeraldGlass = new THREE.MeshPhysicalMaterial({
+  color: 0x10b981,
+  metalness: 0.12,
+  roughness: 0.08,
+  transmission: 0.82,
+  thickness: 2.2,
+  ior: 1.62,
+  emissive: 0x065f46,
+  emissiveIntensity: 0.75,
+});
+const matTungsten = new THREE.MeshStandardMaterial({
+  color: 0x1e293b,
+  metalness: 0.92,
+  roughness: 0.26,
+});
+
+// === WORLD 1: THE FROZEN VAULT + 400 EXPLODABLE OBSIDIAN SHARDS ===
+const world1 = new THREE.Group();
+const vaultCube = new THREE.Mesh(new THREE.BoxGeometry(3.4, 3.4, 3.4), matObsidian);
+world1.add(vaultCube);
+// Subtle metallic bevel wireframe edges on obsidian vault
+const vaultEdges = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.BoxGeometry(3.44, 3.44, 3.44)),
+  new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.55 })
+);
+world1.add(vaultEdges);
+// Brushed-gold dormant emblem caged inside
+const goldTorus = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.24, 32, 80), matGold);
+world1.add(goldTorus);
+const goldInnerRing = new THREE.Mesh(new THREE.TorusGeometry(0.54, 0.06, 20, 64), matGold);
+world1.add(goldInnerRing);
+// Dark tungsten prison bars around the gold
+for (let i = -2; i <= 2; i++) {
+  if (i === 0) continue;
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 3.3, 12), matTungsten);
+  bar.position.set(i * 0.62, 0, 1.52);
+  world1.add(bar);
+}
+// Hairline incandescent emerald fracture beam splitting the cube front face right before silence drop
+const crackMat = new THREE.MeshBasicMaterial({ color: 0xa7f3d0, transparent: true, opacity: 0.0 });
+const crackBeam = new THREE.Mesh(new THREE.BoxGeometry(0.065, 3.65, 3.62), crackMat);
+world1.add(crackBeam);
+const vaultGoldLight = new THREE.PointLight(0xfbbf24, 10.0, 14, 1.4);
+vaultGoldLight.position.set(0, 0.3, 0.4);
+world1.add(vaultGoldLight);
+scene.add(world1);
+
+// 400 Instanced Obsidian Shards (explode cleanly on Shot 2 Awakening!)
+const SHARD_N = 400;
+const shardGeo = new THREE.OctahedronGeometry(0.22, 0);
+const shardMat = new THREE.MeshStandardMaterial({
+  color: 0x0b1220,
+  metalness: 0.85,
+  roughness: 0.18,
+  emissive: 0x052e23,
+  emissiveIntensity: 0.45,
+});
+const shardInst = new THREE.InstancedMesh(shardGeo, shardMat, SHARD_N);
+const shardData = [];
+const dummy = new THREE.Object3D();
+for (let i = 0; i < SHARD_N; i++) {
+  const bx = (rand() - 0.5) * 3.1;
+  const by = (rand() - 0.5) * 3.1;
+  const bz = (rand() - 0.5) * 3.1;
+  const dir = new THREE.Vector3(bx, by, bz).normalize().multiplyScalar(2.2 + rand() * 8.5);
+  shardData.push({
+    base: new THREE.Vector3(bx, by, bz),
+    vel: dir,
+    rot: new THREE.Vector3(rand() * 4, rand() * 4, rand() * 4),
+    sc: 0.45 + rand() * 1.15,
+  });
+}
+shardInst.visible = false;
+scene.add(shardInst);
+
+// === WORLD 2: THE AWAKENING LIVING CORE ===
+const world2 = new THREE.Group();
+const coreOuter = new THREE.Mesh(new THREE.IcosahedronGeometry(1.75, 1), matEmeraldGlass);
+world2.add(coreOuter);
+const coreWire = new THREE.LineSegments(
+  new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(1.92, 1)),
+  new THREE.LineBasicMaterial({ color: 0x6ee7b7, transparent: true, opacity: 0.72 })
+);
+world2.add(coreWire);
+const coreInner = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(0.88, 2),
+  new THREE.MeshBasicMaterial({ color: 0xa7f3d0 })
+);
+world2.add(coreInner);
+const coreRings = [];
+for (let r = 0; r < 3; r++) {
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(2.55 + r * 0.62, 0.032, 16, 120),
+    new THREE.MeshStandardMaterial({
+      color: r === 1 ? 0x38bdf8 : 0x34d399,
+      emissive: r === 1 ? 0x0284c7 : 0x059669,
+      emissiveIntensity: 1.4,
+      metalness: 0.8,
+      roughness: 0.2,
+    })
+  );
+  world2.add(ring);
+  coreRings.push(ring);
+}
+world2.visible = false;
+scene.add(world2);
+
+// === WORLD 3: MATHEMATICAL CONSCIENCE (GLASS MÖBIUS CONDUIT + STARK RING + HEX SHIELD + SILICON DIE) ===
+const world3 = new THREE.Group();
+const mobiusMesh = new THREE.Mesh(
+  new THREE.TorusKnotGeometry(2.35, 0.22, 220, 28, 2, 3),
+  matEmeraldGlass
+);
+world3.add(mobiusMesh);
+const mobiusWire = new THREE.LineSegments(
+  new THREE.WireframeGeometry(new THREE.TorusKnotGeometry(2.35, 0.25, 110, 12, 2, 3)),
+  new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.28 })
+);
+world3.add(mobiusWire);
+// Rotating STARK Interference Ring encircling the knot
+const starkRing = new THREE.Mesh(
+  new THREE.TorusGeometry(3.45, 0.06, 20, 140),
+  new THREE.MeshBasicMaterial({ color: 0x6ee7b7 })
+);
+world3.add(starkRing);
+const starkRing2 = new THREE.Mesh(
+  new THREE.TorusGeometry(3.85, 0.025, 16, 140),
+  new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.65 })
+);
+world3.add(starkRing2);
+// Holographic hexagonal emerald shield wall blocking rogue crimson theft filament
+const hexShieldMat = new THREE.MeshBasicMaterial({
+  color: 0x34d399,
+  wireframe: true,
+  transparent: true,
+  opacity: 0.0,
+});
+const hexShield = new THREE.Mesh(new THREE.CircleGeometry(1.65, 6), hexShieldMat);
+hexShield.position.set(3.0, 0.4, 0.3);
+hexShield.rotation.y = -Math.PI * 0.32;
+world3.add(hexShield);
+const rogueBeamMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e, transparent: true, opacity: 0.0 });
+const rogueBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 2.8, 12), rogueBeamMat);
+rogueBeam.rotation.z = Math.PI * 0.46;
+rogueBeam.position.set(1.65, 0.35, 0.25);
+world3.add(rogueBeam);
+// Jewel-like dark micro-silicon edge chip ($5 verifier) emerging at shot end
+const chipGroup = new THREE.Group();
+const chipBody = new THREE.Mesh(
+  new THREE.BoxGeometry(1.4, 0.14, 1.4),
+  new THREE.MeshStandardMaterial({ color: 0x0a101c, metalness: 0.88, roughness: 0.16 })
+);
+chipGroup.add(chipBody);
+const chipDie = new THREE.Mesh(
+  new THREE.BoxGeometry(0.72, 0.17, 0.72),
+  new THREE.MeshBasicMaterial({ color: 0x34d399 })
+);
+chipGroup.add(chipDie);
+chipGroup.position.set(0, 0, 2.2);
+chipGroup.visible = false;
+world3.add(chipGroup);
+world3.visible = false;
+scene.add(world3);
+
+// === WORLD 4: AUTONOMOUS ABUNDANCE TERRAIN (GLSL BASALT TOPOGRAPHY + SOLAR MIRRORS + COMPUTE MONOLITHS) ===
+const world4 = new THREE.Group();
+const terrainUniforms = {
+  uTime: { value: 0 },
+  uScan: { value: 0 },      // golden verification scan ring radius
+  uCompound: { value: 0 },  // 0..1 fractal parcel ignition wave!
+};
+const terrainGeo = new THREE.PlaneGeometry(46, 46, 150, 150);
+terrainGeo.rotateX(-Math.PI / 2);
+const terrainMat = new THREE.ShaderMaterial({
+  uniforms: terrainUniforms,
+  vertexShader: `
+    uniform float uTime;
+    varying float vH;
+    varying vec3 vWorld;
+    float topo(vec2 p) {
+      float h = sin(p.x * 0.24) * cos(p.y * 0.22) * 1.45;
+      h += sin(p.x * 0.55 + p.y * 0.42) * 0.55;
+      h += cos(length(p) * 0.32) * 0.45;
+      return h;
+    }
+    void main() {
+      vec3 pos = position;
+      float h = topo(pos.xz);
+      pos.y += h;
+      vH = h;
+      vec4 wp = modelMatrix * vec4(pos, 1.0);
+      vWorld = wp.xyz;
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }
+  `,
+  fragmentShader: `
+    uniform float uTime;
+    uniform float uScan;
+    uniform float uCompound;
+    varying float vH;
+    varying vec3 vWorld;
+    void main() {
+      // Dark volcanic basalt base
+      vec3 col = vec3(0.025, 0.04, 0.068);
+
+      // Luminous emerald topographic contour lines
+      float contour = abs(fract(vH * 3.8) - 0.5);
+      float line = 1.0 - smoothstep(0.0, 0.065, contour);
+      col += vec3(0.08, 0.85, 0.54) * line * 0.72;
+
+      // Fractal Parcel Grid veins igniting outward on uCompound!
+      vec2 grid = abs(fract(vWorld.xz * 0.22) - 0.5);
+      float gLine = 1.0 - smoothstep(0.0, 0.032, min(grid.x, grid.y));
+      float parcelDist = length(vWorld.xz);
+      float ignite = smoothstep(uCompound * 26.0 + 1.5, uCompound * 26.0 - 3.5, parcelDist) * uCompound;
+      col += vec3(0.20, 0.98, 0.70) * gLine * (0.18 + ignite * 1.35);
+
+      // Sweeping golden hardware cryptographic scan ring
+      float scanWave = exp(-pow((parcelDist - uScan * 24.0) * 1.1, 2.0));
+      col += vec3(1.0, 0.78, 0.24) * scanWave * 1.45;
+
+      // Atmospheric horizon distance fade
+      float fade = smoothstep(23.0, 7.0, parcelDist);
+      gl_FragColor = vec4(col * fade, 1.0);
+    }
+  `,
+});
+const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
+terrainMesh.position.y = -2.2;
+world4.add(terrainMesh);
+
+// Sleek angled photovoltaic Solar Mirror Arrays with golden specular rim + Tapered Hexagonal Compute Spires
+const solarMat = new THREE.MeshStandardMaterial({
+  color: 0x0e1d36,
+  metalness: 0.92,
+  roughness: 0.10,
+  emissive: 0x78350f,
+  emissiveIntensity: 0.72,
+});
+const solarEdgeMat = new THREE.LineBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.72 });
+const panelGeo = new THREE.BoxGeometry(1.55, 0.07, 1.02);
+const panelEdgeGeo = new THREE.EdgesGeometry(panelGeo);
+for (let i = 0; i < 16; i++) {
+  const row = Math.floor(i / 4) - 1.5;
+  const col = (i % 4) - 1.5;
+  const pGrp = new THREE.Group();
+  pGrp.add(new THREE.Mesh(panelGeo, solarMat));
+  pGrp.add(new THREE.LineSegments(panelEdgeGeo, solarEdgeMat));
+  pGrp.position.set(col * 3.1 + 0.8, -0.55, row * 3.1 - 1.0);
+  pGrp.rotation.x = 0.42;
+  pGrp.rotation.y = -0.2;
+  world4.add(pGrp);
+}
+const spireEdgeMat = new THREE.LineBasicMaterial({ color: 0x6ee7b7, transparent: true, opacity: 0.82 });
+for (let k = 0; k < 6; k++) {
+  const ang = k * (Math.PI * 2 / 6) + 0.3;
+  const hSpire = 3.4 + (k % 2) * 1.5;
+  const sGeo = new THREE.CylinderGeometry(0.14, 0.44, hSpire, 6);
+  const sGrp = new THREE.Group();
+  sGrp.add(new THREE.Mesh(sGeo, matEmeraldGlass));
+  sGrp.add(new THREE.LineSegments(new THREE.EdgesGeometry(sGeo), spireEdgeMat));
+  sGrp.position.set(Math.cos(ang) * 6.5, hSpire * 0.28 - 0.6, Math.sin(ang) * 6.5 - 2.0);
+  world4.add(sGrp);
+}
+world4.visible = false;
+scene.add(world4);
+
+// === WORLD 5: BLIND BITCOIN FORTRESS (DIAMOND MERGE PRISM + DUAL BLOCK CORRIDORS + 21M SPHERE) ===
+const world5 = new THREE.Group();
+const prismGeo = new THREE.OctahedronGeometry(2.15, 0);
+const prismMesh = new THREE.Mesh(
+  prismGeo,
+  new THREE.MeshPhysicalMaterial({
+    color: 0xd1fae5,
+    metalness: 0.05,
+    roughness: 0.04,
+    transmission: 0.92,
+    thickness: 2.8,
+    ior: 2.1,
+    emissive: 0x064e3b,
+    emissiveIntensity: 0.55,
+  })
+);
+world5.add(prismMesh);
+world5.add(new THREE.LineSegments(
+  new THREE.EdgesGeometry(prismGeo),
+  new THREE.LineBasicMaterial({ color: 0x6ee7b7, transparent: true, opacity: 0.9 })
+));
+// Incoming molten gold laser core + glowing refracted Gold & Emerald exit beams!
+const inBeam = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.14, 0.22, 14, 16),
+  new THREE.MeshBasicMaterial({ color: 0xfbbf24 })
+);
+inBeam.rotation.z = Math.PI / 2;
+inBeam.position.set(-8.2, 0, 0);
+world5.add(inBeam);
+const outBtcCurve = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(0.4, 0.15, 0),
+  new THREE.Vector3(2.2, 1.85, 0),
+  new THREE.Vector3(5.2, 2.60, 0),
+  new THREE.Vector3(16.0, 2.60, 0),
+]);
+const outNsCurve = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(0.4, -0.15, 0),
+  new THREE.Vector3(2.2, -1.85, 0),
+  new THREE.Vector3(5.2, -2.60, 0),
+  new THREE.Vector3(16.0, -2.60, 0),
+]);
+world5.add(new THREE.Mesh(
+  new THREE.TubeGeometry(outBtcCurve, 48, 0.11, 12, false),
+  new THREE.MeshBasicMaterial({ color: 0xfbbf24 })
+));
+world5.add(new THREE.Mesh(
+  new THREE.TubeGeometry(outNsCurve, 48, 0.11, 12, false),
+  new THREE.MeshBasicMaterial({ color: 0x34d399 })
+));
+
+// Dual instanced monolithic block corridors (Gold Bitcoin top + Emerald Newsatoshi bottom)
+const BLK_N = 14;
+const blkGeo = new THREE.BoxGeometry(1.15, 0.78, 0.78);
+const btcBlocks = new THREE.InstancedMesh(
+  blkGeo,
+  new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.92, roughness: 0.16, emissive: 0x78350f, emissiveIntensity: 0.75 }),
+  BLK_N
+);
+const nsBlocks = new THREE.InstancedMesh(
+  blkGeo,
+  new THREE.MeshPhysicalMaterial({ color: 0x10b981, metalness: 0.22, roughness: 0.08, transmission: 0.65, emissive: 0x059669, emissiveIntensity: 0.95 }),
+  BLK_N
+);
+world5.add(btcBlocks, nsBlocks);
+
+// Pristine sealed 21,000,000 Celestial Sphere hovering untouched above
+const capSphere = new THREE.Mesh(
+  new THREE.SphereGeometry(1.25, 36, 36),
+  new THREE.MeshPhysicalMaterial({
+    color: 0xfef3c7,
+    metalness: 0.1,
+    roughness: 0.05,
+    transmission: 0.86,
+    emissive: 0xd97706,
+    emissiveIntensity: 0.55,
+  })
+);
+capSphere.position.set(5.2, 3.8, -2.5);
+world5.add(capSphere);
+if (VERTICAL) world5.rotation.z = -Math.PI / 2;
+world5.visible = false;
+scene.add(world5);
+
+// === WORLD 6: CENTURIES-GRADE PRIVACY SPHERE + 4 CHROMATIC VAULTLESS RIVERS ===
+const world6 = new THREE.Group();
+const geoLattice = new THREE.LineSegments(
+  new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(2.35, 2)),
+  new THREE.LineBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.65 })
+);
+world6.add(geoLattice);
+const frostedCore = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(2.15, 2),
+  new THREE.MeshPhysicalMaterial({
+    color: 0x062022,
+    roughness: 0.35,
+    transmission: 0.62,
+    emissive: 0x065f46,
+    emissiveIntensity: 0.35,
+  })
+);
+world6.add(frostedCore);
+// Violet quantum-storm shockwave ring rippling harmlessly off the exterior
+const qShockMat = new THREE.MeshBasicMaterial({ color: 0xa78bfa, transparent: true, opacity: 0.7, side: THREE.DoubleSide });
+const qShockRing = new THREE.Mesh(new THREE.RingGeometry(2.55, 2.75, 64), qShockMat);
+world6.add(qShockRing);
+
+// Weightless Spinning Atomic Preimage Ring (ZERO vault, ZERO box!)
+const atomicRing = new THREE.Mesh(
+  new THREE.TorusGeometry(1.65, 0.07, 24, 120),
+  new THREE.MeshBasicMaterial({ color: 0x6ee7b7 })
+);
+const atomicRing2 = new THREE.Mesh(
+  new THREE.TorusGeometry(1.28, 0.045, 20, 100),
+  new THREE.MeshBasicMaterial({ color: 0xfde68a })
+);
+world6.add(atomicRing, atomicRing2);
+
+// 4 Sweeping 3D Chromatic Energy Rivers converging directly into the weightless Atomic Ring
+const riverColors = [0xfbbf24, 0xfef08a, 0xc084fc, 0x60a5fa];
+const riverTubes = [];
+for (let i = 0; i < 4; i++) {
+  const baseAng = i * (Math.PI / 2) + Math.PI / 4;
+  const pts = [];
+  for (let s = 0; s <= 16; s++) {
+    const u = s / 16;
+    const ang = baseAng + (1 - u) * 1.15;
+    const rad = lerp(13.5, 1.55, Math.pow(u, 0.85));
+    pts.push(new THREE.Vector3(
+      Math.cos(ang) * rad,
+      Math.sin(ang) * rad * (VERTICAL ? 1.25 : 0.72),
+      lerp(-5.5, 0.0, u)
+    ));
+  }
+  const tube = new THREE.Mesh(
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 64, 0.055, 10, false),
+    new THREE.MeshBasicMaterial({ color: riverColors[i], transparent: true, opacity: 0.78 })
+  );
+  world6.add(tube);
+  riverTubes.push(tube);
+}
+world6.visible = false;
+scene.add(world6);
+
+// === WORLD 7: THE SCULPTURAL NEWSATOSHI LOVE MONOLITH & LIVE HEARTBEAT ===
+const world7 = new THREE.Group();
+const monoOuter = new THREE.Mesh(new THREE.OctahedronGeometry(1.85, 0), matEmeraldGlass);
+monoOuter.scale.set(1.0, 1.38, 1.0);
+world7.add(monoOuter);
+const monoWire = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.OctahedronGeometry(1.94, 0)),
+  new THREE.LineBasicMaterial({ color: 0x6ee7b7, transparent: true, opacity: 0.92 })
+);
+monoWire.scale.set(1.0, 1.38, 1.0);
+world7.add(monoWire);
+const monoInner = new THREE.Mesh(
+  new THREE.OctahedronGeometry(0.95, 0),
+  new THREE.MeshStandardMaterial({ color: 0x050a14, metalness: 0.95, roughness: 0.08, emissive: 0x10b981, emissiveIntensity: 0.65 })
+);
+monoInner.scale.set(1.0, 1.38, 1.0);
+world7.add(monoInner);
+const monoHalo = new THREE.Mesh(
+  new THREE.TorusGeometry(2.65, 0.025, 16, 128),
+  new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.65 })
+);
+monoHalo.rotation.x = Math.PI * 0.42;
+world7.add(monoHalo);
+
+// Thick Glowing 3D Volumetric Horizon Mainnet Heartbeat Ribbon (visible at 1080p & triggers HDR bloom!)
+const HB_PTS = 140;
+const hbPos = new Float32Array(HB_PTS * 2 * 3);
+const hbIdx = [];
+for (let i = 0; i < HB_PTS - 1; i++) {
+  const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+  hbIdx.push(a, b, c, b, d, c);
+}
+const hbGeo = new THREE.BufferGeometry();
+hbGeo.setAttribute('position', new THREE.BufferAttribute(hbPos, 3));
+hbGeo.setIndex(hbIdx);
+const hbLine = new THREE.Mesh(
+  hbGeo,
+  new THREE.MeshBasicMaterial({ color: 0x6ee7b7, transparent: true, opacity: 0.95, side: THREE.DoubleSide })
+);
+world7.add(hbLine);
+world7.visible = false;
+scene.add(world7);
+
+// ---------------------------------------------------------------------------
+// 5. RULE-OF-ONE MINIMAL APPLE KINETIC TYPOGRAPHY CHOREOGRAPHY
+// ---------------------------------------------------------------------------
+const STRIKES = [
+  // Shot 1
+  { t0: 1.40, t1: 5.80,  html: `FROZEN IN A <span class="grad-gold">VAULT.</span>`, sub: '', size: 68, y: '76%' },
+  { t0: 6.80, t1: 11.08, html: `CUSTODY BREAKS THE PROMISE.`, sub: '', size: 58, y: '76%' },
+  // Shot 2 (Awakening!)
+  { t0: 12.15, t1: 14.35, html: `WAKE <span class="grad-em">UP.</span>`, sub: '', size: 102, y: '75%' },
+  { t0: 14.55, t1: 16.40, html: `NEWSATOSHI`, sub: 'LOVE', size: 84, y: '75%' },
+  // Shot 3 (Conscience)
+  { t0: 16.85, t1: 21.40, html: `UNBREAKABLE <span class="grad-em">CONSCIENCE.</span>`, sub: '', size: 66, y: '76%' },
+  { t0: 21.85, t1: 23.95, html: `EVERY COIN OF CHANGE.`, sub: '', size: 66, y: '76%' },
+  { t0: 24.10, t1: 26.25, html: `<span class="grad-em">SAME LAW. FOREVER.</span>`, sub: 'OP_VERIFY_COVENANT_STARK · <10MS · $5 CHIP', size: 66, y: '75%' },
+  // Shot 4 (Abundance — 3 Percussive Beat Hits!)
+  { t0: 26.60, t1: 27.14, html: `<span class="grad-em">LAND.</span>`, sub: '', size: 118, y: '50%' },
+  { t0: 27.16, t1: 27.74, html: `<span class="grad-gold">SOLAR.</span>`, sub: '', size: 118, y: '50%' },
+  { t0: 27.76, t1: 29.80, html: `<span class="grad-em">COMPUTE.</span>`, sub: 'HARDWARE PROVES REAL WORK', size: 110, y: '50%' },
+  { t0: 30.50, t1: 32.65, html: `<span class="grad-em">&lt; 1 ms</span>`, sub: 'HTTP 402 PAYWORDS · $0 GAS', size: 116, y: '72%' },
+  { t0: 32.85, t1: 35.15, html: `ZERO <span class="grad-em">CEO.</span>`, sub: 'SURPLUS BUYS THE NEXT ACRE', size: 84, y: '74%' },
+  // Shot 5 (Blind Bitcoin Fortress)
+  { t0: 35.55, t1: 38.25, html: `<span class="grad-gold">21,000,000.</span>`, sub: 'BLIND BASE LAYER · 50 LOVE / BLOCK', size: 96, y: '74%' },
+  { t0: 38.45, t1: 41.55, html: `<span class="grad-em">0 EXTRA WATTS.</span>`, sub: 'BITCOIN AUXPOW · CHAIN ID 20051', size: 82, y: '75%' },
+  // Shot 6 (Sovereignty & Vaultless Gravity)
+  { t0: 42.05, t1: 44.35, html: `PRIVATE LIKE <span class="grad-em">CASH.</span>`, sub: 'PURE HASH MATH · ZERO ELLIPTIC CURVES', size: 70, y: '75%' },
+  { t0: 46.60, t1: 48.35, html: `<span class="grad-em">ZERO VAULTS.</span>`, sub: 'ATOMIC SHA-256 RAILS · SWAP OR 100% REFUND', size: 86, y: '74%' },
+];
+
+const heroEl = document.getElementById('hero-strike');
+const liveTelEl = document.getElementById('live-telemetry');
+const finEl = document.getElementById('finale-lockup');
+const riverEls = {
+  btc: document.getElementById('river-btc'),
+  ln: document.getElementById('river-ln'),
+  sol: document.getElementById('river-sol'),
+  ev: document.getElementById('river-ev'),
+};
+
+function updateTypography(t, stats) {
+  // Active optical strike
+  let active = null;
+  for (const s of STRIKES) {
+    if (t >= s.t0 && t <= s.t1) { active = s; break; }
+  }
+  if (active) {
+    const fin = smoothstep(active.t0, active.t0 + 0.24, t);
+    const fout = 1.0 - smoothstep(active.t1 - 0.22, active.t1, t);
+    const op = clamp01(Math.min(fin, fout));
+    const blur = (1.0 - fin) * 14.0 + (1.0 - fout) * 8.0;
+    const sc = lerp(1.06, 1.0, fin);
+    const fz = VERTICAL ? Math.round(active.size * 0.72) : active.size;
+    heroEl.style.opacity = op.toFixed(4);
+    heroEl.style.fontSize = `${fz}px`;
+    heroEl.style.top = active.y;
+    heroEl.style.transform = `translateY(-50%) scale(${sc.toFixed(4)})`;
+    heroEl.style.filter = blur > 0.15 ? `blur(${blur.toFixed(1)}px)` : 'none';
+    heroEl.innerHTML = active.html + (active.sub ? `<span class="title-micro">${active.sub}</span>` : '');
+  } else {
+    heroEl.style.opacity = '0';
+  }
+
+  // Shot 6 floating river whispers (0:44.45 -> 0:46.75)
+  const rOp = smoothstep(44.45, 44.85, t) * (1.0 - smoothstep(46.50, 46.90, t));
+  if (rOp > 0.01) {
+    const pos = VERTICAL
+      ? { btc: ['14%', '30%'], ln: ['72%', '30%'], sol: ['14%', '66%'], ev: ['76%', '66%'] }
+      : { btc: ['14%', '28%'], ln: ['78%', '28%'], sol: ['15%', '68%'], ev: ['80%', '68%'] };
+    for (const [k, el] of Object.entries(riverEls)) {
+      el.style.opacity = rOp.toFixed(3);
+      el.style.left = pos[k][0];
+      el.style.top = pos[k][1];
+    }
+  } else {
+    for (const el of Object.values(riverEls)) el.style.opacity = '0';
+  }
+
+  // Shot 7 Live Mainnet Telemetry (0:49.0 -> 0:52.7) — 100% REAL LIVE STATS!
+  const telOp = smoothstep(49.00, 49.65, t) * (1.0 - smoothstep(52.10, 52.65, t));
+  liveTelEl.style.opacity = telOp.toFixed(4);
+  if (telOp > 0.01 && stats) {
+    const roll = easeOutCubic((t - 49.0) / 1.15);
+    document.getElementById('tm-height').textContent = `#${Math.round(stats.mainnet_height * (0.92 + 0.08 * roll)).toLocaleString('en-US')}`;
+    document.getElementById('tm-issued').textContent = `${Math.round(stats.mainnet_issued_love * (0.92 + 0.08 * roll)).toLocaleString('en-US')} LOVE`;
+    document.getElementById('tm-diff').textContent = `${(stats.mainnet_diff * (0.92 + 0.08 * roll)).toFixed(1)}`;
+    document.getElementById('tm-merge').textContent = `${Math.round(stats.mainnet_merge_pct || 100)}%`;
+  }
+
+  // Shot 7 Iconic Finale Monument Lockup (0:52.65 -> 0:58.06)
+  const finIn = smoothstep(52.65, 53.45, t);
+  const finOut = 1.0 - smoothstep(57.15, 58.05, t);
+  const finOp = clamp01(Math.min(finIn, finOut));
+  finEl.style.opacity = finOp.toFixed(4);
+  finEl.style.transform = `translateX(-50%) translateY(${lerp(22, 0, finIn).toFixed(1)}px)`;
+}
+
+// ---------------------------------------------------------------------------
+// 6. DETERMINISTIC 60FPS FRAME STEPPER — CALLED DIRECTLY BY PYTHON/PLAYWRIGHT
+// ---------------------------------------------------------------------------
+const SHOT_BOUNDS = [
+  0.000,   // Shot 1: Frozen Vault
+  11.613,  // Shot 2: Awakening (Bar 7 Beat 1!)
+  16.452,  // Shot 3: Conscience
+  26.129,  // Shot 4: Abundance Engine
+  34.839,  // Shot 5: Blind Bitcoin Fortress
+  41.613,  // Shot 6: Privacy & Vaultless Gravity
+  48.387,  // Shot 7: Living Mainnet Heartbeat & Finale (Bar 26 Beat 1!)
+  58.065,
+];
+
+window.__renderFrame = function(frameIdx, fps, payload) {
+  const t = frameIdx / fps;
+  const totalDur = payload.total_dur || 58.0645;
+  const kick = (payload.kick_60hz && payload.kick_60hz[frameIdx]) || 0.0;
+  const bass = (payload.bass_60hz && payload.bass_60hz[frameIdx]) || 0.0;
+  const distMult = VERTICAL ? 1.36 : 1.0;
+
+  // Determine current shot index (0..6)
+  let shot = 6;
+  for (let i = 0; i < 7; i++) {
+    if (t >= SHOT_BOUNDS[i] && t < SHOT_BOUNDS[i + 1]) { shot = i; break; }
+  }
+  const lt = t - SHOT_BOUNDS[shot];
+  const sdur = SHOT_BOUNDS[shot + 1] - SHOT_BOUNDS[shot];
+
+  // Reset world visibility
+  world1.visible = (shot === 0);
+  shardInst.visible = (shot === 1);
+  world2.visible = (shot === 1);
+  world3.visible = (shot === 2);
+  world4.visible = (shot === 3);
+  world5.visible = (shot === 4);
+  world6.visible = (shot === 5);
+  world7.visible = (shot === 6);
+
+  // Update GPU particle uniforms
+  particleUniforms.uTime.value = t;
+  particleUniforms.uMode.value = shot;
+  particleUniforms.uLocalT.value = lt;
+  particleUniforms.uKick.value = kick;
+
+  // Defaults for cinema optics
+  let godRay = 0.0;
+  let chromatic = 0.0011 + kick * 0.0014;
+  let flash = 0.0;
+  let bloomStr = 0.65 + kick * 0.35;
+  const fade = smoothstep(0.0, 0.55, t) * (1.0 - smoothstep(totalDur - 0.85, totalDur, t));
+
+  // === SHOT 1: THE FROZEN VAULT (0:00 -> 0:11.613) ===
+  if (shot === 0) {
+    // Freeze to 4% hyper-slow-mo inside the 484ms silence vacuum!
+    const inVac = t >= 11.129;
+    const effT = inVac ? 11.129 + (t - 11.129) * 0.04 : t;
+    const ang = effT * 0.14 - 0.25;
+    const push = smoothstep(8.2, 11.12, effT);
+    const camZ = lerp(9.4, 5.1, push) * distMult;
+    const panX = smoothstep(6.6, 8.8, effT) * (1.0 - push) * 2.1;
+    camera.position.set(Math.sin(ang) * camZ + panX, lerp(0.55, 0.05, push), Math.cos(ang) * camZ);
+    camera.lookAt(panX * 0.65, 0, 0);
+
+    vaultCube.rotation.y = effT * 0.08;
+    vaultEdges.rotation.y = effT * 0.08;
+    goldTorus.rotation.y = effT * 0.16;
+    goldInnerRing.rotation.x = effT * 0.22;
+
+    // Hairline blinding emerald fracture splits obsidian cube right before vacuum!
+    const crackP = smoothstep(10.55, 11.15, t);
+    crackMat.opacity = crackP;
+    crackBeam.scale.set(1.0 + crackP * 1.4, 1.0, 1.0);
+    godRay = crackP * 1.35;
+    bloomStr = 0.48 + crackP * 0.95;
+    heroPoint.color.setHex(crackP > 0.1 ? 0x34d399 : 0xfbbf24);
+    heroPoint.intensity = 2.4 + crackP * 14.0;
+  }
+
+  // === SHOT 2: THE AWAKENING (0:11.613 -> 0:16.452) ===
+  else if (shot === 1) {
+    const expP = easeOutCubic(lt / 1.4);
+    const diveP = easeInOutQuart((lt - 3.6) / 1.2);
+    // Kinetic 180ms shockwave jolt on Bar 7 Beat 1!
+    const jolt = Math.exp(-lt * 14.0) * 0.35;
+    const camR = lerp(5.4, 9.6, expP) * (1.0 - diveP * 0.85) * distMult;
+    const ang = lt * 0.42;
+    camera.position.set(Math.sin(ang) * camR + Math.sin(lt * 95) * jolt, lerp(0.1, 1.1, expP) * (1 - diveP), Math.cos(ang) * camR);
+    camera.lookAt(0, 0, 0);
+
+    // 400 spinning obsidian shards exploding outward from vault!
+    for (let i = 0; i < SHARD_N; i++) {
+      const sd = shardData[i];
+      const travel = easeOutCubic(lt / 2.8);
+      dummy.position.copy(sd.base).addScaledVector(sd.vel, travel * 1.45);
+      dummy.rotation.set(sd.rot.x * lt, sd.rot.y * lt, sd.rot.z * lt);
+      dummy.scale.setScalar(sd.sc * (1.0 - smoothstep(2.4, 4.4, lt) * 0.65));
+      dummy.updateMatrix();
+      shardInst.setMatrixAt(i, dummy.matrix);
+    }
+    shardInst.instanceMatrix.needsUpdate = true;
+
+    const coreSc = lerp(0.15, 1.05, easeOutCubic(lt / 0.85)) * (1.0 + kick * 0.08);
+    world2.scale.setScalar(coreSc);
+    coreOuter.rotation.set(lt * 0.55, lt * 0.72, 0);
+    coreWire.rotation.set(-lt * 0.4, lt * 0.65, lt * 0.2);
+    coreRings[0].rotation.set(lt * 0.9, lt * 0.5, 0);
+    coreRings[1].rotation.set(-lt * 0.7, 0.4, lt * 0.8);
+    coreRings[2].rotation.set(0.6, -lt * 0.8, lt * 0.4);
+
+    flash = Math.exp(-lt * 9.5) * 0.82;
+    chromatic = 0.0014 + Math.exp(-lt * 6.5) * 0.008;
+    godRay = 0.75 + Math.exp(-lt * 2.5) * 0.9;
+    bloomStr = 0.85 + kick * 0.45 + Math.exp(-lt * 5.0) * 0.6;
+    heroPoint.color.setHex(0x34d399);
+    heroPoint.intensity = 10.0 + kick * 5.0;
+  }
+
+  // === SHOT 3: MATHEMATICAL CONSCIENCE (0:16.452 -> 0:26.129) ===
+  else if (shot === 2) {
+    const chipZoom = smoothstep(7.4, 9.2, lt);
+    const ang = lt * 0.34 - 0.5;
+    const rad = lerp(9.8, 3.3, chipZoom) * distMult;
+    camera.position.set(Math.sin(ang) * rad, lerp(1.3, 1.6, chipZoom), Math.cos(ang) * rad);
+    camera.lookAt(0, 0, lerp(0, 2.2, chipZoom));
+
+    mobiusMesh.rotation.set(lt * 0.28, lt * 0.45, 0);
+    mobiusWire.rotation.copy(mobiusMesh.rotation);
+    starkRing.rotation.set(Math.PI * 0.35 + lt * 0.5, lt * 0.8, 0);
+    starkRing2.rotation.set(-Math.PI * 0.25, -lt * 0.65, lt * 0.4);
+
+    // Rogue crimson theft filament hits holographic hexagonal emerald shield at lt = 4.35s!
+    const repel = Math.exp(-Math.pow((lt - 4.35) * 1.9, 2.0));
+    hexShieldMat.opacity = repel * 0.92;
+    hexShield.scale.setScalar(0.85 + repel * 0.35);
+    rogueBeamMat.opacity = smoothstep(3.1, 4.15, lt) * (1.0 - smoothstep(4.35, 4.75, lt));
+
+    // Jewel-like $5 edge microchip reveals in final 2.2s
+    chipGroup.visible = chipZoom > 0.05;
+    chipGroup.scale.setScalar(easeOutCubic((lt - 7.1) / 0.9));
+    chipGroup.rotation.y = lt * 0.7;
+    chipGroup.rotation.x = 0.45;
+
+    godRay = 0.35 + repel * 0.65;
+    bloomStr = 0.78 + kick * 0.32 + repel * 0.5;
+    heroPoint.color.setHex(0x38bdf8);
+    heroPoint.intensity = 8.5 + kick * 4.0;
+  }
+
+  // === SHOT 4: THE AUTONOMOUS ABUNDANCE ENGINE (0:26.129 -> 0:34.839) ===
+  else if (shot === 3) {
+    // Low-altitude drone skim -> high fractal crane-out!
+    const crane = smoothstep(5.5, 8.6, lt);
+    camera.position.set(
+      Math.sin(lt * 0.32) * 3.8,
+      lerp(2.4, 10.5, crane) * (VERTICAL ? 1.18 : 1.0),
+      lerp(13.5, 1.5, lt / sdur) + crane * 6.0
+    );
+    camera.lookAt(0, lerp(-0.8, -2.0, crane), lerp(-4.0, -2.5, crane));
+
+    terrainUniforms.uTime.value = t;
+    terrainUniforms.uScan.value = smoothstep(2.2, 5.2, lt);
+    terrainUniforms.uCompound.value = smoothstep(6.0, 8.4, lt);
+
+    keyLight.color.setHex(0xfde68a);
+    keyLight.intensity = 3.2;
+    heroPoint.color.setHex(0x34d399);
+    heroPoint.position.set(0, 2.5, -2.0);
+    heroPoint.intensity = 9.0 + kick * 5.0;
+    godRay = 0.25 + terrainUniforms.uCompound.value * 0.55;
+    bloomStr = 0.78 + kick * 0.38;
+  }
+
+  // === SHOT 5: THE BLIND BITCOIN FORTRESS (0:34.839 -> 0:41.613) ===
+  else if (shot === 4) {
+    const whip = smoothstep(1.6, 5.2, lt);
+    const camX = lerp(-4.2, 4.8, whip);
+    const camZ = lerp(11.8, 9.6, whip) * distMult;
+    camera.position.set(VERTICAL ? 0.5 : camX, VERTICAL ? lerp(2.2, -2.4, whip) : 1.4, camZ);
+    camera.lookAt(VERTICAL ? 0 : lerp(0, 3.8, whip), VERTICAL ? lerp(0, -2.0, whip) : 0.3, 0);
+
+    prismMesh.rotation.set(lt * 0.45, lt * 0.85, 0);
+    capSphere.position.y = 3.7 + Math.sin(lt * 1.8) * 0.25;
+    capSphere.rotation.y = lt * 0.5;
+
+    // March twin Gold (Bitcoin) & Emerald (Newsatoshi) monolithic block corridors in exact lockstep!
+    const march = (lt * 2.8) % 2.1;
+    for (let i = 0; i < BLK_N; i++) {
+      const bx = 2.4 + i * 2.1 - march;
+      const sc = smoothstep(1.4, 2.8, bx) * (1.0 - smoothstep(24.0, 29.0, bx));
+      // Upper Bitcoin Gold corridor
+      dummy.position.set(bx, 2.6, Math.sin(i * 0.5 + lt) * 0.15);
+      dummy.rotation.set(0, lt * 0.35 + i * 0.2, 0);
+      dummy.scale.setScalar(sc * (1.0 + kick * 0.06));
+      dummy.updateMatrix();
+      btcBlocks.setMatrixAt(i, dummy.matrix);
+      // Lower Newsatoshi Emerald corridor
+      dummy.position.set(bx, -2.6, -Math.sin(i * 0.5 + lt) * 0.15);
+      dummy.rotation.set(0, -lt * 0.35 + i * 0.2, 0);
+      dummy.updateMatrix();
+      nsBlocks.setMatrixAt(i, dummy.matrix);
+    }
+    btcBlocks.instanceMatrix.needsUpdate = true;
+    nsBlocks.instanceMatrix.needsUpdate = true;
+
+    heroPoint.position.set(0, 0, 1.5);
+    heroPoint.color.setHex(0xfbbf24);
+    heroPoint.intensity = 10.5 + kick * 5.0;
+    godRay = 0.65;
+    bloomStr = 0.85 + kick * 0.38;
+  }
+
+  // === SHOT 6: CENTURIES-GRADE PRIVACY & VAULTLESS GRAVITY (0:41.613 -> 0:48.387) ===
+  else if (shot === 5) {
+    // Plunge near frosted privacy sphere -> corkscrew pullback showing 4 chromatic rivers -> CLIMAX FLASH!
+    const wide = easeInOutQuart((lt - 2.4) / 2.8);
+    const ang = lt * 0.55;
+    const rad = lerp(6.2, 13.8, wide) * distMult;
+    camera.position.set(Math.sin(ang) * rad * 0.45, lerp(0.4, 2.6, wide), rad);
+    camera.lookAt(0, 0, 0);
+
+    geoLattice.rotation.set(lt * 0.28, lt * 0.42, 0);
+    frostedCore.rotation.copy(geoLattice.rotation);
+    geoLattice.scale.setScalar(1.0 - wide * 0.55);
+    frostedCore.scale.setScalar(1.0 - wide * 0.55);
+
+    // Expanding violet quantum shockwave repelling off geodesic sphere!
+    const qw = (lt * 0.85) % 1.0;
+    qShockRing.scale.setScalar(0.85 + qw * 0.95);
+    qShockMat.opacity = (1.0 - qw) * 0.78 * (1.0 - wide);
+    qShockRing.lookAt(camera.position);
+
+    atomicRing.rotation.set(lt * 1.4, lt * 0.9, 0);
+    atomicRing2.rotation.set(-lt * 1.1, lt * 1.6, 0);
+    atomicRing.scale.setScalar(0.4 + wide * 0.95);
+    atomicRing2.scale.setScalar(0.4 + wide * 0.95);
+
+    for (const tb of riverTubes) {
+      tb.material.opacity = wide * 0.85;
+      tb.rotation.z = lt * 0.25;
+    }
+
+    // Epic white-emerald flash peak right into Bar 26 Beat 1 (0:48.387)!
+    const peakFlash = smoothstep(sdur - 0.55, sdur - 0.02, lt);
+    flash = peakFlash * 0.95;
+    godRay = 0.45 + wide * 0.95 + peakFlash * 1.2;
+    chromatic = 0.0014 + wide * 0.003 + peakFlash * 0.009;
+    bloomStr = 0.80 + wide * 0.65 + peakFlash * 0.9;
+    heroPoint.color.setHex(0x34d399);
+    heroPoint.intensity = 9.0 + wide * 8.0;
+  }
+
+  // === SHOT 7: THE LIVING MAINNET HEARTBEAT & ICONIC FINALE (0:48.387 -> 0:58.065) ===
+  else {
+    // Vast museum stillness — glacial reverent dolly-back!
+    const camZ = lerp(8.2, 10.6, lt / sdur) * distMult;
+    camera.position.set(Math.sin(lt * 0.22) * 0.55, lerp(0.15, 0.35, lt / sdur), camZ);
+    camera.lookAt(0, -0.35, 0);
+
+    // Lift sculptural monolith cleanly above live telemetry & lockup
+    const lift = smoothstep(4.2, 5.4, lt);
+    const monoY = lerp(0.95, VERTICAL ? 1.55 : 1.28, lift);
+    const pulse = 1.0 + kick * 0.09;
+    monoOuter.position.y = monoY;
+    monoWire.position.y = monoY;
+    monoInner.position.y = monoY;
+    monoHalo.position.y = monoY;
+    monoOuter.rotation.y = lt * 0.38;
+    monoWire.rotation.y = lt * 0.38;
+    monoInner.rotation.y = -lt * 0.55;
+    monoHalo.rotation.z = lt * 0.28;
+    monoOuter.scale.set(pulse, 1.38 * pulse, pulse);
+    monoWire.scale.set(pulse, 1.38 * pulse, pulse);
+
+    // Thick Glowing 3D Horizon Mainnet Heartbeat Ribbon (62 BPM!)
+    const posAttr = hbGeo.attributes.position;
+    const thick = 0.048;
+    for (let i = 0; i < HB_PTS; i++) {
+      const u = i / (HB_PTS - 1);
+      const x = lerp(-13.5, 13.5, u);
+      const p = ((u * 2.2 - lt * 0.55) % 1.0 + 1.0) % 1.0;
+      let dy = 0;
+      if (p > 0.45 && p < 0.49) dy = 1.35 * Math.sin(((p - 0.45) / 0.04) * Math.PI);
+      else if (p >= 0.49 && p < 0.52) dy = -0.68 * Math.sin(((p - 0.49) / 0.03) * Math.PI);
+      else dy = Math.sin(u * 22 - lt * 3) * 0.04;
+      const env = Math.sin(u * Math.PI);
+      const y = -1.25 + dy * env * (0.55 + kick * 0.85);
+      posAttr.setXYZ(i * 2,     x, y + thick, -2.5);
+      posAttr.setXYZ(i * 2 + 1, x, y - thick, -2.5);
+    }
+    posAttr.needsUpdate = true;
+    hbLine.material.opacity = (1.0 - lift * 0.55) * 0.92;
+
+    // Flash decay out of the 0:48.387 climax impact!
+    flash = Math.exp(-lt * 5.2) * 0.92;
+    godRay = 0.55 + Math.exp(-lt * 2.2) * 0.9;
+    chromatic = 0.0008 + Math.exp(-lt * 4.5) * 0.006;
+    bloomStr = 0.72 + kick * 0.42;
+    heroPoint.position.set(0, monoY, 1.2);
+    heroPoint.color.setHex(0x34d399);
+    heroPoint.intensity = 9.0 + kick * 5.5;
+  }
+
+  // Update post-processing optics uniforms
+  bloomPass.strength = bloomStr;
+  opticsPass.uniforms.uTime.value = t;
+  opticsPass.uniforms.uSeed.value = frameIdx;
+  opticsPass.uniforms.uChromatic.value = chromatic;
+  opticsPass.uniforms.uGodRay.value = godRay;
+  opticsPass.uniforms.uFlash.value = flash;
+  opticsPass.uniforms.uFade.value = fade;
+
+  composer.render();
+  updateTypography(t, payload.stats);
+};
+
+window.__CINEMA_READY = true;
+</script>
+</body>
+</html>
