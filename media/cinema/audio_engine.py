@@ -52,36 +52,34 @@ CLIMAX_FLASH = 25.0 * BAR               # Bar 26 Beat 1 = 48.387097 s
 
 VOICE_NAME = "en-US-AndrewMultilingualNeural"
 
-# 21 Poetic Spoken Lines — 104 words exact, Act-directed prosody, locked to 124 BPM beats
+# 21 Crystal-Clear Mechanism Pitch Lines — explains HOW & WHY it works in 58s @ 124 BPM
 VOICE_LINES: List[Dict[str, Any]] = [
-    # ACT I — THE FROZEN VAULT (brooding, intimate baritone)
-    {"id": "01_freed",    "t": 1.35,  "text": "Bitcoin freed money.",                         "rate": "-6%", "pitch": "-3Hz", "reverb": 0.14},
-    {"id": "02_vault",    "t": 3.45,  "text": "Then left it frozen in a vault.",              "rate": "-5%", "pitch": "-3Hz", "reverb": 0.16},
-    {"id": "03_promise",  "t": 6.75,  "text": "Spend it — and humans break the promise.",     "rate": "-2%", "pitch": "-2Hz", "reverb": 0.12},
+    # ACT I — THE PROBLEM (clear, conversational, brooding)
+    {"id": "p01_store",    "t": 1.05,  "text": "Bitcoin solved storing money.",                                          "rate": "-4%", "pitch": "-3Hz", "reverb": 0.12},
+    {"id": "p02_spend",    "t": 3.05,  "text": "Not spending it.",                                                       "rate": "-6%", "pitch": "-3Hz", "reverb": 0.16},
+    {"id": "p03_human",    "t": 4.95,  "text": "The second you fund a project, a human takes control — and can steal the rest.", "rate": "+2%", "pitch": "-2Hz", "reverb": 0.10},
     # 0:11.129 -> 0:11.613: 484ms TOTAL VACUUM SILENCE
-    # ACT II — AWAKENING & CONSCIENCE (awe -> carved-in-stone poise)
-    {"id": "04_wakeup",   "t": 12.10, "text": "What if money could wake up?",                 "rate": "-2%", "pitch": "-1Hz", "reverb": 0.28},
-    {"id": "05_meet",     "t": 14.55, "text": "Meet Newsatoshi.",                             "rate": "-4%", "pitch": "-2Hz", "reverb": 0.24},
-    {"id": "06_consc",    "t": 16.85, "text": "Money with an unbreakable conscience.",        "rate": "+0%", "pitch": "-1Hz", "reverb": 0.14},
-    {"id": "07_lock",     "t": 19.55, "text": "Lock capital to a mission.",                   "rate": "+2%", "pitch": "-1Hz", "reverb": 0.10},
-    {"id": "08_change",   "t": 21.85, "text": "Every spend. Every coin of change.",           "rate": "+3%", "pitch": "+0Hz", "reverb": 0.09},
-    {"id": "09_law",      "t": 24.15, "text": "Obeys the same law forever.",                  "rate": "+1%", "pitch": "-1Hz", "reverb": 0.14},
-    # ACT III — THE LIVING ENGINE (kinetic, crisp, accelerating)
-    {"id": "10_land",     "t": 26.61, "text": "Land.",                                        "rate": "+4%", "pitch": "+0Hz", "reverb": 0.10},
-    {"id": "11_solar",    "t": 27.18, "text": "Solar.",                                       "rate": "+4%", "pitch": "+0Hz", "reverb": 0.10},
-    {"id": "12_compute",  "t": 27.78, "text": "Compute.",                                     "rate": "+4%", "pitch": "+0Hz", "reverb": 0.10},
-    {"id": "13_hw",       "t": 28.65, "text": "Hardware proves real work.",                   "rate": "+6%", "pitch": "+0Hz", "reverb": 0.09},
-    {"id": "14_ms",       "t": 30.55, "text": "Machines pay in under a millisecond.",         "rate": "+7%", "pitch": "+0Hz", "reverb": 0.08},
-    {"id": "15_acre",     "t": 32.85, "text": "Surplus buys the next acre. No CEO.",          "rate": "+5%", "pitch": "+0Hz", "reverb": 0.10},
-    {"id": "16_21m",      "t": 35.55, "text": "Twenty-one million coins. Zero sensor printing.", "rate": "+4%", "pitch": "-1Hz", "reverb": 0.11},
-    {"id": "17_miners",   "t": 38.45, "text": "Guarded by Bitcoin's miners. Zero extra watts.", "rate": "+3%", "pitch": "-1Hz", "reverb": 0.14},
-    {"id": "18_hash",     "t": 41.75, "text": "Pure hash math. Private like cash.",           "rate": "+5%", "pitch": "+0Hz", "reverb": 0.16},
-    {"id": "19_rails",    "t": 44.15, "text": "Atomic rails from Bitcoin, Solana, Base.",     "rate": "+7%", "pitch": "+0Hz", "reverb": 0.12},
-    {"id": "20_novault",  "t": 46.85, "text": "Zero vaults to hack.",                         "rate": "+5%", "pitch": "-1Hz", "reverb": 0.18},
-    # ACT IV — LIVING MAINNET & STILLNESS (hushed, mythic cathedral resonance)
-    {"id": "21_live",     "t": 49.65, "text": "Live on Mainnet right now.",                   "rate": "-7%", "pitch": "-3Hz", "reverb": 0.28},
-    {"id": "22_ns",       "t": 52.55, "text": "Newsatoshi.",                                  "rate": "-8%", "pitch": "-3Hz", "reverb": 0.30},
-    {"id": "23_alive",    "t": 54.05, "text": "Sovereign money — made alive.",                "rate": "-9%", "pitch": "-3Hz", "reverb": 0.34},
+    # ACT II — HOW NEWSATOSHI FIXES IT WITH MATH
+    {"id": "p04_math",     "t": 12.00, "text": "Newsatoshi fixes that with math.",                                       "rate": "+0%", "pitch": "-1Hz", "reverb": 0.24},
+    {"id": "p05_rule",     "t": 14.35, "text": "You lock funds to one clear rule.",                                      "rate": "+2%", "pitch": "-1Hz", "reverb": 0.16},
+    {"id": "p06_prove",    "t": 16.95, "text": "Money only releases when real-world work is proven.",                    "rate": "+4%", "pitch": "-1Hz", "reverb": 0.12},
+    {"id": "p07_pocket",   "t": 20.10, "text": "Try to pocket the change? Consensus blocks it.",                         "rate": "+5%", "pitch": "+0Hz", "reverb": 0.10},
+    {"id": "p08_leftover", "t": 23.10, "text": "The leftover balance stays locked by the same rule — forever.",          "rate": "+6%", "pitch": "-1Hz", "reverb": 0.12},
+    # ACT III — WHY THE ENGINE & SECURITY ACTUALLY WORK
+    {"id": "p09_land",     "t": 26.61, "text": "Land.",                                                                  "rate": "+5%", "pitch": "+0Hz", "reverb": 0.09},
+    {"id": "p10_solar",    "t": 27.18, "text": "Solar.",                                                                 "rate": "+5%", "pitch": "+0Hz", "reverb": 0.09},
+    {"id": "p11_compute",  "t": 27.78, "text": "Compute.",                                                               "rate": "+5%", "pitch": "+0Hz", "reverb": 0.09},
+    {"id": "p12_meters",   "t": 28.45, "text": "Hardware meters sign real output.",                       "rate": "+8%",  "pitch": "+0Hz", "reverb": 0.09},
+    {"id": "p13_ai",       "t": 30.45, "text": "AI agents pay per call in one millisecond — zero gas.",   "rate": "+10%", "pitch": "+0Hz", "reverb": 0.08},
+    {"id": "p14_compound", "t": 33.40, "text": "Profits automatically buy the next asset.",               "rate": "+9%",  "pitch": "+0Hz", "reverb": 0.10},
+    {"id": "p15_why",      "t": 35.45, "text": "Why can't anyone hack it?",                               "rate": "+8%",  "pitch": "+0Hz", "reverb": 0.11},
+    {"id": "p16_miners",   "t": 37.15, "text": "Bitcoin's miners secure it using the same electricity.",  "rate": "+10%", "pitch": "-1Hz", "reverb": 0.13},
+    {"id": "p17_hash",     "t": 41.65, "text": "Pure hash math — quantum-proof and private.",             "rate": "+8%",  "pitch": "+0Hz", "reverb": 0.15},
+    {"id": "p18_swap",     "t": 44.30, "text": "Swap from Bitcoin, Solana, or Base — no custodian.",      "rate": "+10%", "pitch": "+0Hz", "reverb": 0.15},
+    # ACT IV — LIVE PROOF & MEMORABLE PITCH CLOSE
+    {"id": "p19_live",     "t": 49.55, "text": "No pre-mine. Live on Mainnet today.",                     "rate": "-5%",  "pitch": "-2Hz", "reverb": 0.26},
+    {"id": "p20_ns",       "t": 52.45, "text": "Newsatoshi.",                                             "rate": "-8%",  "pitch": "-3Hz", "reverb": 0.30},
+    {"id": "p21_promise",  "t": 53.95, "text": "Money that keeps its promise.",                           "rate": "-7%",  "pitch": "-3Hz", "reverb": 0.34},
 ]
 
 
@@ -228,11 +226,11 @@ def build_voice_stems(
 
         t_start = float(line["t"])
         # Guarantee clean breathing gap (>= 90ms) if TTS spoke slightly longer than expected
-        if t_start < prev_end_s + 0.09 and line["id"] not in ("11_solar", "12_compute"):
+        if t_start < prev_end_s + 0.09 and line["id"] not in ("p10_solar", "p11_compute"):
             t_start = prev_end_s + 0.09
         dur = len(seg) / SR
         # Hard guard: Act I speech MUST finish cleanly before the 0:11.129 silence vacuum!
-        if line["id"] == "03_promise" and t_start + dur > SILENCE_START - 0.14:
+        if line["id"] == "p03_human" and t_start + dur > SILENCE_START - 0.14:
             t_start = max(prev_end_s + 0.08, SILENCE_START - 0.14 - dur)
 
         i0 = int(round(t_start * SR))
