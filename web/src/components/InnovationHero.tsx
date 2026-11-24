@@ -5,10 +5,10 @@ import {
   ChevronUp,
   Cpu,
   ExternalLink,
+  Infinity as InfinityIcon,
   LockKeyhole,
   ShieldCheck,
   Sparkles,
-  Zap,
 } from 'lucide-react';
 import type { SeedStatusResponse, WorkspaceTab } from '../types';
 import { formatL1IssuedLove } from '../api/normalize';
@@ -21,35 +21,35 @@ interface InnovationHeroProps {
 const BREAKTHROUGHS = [
   {
     num: '01',
-    icon: Cpu,
-    accent: 'text-amber-300 border-amber-500/30 bg-amber-500/10',
-    title: 'Free Bitcoin-Grade Security',
-    tagline: 'Same hash. Zero extra watts.',
-    body: 'Every new coin usually starts weak or begs VCs for security. Newsatoshi piggybacks directly on Bitcoin’s global SHA-256 mining army — any Bitaxe or Antminer can protect Newsatoshi and earn LOVE using the exact same electricity it already spends.',
+    icon: LockKeyhole,
+    accent: 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10',
+    title: 'Money With a Mathematical Conscience',
+    tagline: 'Change can never escape the mission.',
+    body: 'Bitcoin stops working the second you spend it into an organization — humans take custody and drift or embezzle. Newsatoshi recursive STARK covenants lock capital to a real-world mission forever: every spend and every change output must obey the exact same rule, verified in <10ms on a $5 off-grid chip.',
   },
   {
     num: '02',
-    icon: ShieldCheck,
-    accent: 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10',
-    title: 'Quantum-Proof & Private Like Cash',
-    tagline: 'No elliptic curves. No exposed balances.',
-    body: 'Elliptic-curve locks on legacy chains are built to crack under quantum computers, and public ledgers broadcast your net worth. Newsatoshi runs end-to-end on pure hash math (SHA-256, SLH-DSA & STARKs) with shielded wallets and zero secret setup ceremonies.',
+    icon: InfinityIcon,
+    accent: 'text-sky-300 border-sky-500/30 bg-sky-500/10',
+    title: 'Autonomous Abundance Loops',
+    tagline: 'Real assets ↔ machines ↔ capital.',
+    body: 'Field meters sign real energy, soil, or compute output with post-quantum hardware keys; machines & AI agents pay per call in under a millisecond via HTTP 402 PayWords ($0 gas, 1M calls/lock); and a hash-bound Purpose Trust / Wyoming DUNA legal airlock auto-compounds revenue into the next physical asset.',
   },
   {
     num: '03',
-    icon: Zap,
-    accent: 'text-sky-300 border-sky-500/30 bg-sky-500/10',
-    title: 'Pay by the Thought for AI Agents',
-    tagline: 'Up to 1,000,000 instant calls per lock.',
-    body: 'AI agents can’t open a bank account, swipe a credit card, or pay a $5 fee for a $0.0001 API call. With HTTP 402 PayWords and live MCP tools, an agent peels off a cryptographic hash bead in under a millisecond — zero accounts, zero subscriptions, $0 gas.',
+    icon: Cpu,
+    accent: 'text-amber-300 border-amber-500/30 bg-amber-500/10',
+    title: 'Blind, Bitcoin-Secured Base Money',
+    tagline: 'Uncorruptible L1 · 0 extra watts.',
+    body: 'Unlike failed “Proof of Useful Work” coins that collapse to wash-farming, Newsatoshi keeps base issuance 100% blind and ossified (21M LOVE cap, 50 LOVE/blk) while piggybacking on Bitcoin’s global SHA-256 miners at zero extra electricity (AuxPoW chainid 20051).',
   },
   {
     num: '04',
-    icon: LockKeyhole,
+    icon: ShieldCheck,
     accent: 'text-violet-300 border-violet-500/30 bg-violet-500/10',
-    title: 'Zero-Vault Multi-Chain Buy Roads',
-    tagline: 'Nothing to hack. No wrapped IOUs.',
-    body: 'Crypto bridges lose billions because they pool everyone’s money in one central vault. Newsatoshi holds $0 in custody: Bitcoin, Lightning, Solana, and Base all snap onto one shared math lock — reveal the key to swap instantly, or walk away for a 100% refund.',
+    title: 'Centuries-Grade Privacy & Vaultless Gravity',
+    tagline: 'Pure hash math · $0 bridge custody.',
+    body: 'Zero elliptic curves, zero trusted setup ceremonies, shielded cash privacy by default (nsd1…), and vaultless SHA-256 atomic buy roads from Bitcoin, Lightning, Solana, and Base — capital flows in without honeypot bridge custodians or wrapped IOUs.',
   },
 ] as const;
 
@@ -63,27 +63,26 @@ export function InnovationHero({ seed, onNavigateTab }: InnovationHeroProps) {
         <div className="max-w-3xl">
           <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
             <Sparkles className="h-3 w-3" />
-            <span>Plain-English Overview</span>
+            <span>Autonomous Abundance Engine</span>
             <span className="text-slate-500">·</span>
             <span className="text-slate-200">
               {ms
                 ? `Mainnet Block #${ms.height.toLocaleString()} · ${formatL1IssuedLove(ms.issued)} LOVE Fair-Minted`
-                : 'Live Open-Source Protocol · Zero Pre-Mine'}
+                : 'Live Open-Source L1 · Zero Pre-Mine'}
             </span>
           </div>
 
           <h2 className="mt-2.5 text-lg font-bold tracking-tight text-slate-50 sm:text-2xl">
-            Bitcoin invented digital gold for humans.{' '}
+            Bitcoin freed money from banks — and left it idle in a vault.{' '}
             <span className="bg-gradient-to-r from-emerald-300 via-teal-200 to-sky-300 bg-clip-text text-transparent">
-              Newsatoshi upgrades it for the Quantum &amp; AI era.
+              Newsatoshi makes sovereign money alive.
             </span>
           </h2>
 
           <p className="mt-1.5 text-xs leading-relaxed text-slate-300 sm:text-[13px]">
-            Two shocks are breaking legacy blockchains: quantum computers targeting elliptic-curve
-            keys, and billions of autonomous AI agents that can’t open bank accounts or pay gas
-            fees for microscopic API calls. Newsatoshi solves both without venture pre-mines,
-            custodians, or wasted energy.
+            Incorruptible, mission-locked capital that verifies real-world work, pays machines and
+            AI agents in milliseconds, and compounds physical abundance forever — without trusting a
+            CEO, a bridge vault, or a single human custodian.
           </p>
         </div>
 
@@ -93,14 +92,14 @@ export function InnovationHero({ seed, onNavigateTab }: InnovationHeroProps) {
             onClick={() => onNavigateTab('swaps')}
             className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-emerald-400 cursor-pointer"
           >
-            <span>Bridge or Merge-Mine</span>
+            <span>Buy Roads &amp; Mining</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </button>
           <a
             href="/developers"
             className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/35 bg-sky-500/10 px-3 py-1.5 text-xs font-medium text-sky-200 transition hover:bg-sky-500/20"
           >
-            <span>AI Agent Setup</span>
+            <span>AI Agent &amp; Dev Portal</span>
             <ExternalLink className="h-3 w-3" />
           </a>
           <button
@@ -109,7 +108,7 @@ export function InnovationHero({ seed, onNavigateTab }: InnovationHeroProps) {
             className="inline-flex items-center gap-1 rounded-lg border border-slate-700/80 bg-slate-900/70 px-2.5 py-1.5 font-mono text-[11px] text-slate-300 transition hover:border-slate-500 hover:text-white cursor-pointer"
             aria-expanded={expanded}
           >
-            <span>{expanded ? 'Hide 4 Pillars' : 'Show 4 Pillars'}</span>
+            <span>{expanded ? 'Hide Architecture' : 'Show Architecture'}</span>
             {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           </button>
         </div>

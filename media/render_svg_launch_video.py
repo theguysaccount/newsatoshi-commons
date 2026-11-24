@@ -52,67 +52,67 @@ CHROME_CANDIDATES = [
 ]
 
 # ---------------------------------------------------------------------------
-# 6-Beat Plain-English Innovation Script (~80s viral tempo, zero jargon soup)
+# 6-Beat Offensive Civilizational Script: "Sovereign Money Made Alive"
 # ---------------------------------------------------------------------------
 SCENES: List[Dict[str, Any]] = [
     {
-        "id": "shocks",
+        "id": "awakening",
         "pause_after": 0.40,
         "narration": (
-            "Bitcoin invented unstoppable money for humans. "
-            "Now two shocks are breaking old blockchains: quantum computers targeting elliptic-curve locks, "
-            "and billions of AI agents that can't open a bank account or pay five-dollar fees. "
-            "Bitcoin was chapter one. Meet Newsatoshi."
+            "Bitcoin freed money from banks — and left it sitting idle in a vault. "
+            "The moment you spend passive money into a charity, fund, or company, "
+            "humans take custody — and humans drift, embezzle, or capture the mission. "
+            "Bitcoin was chapter one. Meet Newsatoshi: sovereign money made alive."
+        ),
+    },
+    {
+        "id": "conscience",
+        "pause_after": 0.40,
+        "narration": (
+            "Breakthrough one: money with an unbreakable mathematical conscience. "
+            "Lock capital to a real-world mission — clean power, perpetual land, or compute. "
+            "Every future spend and every coin of change is mathematically forced to obey that exact same rule forever. "
+            "No trustee can steal it — and any five-dollar off-grid chip verifies it in ten milliseconds."
+        ),
+    },
+    {
+        "id": "abundance",
+        "pause_after": 0.40,
+        "narration": (
+            "Breakthrough two: self-compounding real-world abundance. "
+            "Field meters cryptographically sign real energy, soil, or compute output. "
+            "Machines and AI agents pay per call in under a millisecond with zero gas. "
+            "And a hash-bound Purpose Trust automatically compounds revenue into buying the next asset forever."
         ),
     },
     {
         "id": "fortress",
         "pause_after": 0.40,
         "narration": (
-            "Breakthrough one: free Bitcoin-grade security. "
-            "Newsatoshi piggybacks directly on Bitcoin's global mining army. "
-            "Same hardware. Same hashes. Zero extra electricity. "
-            "Every Bitcoin miner can secure Newsatoshi and earn LOVE simultaneously."
+            "Breakthrough three: blind, incorruptible base money. "
+            "Other real-world coins print currency for sensor data — and collapse to fake meters and attacks. "
+            "Newsatoshi keeps base issuance strictly blind, capped at twenty-one million, "
+            "and borrows Bitcoin's mining army for zero extra electricity."
         ),
     },
     {
-        "id": "quantum",
+        "id": "sovereignty",
         "pause_after": 0.40,
         "narration": (
-            "Breakthrough two: unbreakable by quantum, and private like cash. "
-            "Newsatoshi throws out elliptic curves completely. "
-            "Pure hash math, shielded balances, zero secret setup ceremonies. "
-            "Even a quantum supercomputer hits solid math."
-        ),
-    },
-    {
-        "id": "ai",
-        "pause_after": 0.40,
-        "narration": (
-            "Breakthrough three: pay by the thought, not by the month. "
-            "An AI agent doesn't need a credit card or subscription. "
-            "It peels off one microscopic cryptographic bead in under a millisecond. "
-            "Zero gas. Zero middlemen. One lock streams a million instant payments."
-        ),
-    },
-    {
-        "id": "bridges",
-        "pause_after": 0.40,
-        "narration": (
-            "Breakthrough four: walk in from any chain, with zero vault to hack. "
-            "No custodian. No wrapped IOUs. "
-            "Bitcoin, Lightning, Solana, and Base all snap onto one shared math lock: "
-            "instant atomic swap, or math refunds every cent."
+            "Breakthrough four: built to last centuries, not quarters. "
+            "Zero elliptic curves, zero trusted setups, private like cash by default. "
+            "And vaultless atomic buy roads connect Bitcoin, Lightning, Solana, and Base directly into Newsatoshi — "
+            "instant math swap, or one hundred percent automatic refund."
         ),
     },
     {
         "id": "finale",
         "pause_after": 2.30,
         "narration": (
-            "No pre-mine. No custody. No whitepaper promises. "
-            "Newsatoshi Mainnet is live right now, one hundred percent Bitcoin merge-mined, "
-            "and open to every miner, builder, and AI agent in one line. "
-            "Newsatoshi: sound money for the quantum and AI era."
+            "No venture pre-mine. No custody. No whitepaper promises. "
+            "Newsatoshi Mainnet is running live right now, one hundred percent Bitcoin merge-mined, "
+            "open to every miner, builder, and AI agent in one line. "
+            "Newsatoshi: sovereign money made alive."
         ),
     },
 ]
@@ -257,7 +257,7 @@ def chunk_words_into_captions(
 async def generate_voiceover_and_timeline(
     work_dir: Path, ffmpeg_exe: str
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], np.ndarray, float]:
-    vo_dir = work_dir / "vo_v3"
+    vo_dir = work_dir / "vo_v4"
     vo_dir.mkdir(parents=True, exist_ok=True)
 
     lead_in = 0.45
@@ -463,14 +463,14 @@ async def render_keyframes_chrome(
     # Capture mid-beat hero frames (plus climax frames for Scene 1 and Scene 6!)
     samples: List[Tuple[str, float]] = []
     for sc in payload["timeline"]:
-        if sc["id"] == "shocks":
-            samples.append(("scene_1a_shocks", sc["start"] + 5.6))
+        if sc["id"] == "awakening":
+            samples.append(("scene_1a_awakening", sc["start"] + 5.8))
             samples.append(("scene_1b_meet_ns", sc["end"] - 0.9))
         elif sc["id"] == "finale":
             samples.append(("scene_6a_live", sc["start"] + 3.0))
             samples.append(("scene_6b_lockup", sc["end"] - 2.2))
         else:
-            samples.append((f"scene_{sc['index']+1}_{sc['id']}", sc["start"] + sc["dur"] * 0.56))
+            samples.append((f"scene_{sc['index']+1}_{sc['id']}", sc["start"] + sc["dur"] * 0.58))
 
     saved: List[Path] = []
     async with async_playwright() as p:
@@ -518,7 +518,7 @@ async def render_video_chrome(
         "-f",
         "image2pipe",
         "-vcodec",
-        "png",
+        "mjpeg",
         "-r",
         str(FPS),
         "-i",
@@ -571,7 +571,7 @@ async def render_video_chrome(
         async def capture_one(tab_idx: int, frame_idx: int) -> bytes:
             ts = frame_idx / FPS
             await pages[tab_idx].evaluate("(t) => window.__renderAt(t, window.__PAYLOAD)", ts)
-            shot = await cdps[tab_idx].send("Page.captureScreenshot", {"format": "png"})
+            shot = await cdps[tab_idx].send("Page.captureScreenshot", {"format": "jpeg", "quality": 96})
             return base64.b64decode(shot["data"])
 
         for base_idx in range(0, total_frames, concurrency):

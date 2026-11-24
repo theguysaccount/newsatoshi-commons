@@ -239,6 +239,67 @@ docker compose up -d`;
 
   return (
     <div className="space-y-6">
+      {/* Honest Multi-Chain Buy Roads Readiness Status */}
+      <Panel
+        title="Multi-Chain Buy Roads — Honest Live Deployment Status"
+        subtitle="Zero custody, zero wrapped tokens: exact live status of every rail so builders & liquidity makers know what is live vs. awaiting on-chain deploy"
+        icon={<ShieldCheck className="h-4 w-4 text-emerald-400" />}
+        accent="emerald"
+        badge={
+          <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-amber-200">
+            VERIFIED STATUS · ZERO FAKE LIQUIDITY
+          </span>
+        }
+      >
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-5">
+          {[
+            {
+              rail: 'Bitcoin Merge-Mining',
+              status: 'LIVE ON MAINNET',
+              tone: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
+              detail: 'AuxPoW chainid 20051 · 50 LOVE/block · Bitaxe / Antminer live today',
+            },
+            {
+              rail: 'Bitcoin L1 (P2WSH)',
+              status: 'COMPILER & VERIFIER LIVE',
+              tone: 'border-emerald-500/35 bg-emerald-500/10 text-emerald-200',
+              detail: 'No deploy needed (native bc1q script) · needs active maker bot with LOVE',
+            },
+            {
+              rail: 'Lightning (BOLT-11)',
+              status: 'DECODER LIVE · NEEDS LND',
+              tone: 'border-amber-500/35 bg-amber-500/10 text-amber-200',
+              detail: 'Invoice parser live · Docker LND hold-invoice node ready to host',
+            },
+            {
+              rail: 'Base / EVM (ETH & USDC)',
+              status: '7/7 TESTS · READY TO DEPLOY',
+              tone: 'border-sky-500/35 bg-sky-500/10 text-sky-200',
+              detail: 'NewsatoshiHtlc.sol verified via Foundry · 1-cmd deploy-evm.sh awaits Base gas',
+            },
+            {
+              rail: 'Solana (SOL & USDC)',
+              status: 'TESTED · READY TO DEPLOY',
+              tone: 'border-violet-500/35 bg-violet-500/10 text-violet-200',
+              detail: 'sol_sha256 PDA escrow tested · awaits 1-time mainnet-beta deploy',
+            },
+          ].map((r) => (
+            <div
+              key={r.rail}
+              className="rounded-xl border border-slate-800/90 bg-slate-950/75 p-3"
+            >
+              <div className="text-xs font-semibold text-slate-100">{r.rail}</div>
+              <div
+                className={`mt-1.5 inline-block rounded border px-1.5 py-0.5 font-mono text-[9.5px] font-bold uppercase ${r.tone}`}
+              >
+                {r.status}
+              </div>
+              <p className="mt-1.5 text-[11px] leading-snug text-slate-400">{r.detail}</p>
+            </div>
+          ))}
+        </div>
+      </Panel>
+
       {/* Section 0: AI Agent Transaction Interface (MCP, HTTP 402 PayWord, /llms.txt) */}
       <Panel
         title="AI Agent Transaction Interface (MCP · HTTP 402 PayWord · /llms.txt)"
