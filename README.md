@@ -1,4 +1,4 @@
-# `newsatoshi-commons` — Sound Money Upgraded for the Quantum & AI Era (`LOVE`)
+# `newsatoshi-commons` — Sovereign Money Made Alive (`LOVE` · Autonomous Abundance Engines)
 
 [![CI](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml/badge.svg)](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/theguysaccount/newsatoshi-commons)](https://github.com/theguysaccount/newsatoshi-commons/releases)
@@ -6,15 +6,15 @@
 [![Live Gateway](https://img.shields.io/badge/Live-commons.newsatoshi.org-10b981)](https://commons.newsatoshi.org)
 [![MCP](https://img.shields.io/badge/MCP-Streamable%20HTTP%20(9%20Tools)-38bdf8)](https://commons.newsatoshi.org/mcp)
 
-### Why Newsatoshi Exists (In Plain English)
-Bitcoin invented unstoppable digital gold for humans. **Two shocks are breaking legacy blockchains today:** quantum computers targeting elliptic-curve keys, and billions of autonomous AI agents that can’t open a bank account, swipe a Visa card, or pay high gas fees for microscopic API calls.
+### What We Actually Built (Beyond Passive Sound Money)
+Bitcoin freed money from banks — and left it sitting idle in a vault. The second you spend Bitcoin into a charity, energy project, land trust, or company, humans take custody and can drift, embezzle, or capture the treasury.
 
-Newsatoshi (`LOVE` / `NEWSATOSHI/2.1`) solves both with **four protocol breakthroughs** — no venture pre-mine, no custodians, no wasted energy:
+**Newsatoshi (`LOVE` / `NEWSATOSHI/2.1`) makes sovereign money alive** — turning passive hard money into **incorruptible, self-compounding real-world capital**:
 
-1. **Free Bitcoin-Grade Security (Zero Extra Watts):** Any Bitcoin SHA-256 miner (Bitaxe, NerdQAxe, Antminer S19/S21) can protect Newsatoshi and earn `50 LOVE/block` using the *exact same electricity* it already spends on Bitcoin (`AuxPoW chainid = 20051`).
-2. **Quantum-Proof & Private Like Cash:** Throws out elliptic curves completely. Pure hash math (SHA-256, NIST FIPS 205 SLH-DSA, Winterfell STARKs) with shielded `nsd1…` wallets and zero trusted-setup ceremonies.
-3. **Pay by the Thought for AI Agents:** One Newsatoshi lock streams up to **1,000,000 sub-millisecond HTTP `402` PayWord micropayments** with zero gas per call, zero subscriptions, and 9 live unauthenticated Streamable HTTP MCP tools (`/mcp`).
-4. **Zero-Vault Multi-Chain Buy Roads:** No honeypot bridge vaults or wrapped IOUs. Bitcoin L1, Lightning, Solana (SOL/USDC), and Base/EVM (ETH/USDC) all snap onto one shared `SHA256(preimage) == payment_hash` atomic lock — instant swap or 100% automatic refund.
+1. **Money With a Mathematical Conscience (`OP_VERIFY_COVENANT_STARK`):** Lock capital to a real-world mission (land, renewable power, compute) and **every spend and every change output is mathematically forced to obey the exact same rule forever** — verified in `< 10ms` on a 5-dollar off-grid microchip. No CEO or trustee can strip the covenant.
+2. **Closed-Loop Real World ↔ Machines ↔ Capital (Autonomous Abundance Engines):** Tamper-resistant hardware meters sign verified kWh/soil/compute output (`SLH-DSA`/`XMSS`), AI agents and users pay per call in under a millisecond (`HTTP 402` PayWords, up to 1M calls/lock, zero gas), and a hash-bound Legal Airlock (Perpetual Purpose Trust §4.2 + Wyoming DUNA) auto-compounds revenue into acquiring the next physical asset.
+3. **Blind, Bitcoin-Secured Base Money (Zero Extra Electricity):** Unlike failed “Proof of Useful Work” coins that collapse to wash-farming, L1 issuance stays 100% blind and ossified (21M cap, `50 LOVE/blk`) while piggybacking directly on Bitcoin’s global SHA-256 miners (`AuxPoW chainid = 20051`).
+4. **Centuries-Grade Privacy & Vaultless Multi-Chain Gravity:** Pure hash math (`SHA-256`, `SLH-DSA`, transparent STARKs — zero elliptic curves, zero trusted setup), default cash privacy (`nsd1…`), and zero-custody SHA-256 atomic buy roads from Bitcoin, Lightning, Solana, and Base.
 
 ---
 

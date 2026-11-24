@@ -299,7 +299,7 @@ export default function App() {
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                Quantum-Proof Sound Money · Free Bitcoin Security · AI Agent Payments
+                Sovereign Money Made Alive · Recursive STARK Covenants &amp; Autonomous Capital
               </p>
             </div>
           </div>

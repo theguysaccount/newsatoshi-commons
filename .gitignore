@@ -9,3 +9,5 @@ hw-signer-key.json
 .DS_Store
 *.log
 media/out/
+bridges/evm/out/
+bridges/evm/cache/
