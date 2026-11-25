@@ -13,6 +13,8 @@ COPY Cargo.toml Cargo.lock ./
 COPY src/ ./src/
 COPY skills/ ./skills/
 COPY scripts/ ./scripts/
+COPY docs/ ./docs/
+COPY formal/ ./formal/
 RUN cargo build --release --bins
 
 # Stage 3: Minimal production runtime with CA certs for live HTTPS newsatoshi-seed polling

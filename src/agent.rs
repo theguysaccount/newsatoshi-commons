@@ -137,6 +137,11 @@ pub const AGENT_SKILL_MARKDOWN: &str =
 /// Embedded 1-line POSIX CLI installer served at `/install.sh`.
 pub const INSTALL_SCRIPT_SH: &str = include_str!("../scripts/install.sh");
 
+/// Embedded NEWSATOSHI/2.1 companion whitepaper (Markdown & IACR ePrint LaTeX) + Lean 4 formal kernel.
+pub const WHITEPAPER_MARKDOWN: &str = include_str!("../docs/NEWSATOSHI-2.1-WHITEPAPER.md");
+pub const WHITEPAPER_LATEX: &str = include_str!("../docs/newsatoshi_2_1_whitepaper.tex");
+pub const LEAN_FORMAL_PROOF: &str = include_str!("../formal/NewsatoshiCovenants.lean");
+
 /// Computes strictly real, live derived network & AuxPoW merge-mining metrics from
 /// live Newsatoshi Mainnet and Testnet `/status` snapshots (zero fabricated figures).
 pub fn compute_network_metrics(seed: &SeedSnapshot, hashrate_ths: f64) -> Value {
@@ -267,6 +272,8 @@ pub fn render_sitemap_xml(base_url: &str) -> String {
     let urls = [
         ("/", "1.0", "hourly"),
         ("/docs", "0.9", "daily"),
+        ("/whitepaper", "0.95", "daily"),
+        ("/formal/NewsatoshiCovenants.lean", "0.9", "weekly"),
         ("/developers", "0.9", "daily"),
         ("/about", "0.8", "weekly"),
         ("/contact", "0.7", "monthly"),
@@ -340,7 +347,7 @@ fn wrap_public_html(
 </head>\n\
 <body>\n\
   <main>\n\
-    <nav aria-label=\"Site navigation\"><a href=\"/\">Home</a> · <a href=\"/docs\">API Docs</a> · <a href=\"/developers\">Developers</a> · <a href=\"/llms.txt\">llms.txt</a> · <a href=\"/openapi.json\">OpenAPI</a> · <a href=\"/about\">About</a> · <a href=\"/contact\">Contact</a> · <a href=\"/privacy\">Privacy</a></nav>\n\
+    <nav aria-label=\"Site navigation\"><a href=\"/\">Home</a> · <a href=\"/whitepaper\">Whitepaper &amp; Lean 4</a> · <a href=\"/docs\">API Docs</a> · <a href=\"/developers\">Developers</a> · <a href=\"/llms.txt\">llms.txt</a> · <a href=\"/openapi.json\">OpenAPI</a> · <a href=\"/about\">About</a> · <a href=\"/contact\">Contact</a> · <a href=\"/privacy\">Privacy</a></nav>\n\
     {body_html}\n\
   </main>\n\
 </body>\n\
@@ -352,6 +359,46 @@ fn wrap_public_html(
 /// (`/docs`, `/developers`, `/about`, `/contact`, `/privacy`).
 pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<(&'static str, String)> {
     match slug {
+        "/whitepaper" => {
+            if wants_md {
+                Some(("text/markdown; charset=utf-8", WHITEPAPER_MARKDOWN.to_string()))
+            } else {
+                let html = wrap_public_html(
+                    base_url,
+                    "/whitepaper",
+                    "NEWSATOSHI/2.1 Whitepaper & Lean 4 Formal Soundness Kernel",
+                    "Tiny-kernel machine-checked Lean 4.36.0 soundness proof (9 theorems, 355 lines, 0 sorry, 0 Mathlib) for Winterfell 0.13 post-quantum recursive STARK covenants, Budish-safe backing, and live 4-chain SHA-256 HTLCs.",
+                    &format!(
+                        "<h1>NEWSATOSHI/2.1: Tiny-Kernel Machine-Checked Post-Quantum Recursive Covenants</h1>\n\
+                         <p><strong>Companion Paper to <em>A Store of Order</em> (<code>newsatoshi.org/white-paper/</code>) &amp; <code>RFC-0021</code></strong> · November 25, 2026</p>\n\
+                         <p>Download raw artifacts: <a href=\"/formal/NewsatoshiCovenants.lean\">Lean 4.36.0 Proof (355 lines, 0 sorry, 0 Mathlib)</a> · <a href=\"/whitepaper.md\">Full Markdown Whitepaper</a> · <a href=\"/whitepaper.tex\">IACR ePrint LaTeX (.tex)</a></p>\n\
+                         <h2>Verify All 9 Theorems Locally in ~1 Second</h2>\n\
+                         <pre>curl -fsSL {base_url}/formal/NewsatoshiCovenants.lean -o NewsatoshiCovenants.lean &amp;&amp; lean NewsatoshiCovenants.lean</pre>\n\
+                         <h2>Why Tiny Formal Kernels Matter in November 2026</h2>\n\
+                         <p>Following the June 2026 Orchard circuit vulnerability (requiring machine-checked balance proofs for private money) and the November 2026 17M-line AI-assisted Lean proof debate, monetary consensus requires <strong>small, line-by-line auditable kernels</strong> where hidden tautologies or field-aliasing bugs cannot hide. Our executing Winterfell 0.13 STARK AIR (<code>src/stark.rs</code>, 15 columns &times; 64 rows over <code>p = 2^128 - 45*2^40 + 1</code>) is machine-verified by 355 lines of zero-dependency Lean 4 using zero <code>Classical.choice</code>:</p>\n\
+                         <ul>\n\
+                           <li><code>digest_pack_injective</code> &mdash; Strict injectivity of 88/88/80-bit SHA-256 packing mod <code>p</code> (axioms: <code>[propext]</code>)</li>\n\
+                           <li><code>prime_boolean_constraint_sound</code> &amp; <code>air_63bit_range_sound</code> &mdash; Zero negative-slack <code>p-1</code> modular wrap-around</li>\n\
+                           <li><code>value_conservation_no_wrap</code> &mdash; Exact integer conservation <code>payout + change = input</code> in &Nopf;</li>\n\
+                           <li><code>streaming_bps_floor_unique</code> &amp; <code>air_streaming_modular_soundness</code> &mdash; Exact Euclidean floor division for basis-point revenue &amp; backing splits</li>\n\
+                           <li><code>recursive_covenant_continuity_and_bound</code> &mdash; Inductive covenant continuity &amp; bounded extraction over unbounded spend depth <code>T</code></li>\n\
+                           <li><code>web4_monotonic_child_bound</code> &mdash; Monotonic Web4 child-agent anti-escalation across arbitrary replication depth (<strong>0 axioms</strong>)</li>\n\
+                           <li><code>htlc_anti_race_safety</code> &mdash; Cross-chain SHA-256 HTLC anti-race timelock dominance (&ge; 120 min safety margin)</li>\n\
+                         </ul>\n\
+                         <h2>Three Open Cryptographic Conjectures for Peer Critique</h2>\n\
+                         <ol>\n\
+                           <li><strong>Minimum-Width Transparent MCU AIR:</strong> Tightest <code>(w, N, d)</code> achieving 128-bit PQ FRI soundness with in-circuit SHA-256 folding in &lt;10 ms on 240 MHz Cortex-M7/ESP32-S3 (&le;512 KiB SRAM).</li>\n\
+                           <li><strong>Hash-Only Sublinear Multi-Merchant PayWords:</strong> Whether a stateless SHA-256 accumulator can settle <code>N</code> dynamic PayWords across <code>M</code> merchants in <code>O(log(MN))</code> L1 verification without pairings or lattices.</li>\n\
+                           <li><strong>Tiny-Kernel Formal Auditability Budget:</strong> Requiring <code>LoC_formal + LoC_AIR &le; 10^3</code> with zero external library axioms for monetary consensus validity circuits.</li>\n\
+                         </ol>\n\
+                         <h2>Live 4-Chain Sourcify-Verified Ownerless EVM HTLCs</h2>\n\
+                         <p>Universal nonce-0 address across <strong>Base (8453), Arbitrum One (42161), Optimism (10), and Polygon (137)</strong>: <code>0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987</code> (all 4 <code>exact_match</code> on Sourcify, live atomic <code>lockEth</code> &rarr; <code>claim</code> proofs on-chain).</p>\n\
+                         <p>Read the complete raw paper at <a href=\"/whitepaper.md\">/whitepaper.md</a> or inspect the source on <a href=\"https://github.com/theguysaccount/newsatoshi-commons\">GitHub</a>.</p>"
+                    ),
+                );
+                Some(("text/html; charset=utf-8", html))
+            }
+        }
         "/docs" => {
             if wants_md {
                 let md = format!(
@@ -642,7 +689,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 
 ## When to use Newsatoshi Commons
 - Use `{base_url}/mcp` or `{base_url}/api/*` when an agent needs to **check live Newsatoshi Mainnet/Testnet state**, **bridge BTC/Lightning/Solana/Base into LOVE trustlessly**, **issue or verify HTTP 402 PayWord micropayments**, or **cryptographically verify Winterfell STARK covenant proofs and L1 hash-locks**.
-- Human & developer documentation: [API Docs]({base_url}/docs), [Developer Portal]({base_url}/developers), [About]({base_url}/about), [Contact]({base_url}/contact), [Privacy]({base_url}/privacy).
+- Human & developer documentation: [Whitepaper & Lean 4 Proof]({base_url}/whitepaper), [API Docs]({base_url}/docs), [Developer Portal]({base_url}/developers), [About]({base_url}/about), [Contact]({base_url}/contact), [Privacy]({base_url}/privacy).
 
 ## Live Network Status
 - {mainnet_line}
