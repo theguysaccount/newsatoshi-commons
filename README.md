@@ -20,8 +20,8 @@ Bitcoin freed money from banks — and left it sitting idle in a vault. The seco
 
 **Technical Stack:** Complete open-source, zero-custody infrastructure for **Newsatoshi (`LOVE` / `NEWSATOSHI/2.1`)** — NIST FIPS 205 SLH-DSA + XMSS covenants, **Winterfell 0.13** transparent STARK proofs, 4 trustless multi-chain SHA-256 HTLC buy roads, 1-command AuxPoW Stratum merge-mining, Streamable HTTP MCP (9 tools), zero-dependency JS & Python HTTP `402` PayWord SDKs, and a Live Verify-Only Telemetry Mirror & Cockpit.
 
-- **Live Verify-Only Gateway:** `https://commons.newsatoshi.org` (`0` server private keys, security-audited `v0.9.0`)
-- **Live Base Mainnet HTLC Contract (`Chain ID 8453`, ownerless, Sourcify `exact_match`):** [`0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987`](https://basescan.org/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987) (live SHA-256 atomic [`lockEth`](https://basescan.org/tx/0x10bbd471e3c5dd34342b30530e5c1238950372728a21270e2a763f2aebea11ed) → [`claim`](https://basescan.org/tx/0x0f6cbfd277610b112d79fe36138dd549931f45f4ffa2894f7ea9e5831a15f595) proven on-chain)
+- **Live Verify-Only Gateway:** `https://commons.newsatoshi.org` (`0` server private keys, security-audited `v0.10.0`)
+- **Live Multi-Chain EVM HTLC (`Base 8453 · Arbitrum 42161 · Optimism 10 · Polygon 137`, ownerless, all 4 Sourcify `exact_match`):** `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987` ([BaseScan](https://basescan.org/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987) · [Arbiscan](https://arbiscan.io/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987) · [OP Etherscan](https://optimistic.etherscan.io/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987) · [Polygonscan](https://polygonscan.com/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987) — live SHA-256 atomic `lockEth` → `claim` proven on all 4 chains; see [`bridges/README.md`](bridges/README.md))
 - **AI Agent Discovery:** `POST /mcp` · `/llms.txt` · `/llms-full.txt` · `/docs` · `/developers` · `/.well-known/agent.json` · `/.well-known/mcp/server-card.json` · `/.well-known/api-catalog` · `/.well-known/agent-skills/index.json` · `/openapi.json`
 - **Live L1 Seed Reference:** `https://newsatoshi.org/mainnet/status` (Mainnet, `auxpow_chainid = 20051`, `50 LOVE/block`) & `https://newsatoshi-seed.fly.dev/status` (Testnet)
 - **RFC-0021 L1 Soft-Fork Prototype (`0xb4`):** `https://github.com/theguysaccount/newsatoshi-rfc0021`
@@ -46,7 +46,7 @@ Installs `newsatoshi-commons`, `newsatoshi-swap`, and `newsatoshi-hw-signer` int
 | **Bitcoin L1 (BTC)** | Canonical BIP-199 SegWit v0 P2WSH (`bc1q…`) | `SHA256(preimage) == payment_hash` | `src/swap.rs`, `newsatoshi-swap` |
 | **Lightning Network (BTC)** | BOLT-11 Invoice Decoding → L1 Hash-Lock | `SHA256(preimage) == payment_hash` | `src/swap.rs`, `bridges/lightning/` |
 | **Solana (SOL & SPL-USDC)** | Deterministic PDA Escrow (`ns_htlc` seeds) | `SHA256(preimage) == payment_hash` | `bridges/solana/src/lib.rs` |
-| **Base / Eth / Arb / OP / Polygon** | Immutable Ownerless `NewsatoshiHtlc.sol` (`0x02`) | `SHA256(preimage) == payment_hash` | **LIVE Base `8453`:** `0xF564A8F6…8987` (`bridges/evm/`) |
+| **Base / Arb / OP / Polygon** | Immutable Ownerless `NewsatoshiHtlc.sol` (`0x02`) | `SHA256(preimage) == payment_hash` | **LIVE on 4 Mainnets:** `0xF564A8F6…8987` (`bridges/evm/`) |
 
 > **Core Invariant:** Keep Newsatoshi L1 issuance and SHA-256 merged-mining ordering (`auxpow_chainid = 20051`) **blind and ossified** — never mint base currency directly for physical work (avoiding Budish 2018 rented-hashpower 51% attacks and Sybil wash-farming). Run recursive Commons treasuries as a CSV engine anchored to live L1 blocks today, then activate `OP_VERIFY_COVENANT_STARK` (`0xb4`) via soft fork after the 90-day adversarial testnet & zkVM audit.
 

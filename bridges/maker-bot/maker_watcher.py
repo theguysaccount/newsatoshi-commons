@@ -26,12 +26,16 @@ DEFAULT_EVM_RPCS = {
     "ethereum": "https://ethereum-rpc.publicnode.com",
     "arbitrum": "https://arb1.arbitrum.io/rpc",
     "optimism": "https://mainnet.optimism.io",
-    "polygon": "https://polygon-bor-rpc.publicnode.com",
+    "polygon": "https://polygon.drpc.org",
 }
 
+CANONICAL_EVM_HTLC = "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987"
 DEFAULT_EVM_CONTRACTS = {
-    # Live, immutable, ownerless Base Mainnet NewsatoshiHtlc.sol (Sourcify exact_match)
-    "base": "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987",
+    # Live, immutable, ownerless NewsatoshiHtlc.sol (all 4 Sourcify exact_match at identical nonce-0 address)
+    "base": CANONICAL_EVM_HTLC,
+    "arbitrum": CANONICAL_EVM_HTLC,
+    "optimism": CANONICAL_EVM_HTLC,
+    "polygon": CANONICAL_EVM_HTLC,
 }
 
 DEFAULT_SOLANA_RPCS = {

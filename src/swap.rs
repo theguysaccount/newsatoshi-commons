@@ -608,9 +608,11 @@ fn validate_evm_address(s: &str, label: &str) -> Result<String, String> {
     Ok(format!("0x{}", hex_part.to_ascii_lowercase()))
 }
 
-/// Canonical live, immutable, ownerless `NewsatoshiHtlc.sol` deployed on Base Mainnet (Chain ID 8453)
-/// and Sourcify-verified (`exact_match` creation + runtime).
-pub const BASE_MAINNET_HTLC_CONTRACT: &str = "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987";
+/// Canonical live, immutable, ownerless `NewsatoshiHtlc.sol` deployed identically at nonce 0
+/// on Base (8453), Arbitrum One (42161), Optimism (10), and Polygon (137), all Sourcify-verified
+/// (`exact_match` creation + runtime).
+pub const CANONICAL_EVM_HTLC_CONTRACT: &str = "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987";
+pub const BASE_MAINNET_HTLC_CONTRACT: &str = CANONICAL_EVM_HTLC_CONTRACT;
 
 fn evm_chain_metadata(
     chain: &str,
@@ -620,7 +622,7 @@ fn evm_chain_metadata(
             8453,
             "https://mainnet.base.org",
             "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-            Some(BASE_MAINNET_HTLC_CONTRACT),
+            Some(CANONICAL_EVM_HTLC_CONTRACT),
         )),
         "ethereum" | "eth" => Ok((
             1,
@@ -632,19 +634,19 @@ fn evm_chain_metadata(
             42161,
             "https://arb1.arbitrum.io/rpc",
             "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
-            None,
+            Some(CANONICAL_EVM_HTLC_CONTRACT),
         )),
         "optimism" | "op" => Ok((
             10,
             "https://mainnet.optimism.io",
             "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
-            None,
+            Some(CANONICAL_EVM_HTLC_CONTRACT),
         )),
         "polygon" | "matic" => Ok((
             137,
-            "https://polygon-bor-rpc.publicnode.com",
+            "https://polygon.drpc.org",
             "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
-            None,
+            Some(CANONICAL_EVM_HTLC_CONTRACT),
         )),
         other => Err(format!(
             "unsupported evm_chain '{other}' (expected base, ethereum, arbitrum, optimism, or polygon)"
@@ -1611,9 +1613,23 @@ mod tests {
         let evm = evm_c.evm_htlc.unwrap();
         assert_eq!(evm.chain, "base");
         assert_eq!(evm.chain_id, 8453);
-        assert_eq!(evm.contract_address, BASE_MAINNET_HTLC_CONTRACT);
+        assert_eq!(evm.contract_address, CANONICAL_EVM_HTLC_CONTRACT);
         assert_eq!(evm.token_address, "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913");
-        assert!(evm.cast_lock_command.contains(BASE_MAINNET_HTLC_CONTRACT));
+        assert!(evm.cast_lock_command.contains(CANONICAL_EVM_HTLC_CONTRACT));
         assert!(evm.cast_lock_command.contains("lockErc20"));
+
+        // 3. Arbitrum, Optimism & Polygon also resolve to universal canonical address; Ethereum L1 stays placeholder
+        for (c, expected_id) in [("arbitrum", 42161u64), ("optimism", 10), ("polygon", 137)] {
+            let mut r = evm_req.clone();
+            r.evm_chain = Some(c.into());
+            let out = compile_atomic_swap(&r).unwrap().evm_htlc.unwrap();
+            assert_eq!(out.chain_id, expected_id);
+            assert_eq!(out.contract_address, CANONICAL_EVM_HTLC_CONTRACT);
+        }
+        let mut eth_req = evm_req;
+        eth_req.evm_chain = Some("ethereum".into());
+        let eth_out = compile_atomic_swap(&eth_req).unwrap().evm_htlc.unwrap();
+        assert_eq!(eth_out.chain_id, 1);
+        assert_eq!(eth_out.contract_address, "<DEPLOYED_NEWSATOSHI_HTLC_SOL_ADDRESS>");
     }
 }

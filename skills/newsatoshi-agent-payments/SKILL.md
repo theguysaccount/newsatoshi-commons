@@ -75,7 +75,7 @@ For **Mainnet**, switch `--net testnet` to `--net mainnet` (50 `LOVE`/block, Aux
 
 1. Generate a local 32-byte CSPRNG preimage + SHA-256 hash (`newsatoshi-swap keygen`). Keep the preimage private until claiming.
 2. Call `newsatoshi_compile_btc_love_swap` (or `POST https://commons.newsatoshi.org/api/swaps/compile`) for:
-   - **Base Mainnet ETH / USDC HTLC (`rail: "evm_htlc"`, `evm_chain: "base"`)** -> defaults directly to the live, ownerless, Sourcify-verified Base Mainnet contract `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987` (`Chain ID 8453`, EVM `0x02` `sha256` precompile).
+   - **Base / Arbitrum One / Optimism / Polygon HTLC (`rail: "evm_htlc"`, `evm_chain: "base" | "arbitrum" | "optimism" | "polygon"`)** -> defaults directly to the live, ownerless, Sourcify `exact_match`-verified universal contract `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987` across all 4 chains (`8453`, `42161`, `10`, `137`; EVM `0x02` `sha256` precompile).
    - **Bitcoin On-Chain P2WSH HTLC (`rail: "btc_onchain"`)** -> returns canonical `bc1q…` Bech32 address + BIP-199 witness script + `newsatoshi --net mainnet lock` command + anti-race timelock check.
    - **Bitcoin Lightning BOLT-11 (`rail: "lightning_bolt11"`)** -> decodes the invoice payment hash & sats directly into the matching `newsatoshi --net mainnet lock` command.
    - **Solana SOL / USDC PDA Escrow (`rail: "solana_htlc"`)** -> compiles the deterministic 49-byte `sol_sha256` PDA lock instruction.
