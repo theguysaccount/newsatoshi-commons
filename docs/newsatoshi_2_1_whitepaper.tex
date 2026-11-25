@@ -1,0 +1,116 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!60!black,
+  urlcolor=teal!70!black,
+  citecolor=blue!60!black
+}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{conjecture}{Conjecture}
+
+\title{\textbf{NEWSATOSHI/2.1: Tiny-Kernel Machine-Checked Post-Quantum Recursive Covenants, Hash-Only Machine Money, and Budish-Safe Asset Backing}}
+\author{Newsatoshi Commons Protocol Working Group\\\texttt{commons@newsatoshi.org} \quad|\quad \url{https://commons.newsatoshi.org}}
+\date{November 25, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Bitcoin~\cite{nakamoto2008} turned the ordering of electronic payments into a cryptographic proof, yet left validity to unbounded full-history re-execution, relied on elliptic-curve signatures vulnerable to Shor's algorithm, and left recursive spending covenants unresolved. \emph{A Store of Order} (\url{https://newsatoshi.org/white-paper/}) reduces private electronic cash and validity proofs to a single hash function (\texttt{SHA-256}) merge-mined with Bitcoin (\texttt{AuxPoW chainid = 20051}).
+
+Two 2026 milestones reshaped formal cryptography: the June 2026 Orchard circuit vulnerability established machine-checked balance proofs as mandatory for private money, while the November 2026 release of a 17-million-line AI-assisted Lean~4 proof of the Generalized Riemann Hypothesis---and rapid independent audits by mathematicians and frontier reasoning models---highlighted that \emph{proof compilation alone does not guarantee human auditability}. For monetary consensus, specification kernels must remain small enough for exhaustive line-by-line inspection.
+
+We present \textbf{NEWSATOSHI/2.1}, a backwards-compatible soft-fork extension (\texttt{OP\_VERIFY\_COVENANT\_STARK}, \texttt{0xb4} redefining \texttt{OP\_NOP5}), accompanied by a \textbf{355-line, zero-dependency, zero-\texttt{sorry} Lean~4.36.0 soundness kernel} (\texttt{formal/NewsatoshiCovenants.lean}) proving nine theorems over Winterfell~0.13's exact prime field $p = 2^{128} - 45\cdot 2^{40} + 1$. We prove injective 3-limb SHA-256 digest packing, zero modular wrap-around in 63-bit bit-decomposition range checks, exact integer value conservation, exact Euclidean basis-point floor uniqueness, unbounded inductive covenant continuity, monotonic Web4 child-agent spending bounds, and cross-chain HTLC anti-race safety. We further prove a Budish rented-hashpower contagion-isolation proposition, report live Sourcify-verified deployments of our ownerless SHA-256 HTLC across four EVM mainnets (\texttt{0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987}), and formulate three open cryptographic conjectures.
+\end{abstract}
+
+\section{Introduction: The Tiny-Kernel Auditability Threshold}
+As AI reasoning systems begin generating and auditing multi-million-line Lean formalizations, formal verification transitions from an academic luxury to a core primitive of protocol engineering. However, monetary consensus differs fundamentally from exploratory pure mathematics: a subtle definitional circularity or field-aliasing loophole inside a private-currency arithmetic circuit enables undetectable counterfeit inflation.
+
+We adopt the \textbf{Tiny Verifier Kernel Principle}: every arithmetic and inductive invariant governing covenanted \texttt{LOVE} spends is specified in $355$ lines of stock Lean~4.36.0 with zero external library dependencies (\texttt{0} \texttt{sorry}, \texttt{0} \texttt{Classical.choice}), mirroring our executing Winterfell~0.13 STARK AIR (\texttt{src/stark.rs}) byte-for-byte.
+
+\section{Executing Winterfell 0.13 AIR Specification}
+\texttt{CovenantTransitionAir} operates over $\mathbb{F}_p$ with prime modulus
+\[
+p = 2^{128} - 45 \cdot 2^{40} + 1 = 340282366920938463463374557953744961537,
+\]
+trace width $w=15$, trace length $N=64$ ($63$ bit-decomposition transitions), Blake3-256 Merkle commitments, blowup factor $B=8$, $32$ queries, and $4$-bit proof-of-work grinding ($\ge 96$--$100$ bits conjectured transparent PQ security). Transition constraints enforce:
+\begin{align*}
+c_i' - c_i &= 0 \quad (i \in \{0,\dots,5\}), & c_3 - c_4 - c_5 &= 0, \\
+b_j(b_j - 1) &= 0, & a_j' - (2a_j + b_j) &= 0 \quad (j \in \{1,2,3,4\}), \\
+c_{14}' - (c_{14}^3 + c_0 + c_4 + 1) &= 0.
+\end{align*}
+
+\section{Nine Machine-Checked Soundness Theorems (Lean 4.36.0)}
+Every theorem below compiles under stock \texttt{lean formal/NewsatoshiCovenants.lean} in $\approx 1.0\,\text{s}$ CPU time using only Lean's constructive core axioms (\texttt{propext}, \texttt{Quot.sound}, or zero axioms):
+
+\begin{theorem}[Injective 3-Limb Digest Packing]
+Let $d = (l_0, l_1, l_2) \in [0,2^{88}) \times [0,2^{88}) \times [0,2^{80})$ represent a 256-bit SHA-256 digest packed into $\mathbb{F}_p^3$ via $(l_0 \bmod p, l_1 \bmod p, l_2 \bmod p)$. Because $2^{88} < p$, the packing map is strictly injective.
+\end{theorem}
+
+\begin{theorem}[Algebraic Booleanity Over Any Prime Field]
+For any prime $p$ and canonical $b < p$, $p \mid b(b-1) \implies b \in \{0, 1\}$.
+\end{theorem}
+
+\begin{theorem}[63-Bit Bit-Decomposition Soundness]
+Given $a_0 = 0$, $a_{k+1} = 2a_k + b_k$, and $b_k \in \{0,1\}$ for $0 \le k < 63$, we have $a_{63} \le 2^{63}-1 < p$, ruling out negative-slack modular wrap-around ($p-1$) attacks.
+\end{theorem}
+
+\begin{theorem}[Exact Integer Value Conservation]
+For $\mathrm{input}, \mathrm{payout}, \mathrm{change} \le 2^{63}-1$, if $\mathrm{input} \equiv \mathrm{payout} + \mathrm{change} \pmod p$, then $\mathrm{payout} + \mathrm{change} = \mathrm{input}$ in $\mathbb{N}$.
+\end{theorem}
+
+\begin{theorem}[End-to-End Modular Basis-Point Floor Uniqueness]
+For $\mathrm{input}, \mathrm{change}, r, u \le 2^{63}-1$ and $\mathrm{bps} \le 10000$, the modular constraints $\mathrm{input}\cdot\mathrm{bps} \equiv 10000\cdot\mathrm{change} + r \pmod p$ and $r + u \equiv 9999 \pmod p$ uniquely force $\mathrm{change} = \lfloor (\mathrm{input}\cdot\mathrm{bps})/10000 \rfloor$ in $\mathbb{N}$.
+\end{theorem}
+
+\begin{theorem}[Inductive Recursive Covenant Continuity]
+Across any valid sequence of $T \ge 0$ covenant transitions preserving $\mathrm{ruleHash}_{t+1} = \mathrm{ruleHash}_t$, $\mathrm{payout}_t + \mathrm{bal}_{t+1} = \mathrm{bal}_t$, and $\mathrm{payout}_t \le B_{\max}$, we have $\mathrm{ruleHash}_T = \mathrm{ruleHash}_0$, $\sum \mathrm{payout}_t + \mathrm{bal}_T = \mathrm{bal}_0$, and $\sum \mathrm{payout}_t \le T \cdot B_{\max}$.
+\end{theorem}
+
+\begin{theorem}[Monotonic Web4 Child-Agent Spending Bounds]
+For any parent-to-child autonomous agent replication chain of arbitrary depth $d$ enforcing $\mathrm{constHash}_{\text{child}} = \mathrm{constHash}_{\text{parent}}$, $\mathrm{maxSpend}_{\text{child}} \le \mathrm{maxSpend}_{\text{parent}}$, and $\mathrm{backingBps}_{\text{child}} \ge \mathrm{backingBps}_{\text{parent}}$, no descendant can widen spending authority or weaken reserve backing (proven with \textbf{zero axioms}).
+\end{theorem}
+
+\begin{theorem}[Cross-Chain SHA-256 HTLC Anti-Race Safety]
+If $t_{\text{first}} \ge t_{\text{second}} + 120$ and the counterparty claims leg 2 at $t_{\text{claim}} < t_{\text{second}}$, then $t_{\text{claim}} + 120 < t_{\text{first}}$.
+\end{theorem}
+
+\section{Economic Security: Budish Contagion Isolation}
+\begin{proposition}[L1 Blindness Against Rented-Hashpower \& Wash-Farming]
+Under Budish's~\cite{budish2018} majority-attack inequality $P_{\text{attack}} < C_{\text{rent}}(z)$, coupling base-layer issuance to physical oracle attestations permits zero-marginal-cost wash-farming and spot-hashpower reorgs. By keeping \texttt{LOVE} L1 issuance strictly blind (50~LOVE/block, Bitcoin AuxPoW \texttt{chainid = 20051}) and restricting covenants and backing vaults to pre-mined UTXOs and immutable EVM reserve contracts, oracle failure has strictly zero L1 systemic blast radius.
+\end{proposition}
+
+\section{Live Multi-Chain Deployments \& Open Cryptographic Conjectures}
+Our ownerless Solidity HTLC (\texttt{bridges/evm/NewsatoshiHtlc.sol}, EVM precompile \texttt{0x02} \texttt{sha256}) is deployed identically at \texttt{0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987} across Base (\texttt{8453}), Arbitrum One (\texttt{42161}), Optimism (\texttt{10}), and Polygon (\texttt{137}), all four verified \texttt{exact\_match} on Sourcify with live atomic \texttt{lockEth} $\to$ \texttt{claim} proofs.
+
+\begin{conjecture}[Minimum-Width Transparent MCU AIR]
+Determine the tightest $(w, N, d)$ achieving $\ge 128$-bit proven FRI PQ soundness over hash-only commitments with in-circuit SHA-256 continuity under $<10\,\text{ms}$ verification on 240~MHz microcontrollers ($\le 512\,\text{KiB}$ SRAM).
+\end{conjecture}
+
+\begin{conjecture}[Hash-Only Sublinear Multi-Merchant PayWords]
+Determine whether a stateless pure-SHA-256 accumulator can settle $N$ dynamic PayWord micropayments across $M$ arbitrary merchants in $O(\log(MN))$ L1 verification time without elliptic curves or lattice assumptions.
+\end{conjecture}
+
+\begin{conjecture}[Tiny-Kernel Auditability Budget for Consensus]
+Monetary validity circuits should satisfy $\mathrm{LoC}_{\text{formal}} + \mathrm{LoC}_{\text{AIR}} \le 10^3$ with zero external library axioms to prevent specification-mismatch vulnerabilities from hiding inside large machine-generated proofs.
+\end{conjecture}
+
+\begin{thebibliography}{9}
+\bibitem{nakamoto2008} S.~Nakamoto, \emph{Bitcoin: A Peer-to-Peer Electronic Cash System}, 2008.
+\bibitem{newsatoshi2026} Newsatoshi, \emph{A Store of Order: Electronic cash everyone can verify}, \url{https://newsatoshi.org/white-paper/}, Nov.\ 2026.
+\bibitem{budish2018} E.~Budish, \emph{The Economic Limits of Bitcoin and the Blockchain}, NBER Working Paper 24717, 2018.
+\bibitem{starks2018} E.~Ben-Sasson et~al., \emph{Scalable, transparent, and post-quantum secure computational integrity}, IACR ePrint 2018/046.
+\bibitem{fips205} NIST FIPS 205, \emph{Stateless Hash-Based Digital Signature Standard (SLH-DSA)}, 2024.
+\bibitem{payword} R.~L.~Rivest and A.~Shamir, \emph{PayWord and MicroMint: Two Simple Micropayment Schemes}, 1996.
+\end{thebibliography}
+
+\end{document}

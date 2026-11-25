@@ -4,6 +4,7 @@ use crate::agent::{
     render_llms_txt, render_mcp_manifest_json, render_mcp_server_card_json, render_og_image_svg,
     render_openapi_json, render_public_page, render_robots_txt, render_sitemap_xml,
     verify_payword_token, AGENT_SKILL_MARKDOWN, DEFAULT_PUBLIC_BASE_URL, INSTALL_SCRIPT_SH,
+    LEAN_FORMAL_PROOF, WHITEPAPER_LATEX, WHITEPAPER_MARKDOWN,
 };
 use crate::crypto::{sha256, sha256_concat};
 use crate::hardware::{ExternalDeedPacket, ExternalTelemetryPacket};
@@ -550,7 +551,7 @@ fn handle_request(mut req: Request, state: &AppState) {
 
     if method == Method::Head {
         let head_ct = match path.as_str() {
-            "/" | "/index.html" | "/docs" | "/developers" | "/about" | "/contact" | "/privacy" => {
+            "/" | "/index.html" | "/whitepaper" | "/docs" | "/developers" | "/about" | "/contact" | "/privacy" => {
                 if wants_markdown(&req) {
                     Some("text/markdown; charset=utf-8")
                 } else {
@@ -559,9 +560,11 @@ fn handle_request(mut req: Request, state: &AppState) {
             }
             "/og-image.svg" => Some("image/svg+xml"),
             "/install.sh" => Some("text/x-shellscript; charset=utf-8"),
-            "/robots.txt" | "/.well-known/mcp-registry-auth" => Some("text/plain; charset=utf-8"),
+            "/robots.txt" | "/.well-known/mcp-registry-auth" | "/formal/NewsatoshiCovenants.lean" | "/whitepaper.tex" => {
+                Some("text/plain; charset=utf-8")
+            }
             "/sitemap.xml" => Some("application/xml; charset=utf-8"),
-            "/llms.txt" | "/llms-full.txt" | "/skills/newsatoshi-agent-payments/SKILL.md" => {
+            "/llms.txt" | "/llms-full.txt" | "/whitepaper.md" | "/skills/newsatoshi-agent-payments/SKILL.md" => {
                 Some("text/markdown; charset=utf-8")
             }
             "/.well-known/api-catalog" => Some("application/linkset+json; charset=utf-8"),
@@ -615,7 +618,31 @@ fn handle_request(mut req: Request, state: &AppState) {
                 INSTALL_SCRIPT_SH.to_string(),
             );
         }
-        (Method::Get, "/docs" | "/developers" | "/about" | "/contact" | "/privacy") => {
+        (Method::Get, "/whitepaper.md") => {
+            respond_text(
+                req,
+                200,
+                "text/markdown; charset=utf-8",
+                WHITEPAPER_MARKDOWN.to_string(),
+            );
+        }
+        (Method::Get, "/whitepaper.tex") => {
+            respond_text(
+                req,
+                200,
+                "text/plain; charset=utf-8",
+                WHITEPAPER_LATEX.to_string(),
+            );
+        }
+        (Method::Get, "/formal/NewsatoshiCovenants.lean") => {
+            respond_text(
+                req,
+                200,
+                "text/plain; charset=utf-8",
+                LEAN_FORMAL_PROOF.to_string(),
+            );
+        }
+        (Method::Get, "/whitepaper" | "/docs" | "/developers" | "/about" | "/contact" | "/privacy") => {
             let base_url = infer_base_url(&req);
             if let Some((ct, body)) = render_public_page(&path, &base_url, wants_markdown(&req)) {
                 let mut resp = Response::from_string(body)
