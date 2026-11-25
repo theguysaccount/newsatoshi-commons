@@ -608,13 +608,44 @@ fn validate_evm_address(s: &str, label: &str) -> Result<String, String> {
     Ok(format!("0x{}", hex_part.to_ascii_lowercase()))
 }
 
-fn evm_chain_metadata(chain: &str) -> Result<(u64, &'static str, &'static str), String> {
+/// Canonical live, immutable, ownerless `NewsatoshiHtlc.sol` deployed on Base Mainnet (Chain ID 8453)
+/// and Sourcify-verified (`exact_match` creation + runtime).
+pub const BASE_MAINNET_HTLC_CONTRACT: &str = "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987";
+
+fn evm_chain_metadata(
+    chain: &str,
+) -> Result<(u64, &'static str, &'static str, Option<&'static str>), String> {
     match chain.trim().to_ascii_lowercase().as_str() {
-        "base" => Ok((8453, "https://mainnet.base.org", "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913")),
-        "ethereum" | "eth" => Ok((1, "https://ethereum-rpc.publicnode.com", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")),
-        "arbitrum" | "arb" => Ok((42161, "https://arb1.arbitrum.io/rpc", "0xaf88d065e77c8cC2239327C5EDb3A432268e5831")),
-        "optimism" | "op" => Ok((10, "https://mainnet.optimism.io", "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85")),
-        "polygon" | "matic" => Ok((137, "https://polygon-bor-rpc.publicnode.com", "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359")),
+        "base" => Ok((
+            8453,
+            "https://mainnet.base.org",
+            "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            Some(BASE_MAINNET_HTLC_CONTRACT),
+        )),
+        "ethereum" | "eth" => Ok((
+            1,
+            "https://ethereum-rpc.publicnode.com",
+            "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            None,
+        )),
+        "arbitrum" | "arb" => Ok((
+            42161,
+            "https://arb1.arbitrum.io/rpc",
+            "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+            None,
+        )),
+        "optimism" | "op" => Ok((
+            10,
+            "https://mainnet.optimism.io",
+            "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+            None,
+        )),
+        "polygon" | "matic" => Ok((
+            137,
+            "https://polygon-bor-rpc.publicnode.com",
+            "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+            None,
+        )),
         other => Err(format!(
             "unsupported evm_chain '{other}' (expected base, ethereum, arbitrum, optimism, or polygon)"
         )),
@@ -962,7 +993,7 @@ pub fn compile_atomic_swap(req: &CompileSwapRequest) -> Result<AtomicSwapContrac
                 .filter(|s| !s.is_empty())
                 .unwrap_or("base")
                 .to_ascii_lowercase();
-            let (chain_id, rpc_url, default_usdc) = evm_chain_metadata(&chain)?;
+            let (chain_id, rpc_url, default_usdc, canonical_htlc) = evm_chain_metadata(&chain)?;
             let asset = req
                 .source_asset
                 .as_deref()
@@ -984,7 +1015,9 @@ pub fn compile_atomic_swap(req: &CompileSwapRequest) -> Result<AtomicSwapContrac
             )?;
             let contract = match req.evm_contract_address.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
                 Some(c) => validate_evm_address(c, "evm_contract_address")?,
-                None => "<DEPLOYED_NEWSATOSHI_HTLC_SOL_ADDRESS>".to_string(),
+                None => canonical_htlc
+                    .unwrap_or("<DEPLOYED_NEWSATOSHI_HTLC_SOL_ADDRESS>")
+                    .to_string(),
             };
             let is_native_eth = asset == "ETH";
             let token_addr = if is_native_eth {
@@ -1578,7 +1611,9 @@ mod tests {
         let evm = evm_c.evm_htlc.unwrap();
         assert_eq!(evm.chain, "base");
         assert_eq!(evm.chain_id, 8453);
+        assert_eq!(evm.contract_address, BASE_MAINNET_HTLC_CONTRACT);
         assert_eq!(evm.token_address, "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913");
+        assert!(evm.cast_lock_command.contains(BASE_MAINNET_HTLC_CONTRACT));
         assert!(evm.cast_lock_command.contains("lockErc20"));
     }
 }

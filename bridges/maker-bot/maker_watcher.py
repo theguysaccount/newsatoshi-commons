@@ -29,6 +29,11 @@ DEFAULT_EVM_RPCS = {
     "polygon": "https://polygon-bor-rpc.publicnode.com",
 }
 
+DEFAULT_EVM_CONTRACTS = {
+    # Live, immutable, ownerless Base Mainnet NewsatoshiHtlc.sol (Sourcify exact_match)
+    "base": "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987",
+}
+
 DEFAULT_SOLANA_RPCS = {
     "mainnet-beta": "https://api.mainnet-beta.solana.com",
     "devnet": "https://api.devnet.solana.com",
@@ -171,9 +176,11 @@ def main() -> int:
         "newsatoshi": check_newsatoshi_lock(args.hash.lower(), args.love_net),
     }
 
-    if args.evm_contract and args.evm_swap_id:
-        rpc = args.evm_rpc or DEFAULT_EVM_RPCS.get(args.evm_chain or "base")
-        report["evm"] = check_evm_swap_status(rpc, args.evm_contract, args.evm_swap_id)
+    evm_chain = args.evm_chain or "base"
+    evm_contract = args.evm_contract or DEFAULT_EVM_CONTRACTS.get(evm_chain)
+    if evm_contract and args.evm_swap_id:
+        rpc = args.evm_rpc or DEFAULT_EVM_RPCS.get(evm_chain)
+        report["evm"] = check_evm_swap_status(rpc, evm_contract, args.evm_swap_id)
 
     if args.solana_pda:
         rpc = args.solana_rpc or DEFAULT_SOLANA_RPCS.get(args.solana_cluster or "mainnet-beta")

@@ -34,14 +34,16 @@ Machine-readable discovery surfaces:
 - MCP manifest: `https://commons.newsatoshi.org/.well-known/mcp.json`
 - OpenAPI 3.1 schema: `https://commons.newsatoshi.org/openapi.json`
 
-### Live MCP Tools
+### Live MCP Tools (9 Tools)
 1. `newsatoshi_get_network_status` — Live Mainnet & Testnet block height, difficulty, issued `LOVE`, locks, peers, AuxPoW `chainid = 20051`.
 2. `newsatoshi_get_commons_state` — Live `NEWSATOSHI/2.1` Commons balance, `covenant_rule_hash`, cold-ceremony public roots, STARK proofs, L1 anchors.
-3. `newsatoshi_compile_btc_love_swap` — Compiles a canonical BIP-199 Bitcoin P2WSH HTLC (`bc1q…` / `tb1q…`) or decodes a Lightning BOLT-11 invoice into exact `newsatoshi lock` CLI commands.
+3. `newsatoshi_compile_btc_love_swap` — Compiles a canonical BIP-199 Bitcoin P2WSH HTLC (`bc1q…` / `tb1q…`), decodes Lightning BOLT-11, Solana PDA escrow, or live Base Mainnet `NewsatoshiHtlc.sol` (`0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987`, Chain ID `8453`) into exact lock CLI commands.
 4. `newsatoshi_verify_onchain_lock` — Verifies any SHA-256 hash-lock live on Newsatoshi L1 (`/api/lock?hash=`), Bitcoin P2WSH UTXOs (`mempool.space`), and preimage match.
 5. `newsatoshi_verify_payword_402` — Verifies a pure-SHA-256 PayWord HTTP `402` micropayment token (`SHA256^ticks(token) == tip`) in microseconds.
 6. `newsatoshi_verify_stark_proof` — Cryptographically re-verifies any Winterfell STARK proof recorded in the Commons ledger.
 7. `newsatoshi_agent_quickstart` — Returns step-by-step wallet, faucet, swap, and HTTP 402 onboarding commands.
+8. `newsatoshi_create_402_challenge` — Generates a standard `NEWSATOSHI-402/1.0` Payment Required challenge to monetize agent APIs in `LOVE`.
+9. `newsatoshi_get_mining_economics` — Live AuxPoW merge-mining yield & network hashrate economics.
 
 ---
 
@@ -72,9 +74,11 @@ For **Mainnet**, switch `--net testnet` to `--net mainnet` (50 `LOVE`/block, Aux
 ## 3. Acquire Mainnet `LOVE` Without Exchanges (Trustless `BTC ↔ LOVE` Atomic Swaps)
 
 1. Generate a local 32-byte CSPRNG preimage + SHA-256 hash (`newsatoshi-swap keygen`). Keep the preimage private until claiming.
-2. Call `newsatoshi_compile_btc_love_swap` (or `POST https://commons.newsatoshi.org/api/swaps/compile`) for either:
+2. Call `newsatoshi_compile_btc_love_swap` (or `POST https://commons.newsatoshi.org/api/swaps/compile`) for:
+   - **Base Mainnet ETH / USDC HTLC (`rail: "evm_htlc"`, `evm_chain: "base"`)** -> defaults directly to the live, ownerless, Sourcify-verified Base Mainnet contract `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987` (`Chain ID 8453`, EVM `0x02` `sha256` precompile).
    - **Bitcoin On-Chain P2WSH HTLC (`rail: "btc_onchain"`)** -> returns canonical `bc1q…` Bech32 address + BIP-199 witness script + `newsatoshi --net mainnet lock` command + anti-race timelock check.
    - **Bitcoin Lightning BOLT-11 (`rail: "lightning_bolt11"`)** -> decodes the invoice payment hash & sats directly into the matching `newsatoshi --net mainnet lock` command.
+   - **Solana SOL / USDC PDA Escrow (`rail: "solana_htlc"`)** -> compiles the deterministic 49-byte `sol_sha256` PDA lock instruction.
 3. Verify both legs live via `newsatoshi_verify_onchain_lock` (or `POST https://commons.newsatoshi.org/api/swaps/verify`) before revealing the preimage.
 
 ---
