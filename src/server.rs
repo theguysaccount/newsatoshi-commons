@@ -559,7 +559,7 @@ fn handle_request(mut req: Request, state: &AppState) {
             }
             "/og-image.svg" => Some("image/svg+xml"),
             "/install.sh" => Some("text/x-shellscript; charset=utf-8"),
-            "/robots.txt" => Some("text/plain; charset=utf-8"),
+            "/robots.txt" | "/.well-known/mcp-registry-auth" => Some("text/plain; charset=utf-8"),
             "/sitemap.xml" => Some("application/xml; charset=utf-8"),
             "/llms.txt" | "/llms-full.txt" | "/skills/newsatoshi-agent-payments/SKILL.md" => {
                 Some("text/markdown; charset=utf-8")
@@ -664,6 +664,14 @@ fn handle_request(mut req: Request, state: &AppState) {
                 200,
                 "text/markdown; charset=utf-8",
                 render_llms_full_txt(&base_url, &api_state, &seed),
+            );
+        }
+        (Method::Get, "/.well-known/mcp-registry-auth") => {
+            respond_text(
+                req,
+                200,
+                "text/plain; charset=utf-8",
+                "v=MCPv1; k=ed25519; p=n0LJ+zLwShIlENsy4iOKZLHW3eeAfRyO1ItUzxWm0n4=\n".to_string(),
             );
         }
         (Method::Get, "/.well-known/agent.json") => {

@@ -272,13 +272,16 @@ docker compose up -d`;
               detail: 'Invoice parser live · Docker LND hold-invoice node ready to host',
             },
             {
-              rail: 'Base / EVM (ETH & USDC)',
-              status: 'LIVE ON BASE MAINNET',
+              rail: 'EVM L2s & PoS (ETH/POL/USDC)',
+              status: 'LIVE ON 4 MAINNETS',
               tone: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
-              detail: 'Ownerless NewsatoshiHtlc.sol (Chain 8453) · Sourcify exact_match · atomic claim proven',
-              href: 'https://basescan.org/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987',
-              linkLabel: '0xF564A8F6…dC638987 ↗',
-              proofHref: 'https://basescan.org/tx/0x0f6cbfd277610b112d79fe36138dd549931f45f4ffa2894f7ea9e5831a15f595',
+              detail: 'Base · Arbitrum · Optimism · Polygon — same ownerless 0xF564A8F6…8987 (all 4 Sourcify exact_match)',
+              links: [
+                { label: 'Base ↗', href: 'https://basescan.org/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987' },
+                { label: 'Arb ↗', href: 'https://arbiscan.io/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987' },
+                { label: 'OP ↗', href: 'https://optimistic.etherscan.io/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987' },
+                { label: 'Pol ↗', href: 'https://polygonscan.com/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987' },
+              ],
             },
             {
               rail: 'Solana (SOL & USDC)',
@@ -298,26 +301,19 @@ docker compose up -d`;
                 {r.status}
               </div>
               <p className="mt-1.5 text-[11px] leading-snug text-slate-400">{r.detail}</p>
-              {'href' in r && r.href && (
+              {'links' in r && r.links && (
                 <div className="mt-1.5 flex flex-wrap items-center gap-2 font-mono text-[10px]">
-                  <a
-                    href={r.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-emerald-400 hover:underline"
-                  >
-                    {r.linkLabel}
-                  </a>
-                  {'proofHref' in r && r.proofHref && (
+                  {r.links.map((lk) => (
                     <a
-                      href={r.proofHref}
+                      key={lk.label}
+                      href={lk.href}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-sky-400 hover:underline"
+                      className="text-emerald-400 hover:underline"
                     >
-                      Proof TX ↗
+                      {lk.label}
                     </a>
-                  )}
+                  ))}
                 </div>
               )}
             </div>
@@ -925,18 +921,27 @@ docker compose up -d`;
                     </div>
                     <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] text-slate-300">
                       <span>Contract:</span>
-                      {compiled.evm_htlc.chain_id === 8453 && compiled.evm_htlc.contract_address.startsWith('0x') ? (
-                        <a
-                          href={`https://basescan.org/address/${compiled.evm_htlc.contract_address}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-emerald-400 hover:underline break-all"
-                        >
-                          {compiled.evm_htlc.contract_address} ↗
-                        </a>
-                      ) : (
-                        <code className="break-all text-slate-200">{compiled.evm_htlc.contract_address}</code>
-                      )}
+                      {(() => {
+                        const explorerBase: Record<number, string> = {
+                          8453: 'https://basescan.org/address/',
+                          42161: 'https://arbiscan.io/address/',
+                          10: 'https://optimistic.etherscan.io/address/',
+                          137: 'https://polygonscan.com/address/',
+                        };
+                        const base = explorerBase[compiled.evm_htlc.chain_id];
+                        return base && compiled.evm_htlc.contract_address.startsWith('0x') ? (
+                          <a
+                            href={`${base}${compiled.evm_htlc.contract_address}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-emerald-400 hover:underline break-all"
+                          >
+                            {compiled.evm_htlc.contract_address} ↗
+                          </a>
+                        ) : (
+                          <code className="break-all text-slate-200">{compiled.evm_htlc.contract_address}</code>
+                        );
+                      })()}
                     </div>
                     <code className="block break-all font-mono text-[10px] text-sky-200">
                       {compiled.evm_htlc.cast_lock_command}

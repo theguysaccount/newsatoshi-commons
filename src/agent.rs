@@ -368,7 +368,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                      - `POST {base_url}/mcp` — Streamable HTTP MCP JSON-RPC 2.0 server (9 live tools).\n\
                      - `GET {base_url}/api/health` — Node version, verify-only posture, and uptime.\n\
                      - `GET {base_url}/api/seed` — Live Newsatoshi Mainnet and Testnet block height, difficulty, issued LOVE, and peer count.\n\
-                     - `POST {base_url}/api/swaps/compile` — Compile zero-custody SHA-256 HTLC swaps for Bitcoin (`btc_onchain`), Lightning (`lightning_bolt11`), Solana (`solana_htlc`), and Base/Ethereum/Arbitrum (`evm_htlc`; **live verified Base Mainnet contract:** `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987`, Chain ID `8453`).\n\
+                     - `POST {base_url}/api/swaps/compile` — Compile zero-custody SHA-256 HTLC swaps for Bitcoin (`btc_onchain`), Lightning (`lightning_bolt11`), Solana (`solana_htlc`), and EVM (`evm_htlc`; **live Sourcify-verified contract across Base `8453`, Arbitrum One `42161`, Optimism `10`, and Polygon `137`:** `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987`).\n\
                      - `POST {base_url}/api/swaps/verify` — Live dual-chain verification across Newsatoshi L1 `/api/lock` and Bitcoin `mempool.space`.\n\
                      - `GET {base_url}/api/agent/402-challenge` & `POST {base_url}/api/agent/402-verify` — HTTP 402 PayWord hash-chain & L1 lock micropayments.\n\n\
                      ## Official CLI Tools\n\
@@ -412,7 +412,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                      - `newsatoshi-swap` — Local CSPRNG preimage generator & BTC/Lightning/Solana/EVM HTLC compiler\n\
                      - `newsatoshi-hw-signer` — Offline NIST FIPS 205 SLH-DSA & XMSS hardware telemetry/deed signer\n\
                      - `auxpow-stratum/` — 1-command Bitcoin SHA-256 ASIC AuxPoW merge-mining server (`chainid = 20051`)\n\
-                     - `bridges/evm/NewsatoshiHtlc.sol` (**LIVE on Base Mainnet `8453`:** `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987`, Sourcify exact-match verified) & `bridges/solana/` — Immutable ownerless EVM & Solana SHA-256 HTLC contracts\n\
+                     - `bridges/evm/NewsatoshiHtlc.sol` (**LIVE on Base `8453`, Arbitrum `42161`, Optimism `10`, Polygon `137`:** `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987`, all 4 Sourcify exact-match verified) & `bridges/solana/` — Immutable ownerless EVM & Solana SHA-256 HTLC contracts\n\
                      - Installable Agent Skill: `{base_url}/skills/newsatoshi-agent-payments/SKILL.md`\n\n\
                      Source repositories: https://github.com/theguysaccount/newsatoshi-commons and https://github.com/theguysaccount/newsatoshi-rfc0021\n"
                 );
@@ -431,7 +431,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                          <h2>2. Free Testnet Sandbox</h2>\n\
                          <p>Generate a non-interactive shielded delivery address with <code>newsatoshi --net testnet address --delivery</code> and fund it instantly from the live testnet faucet at <code>https://newsatoshi-seed.fly.dev/api/faucet</code>.</p>\n\
                          <h2>3. Official Rust CLIs &amp; Multi-Chain Kits</h2>\n\
-                         <ul><li><strong>Rust CLIs:</strong> <code>cargo install --git https://github.com/theguysaccount/newsatoshi-commons</code> installs <code>newsatoshi-commons</code>, <code>newsatoshi-swap</code>, and <code>newsatoshi-hw-signer</code>.</li><li><strong>AuxPoW Merge-Mining Kit:</strong> Zero-dependency Stratum v1 server in <code>auxpow-stratum/</code> (<code>chainid = 20051</code>, 50 LOVE/block).</li><li><strong>Multi-Chain HTLC Bridges:</strong> Immutable <code>bridges/evm/NewsatoshiHtlc.sol</code> (<strong>LIVE on Base Mainnet 8453:</strong> <a href=\"https://basescan.org/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987\"><code>0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987</code></a>, Sourcify exact-match verified) and <code>bridges/solana/</code> (SOL &amp; SPL-USDC).</li><li><strong>Installable Agent Skill:</strong> <a href=\"/skills/newsatoshi-agent-payments/SKILL.md\">newsatoshi-agent-payments/SKILL.md</a> (<a href=\"/.well-known/agent-skills/index.json\">SHA-256 index</a>).</li></ul>\n\
+                         <ul><li><strong>Rust CLIs:</strong> <code>cargo install --git https://github.com/theguysaccount/newsatoshi-commons</code> installs <code>newsatoshi-commons</code>, <code>newsatoshi-swap</code>, and <code>newsatoshi-hw-signer</code>.</li><li><strong>AuxPoW Merge-Mining Kit:</strong> Zero-dependency Stratum v1 server in <code>auxpow-stratum/</code> (<code>chainid = 20051</code>, 50 LOVE/block).</li><li><strong>Multi-Chain HTLC Bridges:</strong> Immutable <code>bridges/evm/NewsatoshiHtlc.sol</code> (<strong>LIVE on Base, Arbitrum, Optimism &amp; Polygon:</strong> <a href=\"https://basescan.org/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987\"><code>0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987</code></a>, all 4 Sourcify exact-match verified) and <code>bridges/solana/</code> (SOL &amp; SPL-USDC).</li><li><strong>Installable Agent Skill:</strong> <a href=\"/skills/newsatoshi-agent-payments/SKILL.md\">newsatoshi-agent-payments/SKILL.md</a> (<a href=\"/.well-known/agent-skills/index.json\">SHA-256 index</a>).</li></ul>\n\
                          <p>Read the full <a href=\"/docs\">API Documentation</a> or inspect the live <a href=\"/openapi.json\">OpenAPI 3.1 schema</a>.</p>"
                     ),
                 );
@@ -647,7 +647,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 ## Live Network Status
 - {mainnet_line}
 - {testnet_line}
-- Base Mainnet Verified HTLC (`Chain ID 8453`, ownerless, Sourcify `exact_match`): `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987` (ETH & Base USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`)
+- Live Verified EVM HTLC (`Base 8453 · Arbitrum 42161 · Optimism 10 · Polygon 137`, ownerless, all 4 Sourcify `exact_match`): `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987` (Native ETH/POL & Canonical USDC)
 - Commons Covenant Rule Hash: `{rule_hash}` (`verify_only={verify_only}`, `{key_mode}`)
 - Commons Treasury Balance: `{bal} LOVE` (`nonce={nonce}`, `parcels={parcels}`, `kwh={kwh}`, `starks={starks}`)
 
@@ -1255,7 +1255,7 @@ pub fn mcp_tools_list() -> Value {
             },
             {
                 "name": "newsatoshi_compile_btc_love_swap",
-                "description": "Compile a trustless multi-chain SHA-256 HTLC atomic swap into LOVE: Bitcoin BIP-199 P2WSH (bc1q...), Lightning BOLT-11, Solana SOL/USDC PDA escrow, or Base/EVM ETH/USDC HTLC (live verified Base Mainnet contract 0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987).",
+                "description": "Compile a trustless multi-chain SHA-256 HTLC atomic swap into LOVE: Bitcoin BIP-199 P2WSH (bc1q...), Lightning BOLT-11, Solana SOL/USDC PDA escrow, or EVM ETH/POL/USDC HTLC (live Sourcify-verified contract 0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987 across Base, Arbitrum One, Optimism & Polygon).",
                 "inputSchema": {
                     "type": "object",
                     "required": ["amount_love", "love_claim_address"],
@@ -1275,9 +1275,9 @@ pub fn mcp_tools_list() -> Value {
                         "btc_locktime": { "type": "integer", "description": "Bitcoin CLTV block height or Unix timestamp" },
                         "btc_current_height": { "type": "integer", "description": "Optional current BTC tip for anti-race margin check" },
                         "source_asset": { "type": "string", "description": "Asset for solana_htlc (USDC/SOL) or evm_htlc (USDC/ETH)" },
-                        "evm_chain": { "type": "string", "enum": ["base", "ethereum", "arbitrum", "optimism", "polygon"], "default": "base", "description": "Target EVM chain (Base Mainnet defaults to live verified 0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987)" },
+                        "evm_chain": { "type": "string", "enum": ["base", "ethereum", "arbitrum", "optimism", "polygon"], "default": "base", "description": "Target EVM chain (Base, Arbitrum, Optimism & Polygon default to live verified 0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987)" },
                         "evm_recipient_address": { "type": "string", "description": "0x... counterparty recipient for evm_htlc" },
-                        "evm_contract_address": { "type": "string", "description": "Optional override; Base Mainnet defaults to live verified 0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987" },
+                        "evm_contract_address": { "type": "string", "description": "Optional override; Base/Arbitrum/Optimism/Polygon default to live verified 0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987" },
                         "solana_cluster": { "type": "string", "enum": ["mainnet-beta", "devnet"], "default": "mainnet-beta" },
                         "solana_sender_pubkey": { "type": "string", "description": "Base58 sender pubkey for solana_htlc" },
                         "solana_recipient_pubkey": { "type": "string", "description": "Base58 recipient pubkey for solana_htlc" }
