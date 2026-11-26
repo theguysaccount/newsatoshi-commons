@@ -1,8 +1,10 @@
 /**
- * @newsatoshi/402 — Zero-Dependency Post-Quantum HTTP 402 PayWord & MCP SDK (v0.14.0)
+ * @newsatoshi/402 — Zero-Dependency Post-Quantum HTTP 402 PayWord & MCP SDK (v0.15.0)
  *
  * Implements incremental O(1) Rivest–Shamir (1996) PayWord SHA-256 hash-chain metering
- * paired with live on-chain funding verification (Newsatoshi L1 /api/lock or custom EVM HTLC)
+ * paired with live Newsatoshi L1 RFC-0022 PayWord Channel verification (`/api/channel`,
+ * canonical SHA-256 Merkle inclusion proof check, and 70-byte unilateral `ChannelClaim`
+ * transaction broadcast via `POST /api/tx`), legacy L1 HTLC lock checks (`/api/lock`),
  * and zero-API-key Streamable HTTP MCP access for https://commons.newsatoshi.org/mcp.
  *
  * Works in Node 18+ (fast native node:crypto SHA-256), Cloudflare Workers, Vercel Edge,
@@ -11,9 +13,10 @@
  * Security & Honesty Guarantees:
  * - O(1) per sequential voucher: verifies SHA256^(ticks - lastTicks)(token) == lastToken
  *   (1 hash per sequential call regardless of whether ticks is 1 or 1,000,000).
- * - Supports up to 1,000,000 ticks per channel (matching protocol docs).
+ * - Supports up to 1,000,000 ticks per channel (matching L1 RFC-0022 consensus limits).
  * - Separates local hash-chain verification from on-chain solvency: production gates
- *   require a verified funded on-chain lock (`fundingStatus: "verified_onchain_lock"`).
+ *   require a verified funded on-chain RFC-0022 channel (`fundingStatus: "verified_onchain_channel"`)
+ *   or L1 lock (`fundingStatus: "verified_onchain_lock"`).
  *   Unfunded sandbox usage must explicitly opt into `allowUnfundedDemo: true` and is
  *   always labeled `fundingStatus: "unfunded_demo"` with `collectibleOnChain: false`.
  */
@@ -304,6 +307,244 @@ export function parsePayWordHeader(headerValue) {
 }
 
 /**
+ * Verifies a canonical Newsatoshi L1 `MerkleMap` inclusion proof (`GET /api/channel?id=`)
+ * against its committed root using pure SHA-256 (`nsMKL` / `nsMKB` domain tags).
+ */
+export async function verifyChannelMerkleProof(proof) {
+  if (!proof || typeof proof !== "object") return false;
+  try {
+    const rootBytes = hexToBytes(proof.root);
+    if (rootBytes.every((b) => b === 0)) return false;
+    const keyBytes = hexToBytes(proof.key);
+    const valBytes = hexToBytes(proof.value_hash ?? proof.valueHash);
+    const siblings = Array.isArray(proof.siblings) ? proof.siblings : null;
+    if (!siblings || siblings.length > 256) return false;
+
+    const leafBuf = new Uint8Array(5 + 32 + 32);
+    leafBuf.set([0x6e, 0x73, 0x4d, 0x4b, 0x4c], 0); // "nsMKL"
+    leafBuf.set(keyBytes, 5);
+    leafBuf.set(valBytes, 37);
+    let cur = await sha256(leafBuf);
+
+    const branchBuf = new Uint8Array(5 + 32 + 32);
+    branchBuf.set([0x6e, 0x73, 0x4d, 0x4b, 0x42], 0); // "nsMKB"
+    for (let depth = siblings.length - 1; depth >= 0; depth--) {
+      const sib = hexToBytes(siblings[depth]);
+      const bit = ((keyBytes[depth >> 3] >> (7 - (depth & 7))) & 1) === 1;
+      if (bit) {
+        branchBuf.set(sib, 5);
+        branchBuf.set(cur, 37);
+      } else {
+        branchBuf.set(cur, 5);
+        branchBuf.set(sib, 37);
+      }
+      cur = await sha256(branchBuf);
+    }
+    return constantTimeEqual(cur, rootBytes);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Encodes an exact 70-byte Newsatoshi L1 RFC-0022 unilateral `Action::ChannelClaim`
+ * transaction (`Tx::Act(11)`) ready for `POST /api/tx` on any independent node.
+ */
+export function encodeChannelClaimTx(channelIdHex, ticks, tokenHex) {
+  if (!Number.isInteger(ticks) || ticks < 1 || ticks > MAX_PAYWORD_TICKS) {
+    throw new Error(`ticks must be an integer in 1..=${MAX_PAYWORD_TICKS}`);
+  }
+  const chBytes = hexToBytes(channelIdHex);
+  const tokBytes = hexToBytes(tokenHex);
+  const out = new Uint8Array(70);
+  out[0] = 2; // Tx::Act
+  out[1] = 11; // Action::ChannelClaim
+  out.set(chBytes, 2);
+  new DataView(out.buffer).setUint32(34, ticks, true);
+  out.set(tokBytes, 38);
+  return out;
+}
+
+/**
+ * Encodes an exact 34-byte Newsatoshi L1 RFC-0022 `Action::ChannelExpire`
+ * transaction (`Tx::Act(12)`) ready for `POST /api/tx` after channel timeout.
+ */
+export function encodeChannelExpireTx(channelIdHex) {
+  const chBytes = hexToBytes(channelIdHex);
+  const out = new Uint8Array(34);
+  out[0] = 2; // Tx::Act
+  out[1] = 12; // Action::ChannelExpire
+  out.set(chBytes, 2);
+  return out;
+}
+
+/**
+ * Broadcasts a 70-byte unilateral RFC-0022 `ChannelClaim` transaction directly to any
+ * Newsatoshi L1 node (`POST /api/tx`) with zero buyer cooperation or central gateway.
+ */
+export async function submitL1ChannelClaim({
+  channelIdHex,
+  ticks,
+  tokenHex,
+  network = "mainnet",
+  seedBaseUrl = null,
+  fetchImpl = fetch,
+}) {
+  const net = network === "testnet" ? "testnet" : "mainnet";
+  const base = (
+    seedBaseUrl ||
+    (net === "testnet" ? DEFAULT_TESTNET_SEED_URL : DEFAULT_MAINNET_SEED_URL)
+  ).replace(/\/$/, "");
+  const txBytes = encodeChannelClaimTx(channelIdHex, ticks, tokenHex);
+  const resp = await fetchImpl(`${base}/api/tx`, {
+    method: "POST",
+    headers: { "Content-Type": "application/octet-stream" },
+    body: txBytes,
+  });
+  const data = await resp.json().catch(() => ({ ok: false, error: `HTTP ${resp.status}` }));
+  return {
+    ok: Boolean(resp.ok && data?.ok),
+    status: resp.status,
+    txid: data?.txid || null,
+    txBytes: txBytes.length,
+    error: data?.error || null,
+  };
+}
+
+/**
+ * Queries a live Newsatoshi L1 node (`GET /api/channel?tip=<hex>` or `?id=<hex>`) to
+ * verify whether an RFC-0022 PayWord channel is open on-chain, funded for `sellerAddress`,
+ * covers `requiredTicks` at `unitPriceBaseUnits` with sufficient `minBlocksRemaining`
+ * before timeout, and passes canonical SHA-256 Merkle inclusion proof verification.
+ */
+export async function verifyL1ChannelFunding({
+  tipHex = null,
+  channelId = null,
+  network = "mainnet",
+  sellerAddress = null,
+  merchantAddress = null,
+  requiredTicks = 1,
+  unitPriceBaseUnits = 1,
+  minBlocksRemaining = 6,
+  requireConfirmed = true,
+  seedBaseUrl = null,
+  fetchImpl = fetch,
+}) {
+  const net = network === "testnet" ? "testnet" : "mainnet";
+  const base = (
+    seedBaseUrl ||
+    (net === "testnet" ? DEFAULT_TESTNET_SEED_URL : DEFAULT_MAINNET_SEED_URL)
+  ).replace(/\/$/, "");
+  const expectedSeller = sellerAddress || merchantAddress;
+
+  try {
+    let url;
+    if (channelId) {
+      const cleanId = channelId.trim().toLowerCase().replace(/^0x/, "");
+      url = `${base}/api/channel?id=${cleanId}`;
+    } else if (tipHex) {
+      const cleanTip = tipHex.trim().toLowerCase().replace(/^0x/, "");
+      url = `${base}/api/channel?tip=${cleanTip}`;
+    } else {
+      return { funded: false, network: net, reason: "tipHex or channelId is required" };
+    }
+
+    const resp = await fetchImpl(url);
+    if (!resp.ok) {
+      return {
+        funded: false,
+        network: net,
+        reason: `L1 channel lookup returned HTTP ${resp.status}`,
+      };
+    }
+    const data = await resp.json();
+    const currentHeight = Number(data.height || 0);
+    const candidates = Array.isArray(data.channels)
+      ? data.channels
+      : data.found
+        ? [data]
+        : [];
+    const openChannels = candidates.filter((c) => c && c.found !== false && c.state === "open");
+
+    if (openChannels.length === 0) {
+      return {
+        funded: false,
+        network: net,
+        currentHeight,
+        reason: `no open funded RFC-0022 L1 channel found on ${net}`,
+      };
+    }
+
+    const matching = openChannels.find((ch) => {
+      const chHeight = Number(ch.height || currentHeight || 0);
+      const maxTicks = Number(ch.max_ticks ?? 0);
+      const unitPrice = Number(ch.unit_price ?? 0);
+      const timeout = Number(ch.timeout ?? 0);
+      const seller = String(ch.seller ?? "").trim().toLowerCase();
+      const confirmedOk = !requireConfirmed || ch.confirmed === true;
+      const addrOk =
+        !expectedSeller ||
+        expectedSeller.startsWith("<") ||
+        seller === expectedSeller.trim().toLowerCase();
+      const ticksOk = maxTicks >= requiredTicks;
+      const priceOk = unitPrice >= unitPriceBaseUnits;
+      const timeoutOk = chHeight === 0 || timeout >= chHeight + minBlocksRemaining;
+      return confirmedOk && addrOk && ticksOk && priceOk && timeoutOk;
+    });
+
+    if (!matching) {
+      return {
+        funded: false,
+        network: net,
+        currentHeight,
+        reason: `open RFC-0022 channel exists on ${net} but fails confirmation, seller address, max_ticks (>= ${requiredTicks}), unit_price (>= ${unitPriceBaseUnits}), or timeout (>= +${minBlocksRemaining} blocks) check`,
+      };
+    }
+
+    let merkleProofVerified = false;
+    if (matching.merkle_proof) {
+      merkleProofVerified = await verifyChannelMerkleProof(matching.merkle_proof);
+      if (!merkleProofVerified) {
+        return {
+          funded: false,
+          network: net,
+          currentHeight,
+          reason: "RFC-0022 channel Merkle inclusion proof failed local SHA-256 verification",
+        };
+      }
+    }
+
+    const budget = Number(matching.budget ?? Number(matching.max_ticks) * Number(matching.unit_price));
+    return {
+      funded: true,
+      rail: "rfc0022_payword_channel",
+      network: net,
+      channelId: matching.id || null,
+      tipHex: matching.tip || tipHex,
+      maxTicks: Number(matching.max_ticks || 0),
+      unitPriceBaseUnits: Number(matching.unit_price || 0),
+      claimFeeBaseUnits: Number(matching.claim_fee || 0),
+      budgetBaseUnits: budget,
+      totalDepositBaseUnits: Number(matching.total_deposit || budget),
+      amountBaseUnits: budget,
+      timeoutHeight: Number(matching.timeout || 0),
+      currentHeight: Number(matching.height || currentHeight || 0),
+      confirmations: Number(matching.confirmations || 0),
+      confirmed: Boolean(matching.confirmed),
+      sellerAddress: matching.seller || null,
+      refundAddress: matching.refund || null,
+      merkleProofVerified,
+    };
+  } catch (err) {
+    return {
+      funded: false,
+      network: net,
+      reason: `L1 channel verification failed: ${err.message}`,
+    };
+  }
+}
+
+/**
  * Queries a live Newsatoshi L1 node (`/api/lock?hash=<tip>`) to verify whether a PayWord
  * channel commitment is actually backed by an open, unspent on-chain lock paying the merchant
  * with sufficient balance and timeout safety margin.
@@ -339,13 +580,15 @@ export async function verifyL1LockFunding({
     const statusData = statusResp.ok ? await statusResp.json() : {};
     const currentHeight = Number(statusData.height || 0);
 
-    const openLocks = Array.isArray(lockData.open)
-      ? lockData.open
-      : lockData.open
-        ? [lockData.open]
-        : lockData.lock && lockData.status === "open"
-          ? [lockData.lock]
-          : [];
+    const openLocks = Array.isArray(lockData.locks)
+      ? lockData.locks.filter((l) => l && l.found !== false && l.state === "open")
+      : Array.isArray(lockData.open)
+        ? lockData.open
+        : lockData.open
+          ? [lockData.open]
+          : lockData.lock && lockData.status === "open"
+            ? [lockData.lock]
+            : [];
 
     if (openLocks.length === 0) {
       return {
@@ -493,8 +736,11 @@ export function createPayWordGate({
   allowedTips = null,
   requireFunding = false,
   allowUnfundedDemo = !requireFunding,
+  fundingRail = "auto",
+  requireConfirmed = true,
   minBlocksRemaining = 6,
   seedBaseUrl = null,
+  fetchImpl = fetch,
   fundingVerifier = null,
   store = null,
 } = {}) {
@@ -560,7 +806,11 @@ export function createPayWordGate({
 
       const requiredTotalBaseUnits = parsed.ticks * unitPriceBaseUnits;
       let fundedLock = prevState?.fundedLock || null;
-      let fundingStatus = fundedLock ? "verified_onchain_lock" : "unfunded_demo";
+      let fundingStatus = fundedLock
+        ? fundedLock.rail === "rfc0022_payword_channel"
+          ? "verified_onchain_channel"
+          : "verified_onchain_lock"
+        : "unfunded_demo";
 
       const needsFundingCheck =
         requireFunding ||
@@ -571,36 +821,72 @@ export function createPayWordGate({
         const cachedCovers =
           fundedLock &&
           fundedLock.funded === true &&
-          Number(fundedLock.amountBaseUnits || 0) >= requiredTotalBaseUnits;
+          (fundedLock.rail === "rfc0022_payword_channel"
+            ? Number(fundedLock.maxTicks || 0) >= parsed.ticks &&
+              Number(fundedLock.unitPriceBaseUnits || 0) >= unitPriceBaseUnits
+            : Number(fundedLock.amountBaseUnits || 0) >= requiredTotalBaseUnits);
 
         if (!cachedCovers) {
-          const checkFunding =
-            typeof fundingVerifier === "function"
-              ? await fundingVerifier({
-                  tipHex: normTip,
-                  ticks: parsed.ticks,
-                  requiredBaseUnits: requiredTotalBaseUnits,
-                  network,
-                  merchantAddress: recipient,
-                  minBlocksRemaining,
-                })
-              : await verifyL1LockFunding({
-                  tipHex: normTip,
-                  network,
-                  merchantAddress: recipient,
-                  requiredBaseUnits: requiredTotalBaseUnits,
-                  minBlocksRemaining,
-                  seedBaseUrl,
-                });
+          let checkFunding;
+          if (typeof fundingVerifier === "function") {
+            checkFunding = await fundingVerifier({
+              tipHex: normTip,
+              ticks: parsed.ticks,
+              unitPriceBaseUnits,
+              requiredBaseUnits: requiredTotalBaseUnits,
+              network,
+              merchantAddress: recipient,
+              minBlocksRemaining,
+            });
+          } else if (fundingRail === "lock") {
+            checkFunding = await verifyL1LockFunding({
+              tipHex: normTip,
+              network,
+              merchantAddress: recipient,
+              requiredBaseUnits: requiredTotalBaseUnits,
+              minBlocksRemaining,
+              seedBaseUrl,
+              fetchImpl,
+            });
+          } else {
+            checkFunding = await verifyL1ChannelFunding({
+              tipHex: normTip,
+              network,
+              sellerAddress: recipient,
+              requiredTicks: parsed.ticks,
+              unitPriceBaseUnits,
+              minBlocksRemaining,
+              requireConfirmed,
+              seedBaseUrl,
+              fetchImpl,
+            });
+            if (!checkFunding.funded && fundingRail === "auto") {
+              const lockCheck = await verifyL1LockFunding({
+                tipHex: normTip,
+                network,
+                merchantAddress: recipient,
+                requiredBaseUnits: requiredTotalBaseUnits,
+                minBlocksRemaining,
+                seedBaseUrl,
+                fetchImpl,
+              });
+              if (lockCheck.funded) {
+                checkFunding = lockCheck;
+              }
+            }
+          }
 
           if (!checkFunding || !checkFunding.funded) {
             return failChallenge(
-              checkFunding?.reason || "unfunded PayWord channel: no live funded on-chain lock",
+              checkFunding?.reason || "unfunded PayWord channel: no live funded on-chain channel or lock",
               resource
             );
           }
           fundedLock = checkFunding;
-          fundingStatus = "verified_onchain_lock";
+          fundingStatus =
+            fundedLock.rail === "rfc0022_payword_channel"
+              ? "verified_onchain_channel"
+              : "verified_onchain_lock";
         }
       }
 
@@ -624,9 +910,15 @@ export function createPayWordGate({
         updatedAtUnix: Math.floor(Date.now() / 1000),
       });
 
+      const collectible =
+        fundingStatus === "verified_onchain_channel" ||
+        fundingStatus === "verified_onchain_lock";
+
       return {
         paid: true,
-        collectibleOnChain: fundingStatus === "verified_onchain_lock",
+        collectibleOnChain: collectible,
+        unilateralClaimReady: fundingStatus === "verified_onchain_channel",
+        channelId: fundedLock?.channelId || null,
         fundingStatus,
         fundedLock,
         verificationMode: check.mode,

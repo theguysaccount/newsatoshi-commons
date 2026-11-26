@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """
-newsatoshi_402 — Zero-Dependency Post-Quantum HTTP 402 PayWord & MCP Python SDK (v0.14.0).
+newsatoshi_402 — Zero-Dependency Post-Quantum HTTP 402 PayWord & MCP Python SDK (v0.15.0).
 
 Implements incremental O(1) Rivest–Shamir (1996) PayWord SHA-256 hash-chain verification
 (supporting up to 1,000,000 ticks per channel with sparse checkpoints), optional durable
-watermark persistence across restarts, live Newsatoshi L1 on-chain lock funding verification,
-and zero-API-key Streamable HTTP MCP access for https://commons.newsatoshi.org/mcp.
+watermark persistence across restarts, live Newsatoshi L1 RFC-0022 PayWord Channel funding
+verification (`/api/channel`, canonical SHA-256 Merkle inclusion proof check, and 70-byte
+unilateral `ChannelClaim` broadcast via `POST /api/tx`), legacy L1 HTLC lock checks
+(`/api/lock`), and zero-API-key Streamable HTTP MCP access for https://commons.newsatoshi.org/mcp.
 """
 
 import hashlib
 import hmac
 import json
 import os
+import struct
 import time
 import urllib.error
 import urllib.request
@@ -175,6 +178,199 @@ def parse_payword_header(header_value: Optional[str]) -> Optional[Tuple[str, str
     return fields["tip"], fields["token"], ticks
 
 
+def verify_channel_merkle_proof(proof: Optional[Dict[str, Any]]) -> bool:
+    """Verifies a canonical Newsatoshi L1 MerkleMap inclusion proof using pure SHA-256."""
+    if not isinstance(proof, dict):
+        return False
+    try:
+        root_bytes = _validate_hex32(str(proof.get("root", "")))
+        if all(b == 0 for b in root_bytes):
+            return False
+        key_bytes = _validate_hex32(str(proof.get("key", "")))
+        val_bytes = _validate_hex32(str(proof.get("value_hash", proof.get("valueHash", ""))))
+        siblings = proof.get("siblings")
+        if not isinstance(siblings, list) or len(siblings) > 256:
+            return False
+        cur = hashlib.sha256(b"nsMKL" + key_bytes + val_bytes).digest()
+        for depth in range(len(siblings) - 1, -1, -1):
+            sib = _validate_hex32(str(siblings[depth]))
+            bit = ((key_bytes[depth >> 3] >> (7 - (depth & 7))) & 1) == 1
+            if bit:
+                cur = hashlib.sha256(b"nsMKB" + sib + cur).digest()
+            else:
+                cur = hashlib.sha256(b"nsMKB" + cur + sib).digest()
+        return hmac.compare_digest(cur, root_bytes)
+    except Exception:
+        return False
+
+
+def encode_channel_claim_tx(channel_id_hex: str, ticks: int, token_hex: str) -> bytes:
+    """Encodes the exact 70-byte RFC-0022 unilateral Action::ChannelClaim L1 transaction."""
+    if not isinstance(ticks, int) or not (1 <= ticks <= MAX_PAYWORD_TICKS):
+        raise ValueError(f"ticks must be in 1..={MAX_PAYWORD_TICKS}")
+    ch_bytes = _validate_hex32(channel_id_hex)
+    tok_bytes = _validate_hex32(token_hex)
+    return bytes([2, 11]) + ch_bytes + struct.pack("<I", ticks) + tok_bytes
+
+
+def encode_channel_expire_tx(channel_id_hex: str) -> bytes:
+    """Encodes the exact 34-byte RFC-0022 Action::ChannelExpire L1 transaction."""
+    ch_bytes = _validate_hex32(channel_id_hex)
+    return bytes([2, 12]) + ch_bytes
+
+
+def submit_l1_channel_claim(
+    channel_id_hex: str,
+    ticks: int,
+    token_hex: str,
+    *,
+    network: str = "mainnet",
+    seed_base_url: Optional[str] = None,
+    timeout: float = 10.0,
+) -> Dict[str, Any]:
+    """Broadcasts a 70-byte unilateral RFC-0022 ChannelClaim tx to any Newsatoshi L1 node."""
+    net = "testnet" if network == "testnet" else "mainnet"
+    base = (
+        seed_base_url or (DEFAULT_TESTNET_SEED_URL if net == "testnet" else DEFAULT_MAINNET_SEED_URL)
+    ).rstrip("/")
+    tx_bytes = encode_channel_claim_tx(channel_id_hex, ticks, token_hex)
+    req = urllib.request.Request(
+        f"{base}/api/tx",
+        data=tx_bytes,
+        headers={"Content-Type": "application/octet-stream"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read(65_536).decode("utf-8"))
+            return {
+                "ok": bool(data.get("ok")),
+                "status": resp.status,
+                "txid": data.get("txid"),
+                "tx_bytes": len(tx_bytes),
+                "error": data.get("error"),
+            }
+    except urllib.error.HTTPError as err:
+        try:
+            data = json.loads(err.read(65_536).decode("utf-8"))
+        except Exception:
+            data = {"ok": False, "error": f"HTTP {err.code}"}
+        return {
+            "ok": False,
+            "status": err.code,
+            "txid": None,
+            "tx_bytes": len(tx_bytes),
+            "error": data.get("error", f"HTTP {err.code}"),
+        }
+
+
+def verify_l1_channel_funding(
+    tip_hex: Optional[str] = None,
+    *,
+    channel_id: Optional[str] = None,
+    network: str = "mainnet",
+    seller_address: Optional[str] = None,
+    merchant_address: Optional[str] = None,
+    required_ticks: int = 1,
+    unit_price_base_units: int = 1,
+    min_blocks_remaining: int = 6,
+    require_confirmed: bool = True,
+    seed_base_url: Optional[str] = None,
+    timeout: float = 10.0,
+) -> Dict[str, Any]:
+    """Queries live Newsatoshi L1 (/api/channel?tip=<hex> or ?id=<hex>) for an open RFC-0022 channel."""
+    net = "testnet" if network == "testnet" else "mainnet"
+    base = (
+        seed_base_url or (DEFAULT_TESTNET_SEED_URL if net == "testnet" else DEFAULT_MAINNET_SEED_URL)
+    ).rstrip("/")
+    expected_seller = seller_address or merchant_address
+    try:
+        if channel_id:
+            clean_id = channel_id.strip().lower().removeprefix("0x")
+            url = f"{base}/api/channel?id={clean_id}"
+        elif tip_hex:
+            clean_tip = tip_hex.strip().lower().removeprefix("0x")
+            url = f"{base}/api/channel?tip={clean_tip}"
+        else:
+            return {"funded": False, "network": net, "reason": "tip_hex or channel_id is required"}
+
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
+            data = json.loads(resp.read(524_288).decode("utf-8"))
+        current_height = int(data.get("height", 0) or 0)
+        if isinstance(data.get("channels"), list):
+            candidates = data["channels"]
+        elif data.get("found"):
+            candidates = [data]
+        else:
+            candidates = []
+        open_channels = [
+            ch for ch in candidates if isinstance(ch, dict) and ch.get("found") is not False and ch.get("state") == "open"
+        ]
+        if not open_channels:
+            return {
+                "funded": False,
+                "network": net,
+                "current_height": current_height,
+                "reason": f"no open funded RFC-0022 L1 channel found on {net}",
+            }
+
+        for ch in open_channels:
+            ch_height = int(ch.get("height", current_height) or current_height or 0)
+            max_ticks = int(ch.get("max_ticks", 0) or 0)
+            unit_price = int(ch.get("unit_price", 0) or 0)
+            ch_timeout = int(ch.get("timeout", 0) or 0)
+            seller = str(ch.get("seller", "")).strip().lower()
+            confirmed_ok = (not require_confirmed) or (ch.get("confirmed") is True)
+            addr_ok = (
+                not expected_seller
+                or expected_seller.startswith("<")
+                or seller == expected_seller.strip().lower()
+            )
+            ticks_ok = max_ticks >= required_ticks
+            price_ok = unit_price >= unit_price_base_units
+            timeout_ok = ch_height == 0 or ch_timeout >= ch_height + min_blocks_remaining
+            if confirmed_ok and addr_ok and ticks_ok and price_ok and timeout_ok:
+                merkle_verified = False
+                if ch.get("merkle_proof"):
+                    merkle_verified = verify_channel_merkle_proof(ch["merkle_proof"])
+                    if not merkle_verified:
+                        return {
+                            "funded": False,
+                            "network": net,
+                            "current_height": ch_height,
+                            "reason": "RFC-0022 channel Merkle inclusion proof failed local SHA-256 verification",
+                        }
+                budget = int(ch.get("budget", max_ticks * unit_price) or (max_ticks * unit_price))
+                return {
+                    "funded": True,
+                    "rail": "rfc0022_payword_channel",
+                    "network": net,
+                    "channel_id": ch.get("id"),
+                    "tip_hex": ch.get("tip") or tip_hex,
+                    "max_ticks": max_ticks,
+                    "unit_price_base_units": unit_price,
+                    "claim_fee_base_units": int(ch.get("claim_fee", 0) or 0),
+                    "budget_base_units": budget,
+                    "total_deposit_base_units": int(ch.get("total_deposit", budget) or budget),
+                    "amount_base_units": budget,
+                    "timeout_height": ch_timeout,
+                    "current_height": ch_height,
+                    "confirmations": int(ch.get("confirmations", 0) or 0),
+                    "confirmed": bool(ch.get("confirmed")),
+                    "seller_address": ch.get("seller"),
+                    "refund_address": ch.get("refund"),
+                    "merkle_proof_verified": merkle_verified,
+                }
+        return {
+            "funded": False,
+            "network": net,
+            "current_height": current_height,
+            "reason": f"open RFC-0022 channel on {net} fails confirmation, seller, ticks, unit_price, or timeout check",
+        }
+    except Exception as exc:
+        return {"funded": False, "network": net, "reason": f"L1 channel verification failed: {exc}"}
+
+
 def verify_l1_lock_funding(
     tip_hex: str,
     *,
@@ -200,15 +396,20 @@ def verify_l1_lock_funding(
         except Exception:
             status_data = {}
         current_height = int(status_data.get("height", 0) or 0)
-        open_raw = lock_data.get("open")
-        if isinstance(open_raw, list):
-            open_locks = open_raw
-        elif isinstance(open_raw, dict):
-            open_locks = [open_raw]
-        elif isinstance(lock_data.get("lock"), dict) and lock_data.get("status") == "open":
-            open_locks = [lock_data["lock"]]
+        if isinstance(lock_data.get("locks"), list):
+            open_locks = [
+                lk for lk in lock_data["locks"] if isinstance(lk, dict) and lk.get("found") is not False and lk.get("state") == "open"
+            ]
         else:
-            open_locks = []
+            open_raw = lock_data.get("open")
+            if isinstance(open_raw, list):
+                open_locks = open_raw
+            elif isinstance(open_raw, dict):
+                open_locks = [open_raw]
+            elif isinstance(lock_data.get("lock"), dict) and lock_data.get("status") == "open":
+                open_locks = [lock_data["lock"]]
+            else:
+                open_locks = []
         if not open_locks:
             return {
                 "funded": False,
@@ -264,7 +465,10 @@ class PayWordGate:
         merchant_address: Optional[str] = None,
         require_funding: bool = False,
         allow_unfunded_demo: Optional[bool] = None,
+        funding_rail: str = "auto",
+        require_confirmed: bool = True,
         min_blocks_remaining: int = 6,
+        seed_base_url: Optional[str] = None,
         funding_verifier: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
         state_file: Optional[str] = None,
     ) -> None:
@@ -274,7 +478,10 @@ class PayWordGate:
         self.merchant_address = merchant_address
         self.require_funding = require_funding
         self.allow_unfunded_demo = (not require_funding) if allow_unfunded_demo is None else allow_unfunded_demo
+        self.funding_rail = funding_rail
+        self.require_confirmed = require_confirmed
         self.min_blocks_remaining = min_blocks_remaining
+        self.seed_base_url = seed_base_url
         self.funding_verifier = funding_verifier
         self.state_file = state_file
         self.channels: Dict[str, Dict[str, Any]] = {}
@@ -321,45 +528,85 @@ class PayWordGate:
 
         required_total = ticks * self.unit_price_base_units
         funded_lock = prev_state.get("funded_lock") if prev_state else None
-        funding_status = "verified_onchain_lock" if funded_lock else "unfunded_demo"
+        if funded_lock:
+            funding_status = (
+                "verified_onchain_channel"
+                if funded_lock.get("rail") == "rfc0022_payword_channel"
+                else "verified_onchain_lock"
+            )
+        else:
+            funding_status = "unfunded_demo"
 
         if self.require_funding or not self.allow_unfunded_demo or self.funding_verifier is not None:
-            cached_ok = (
-                isinstance(funded_lock, dict)
-                and funded_lock.get("funded") is True
-                and int(funded_lock.get("amount_base_units", 0)) >= required_total
-            )
+            if isinstance(funded_lock, dict) and funded_lock.get("funded") is True:
+                if funded_lock.get("rail") == "rfc0022_payword_channel":
+                    cached_ok = (
+                        int(funded_lock.get("max_ticks", 0)) >= ticks
+                        and int(funded_lock.get("unit_price_base_units", 0)) >= self.unit_price_base_units
+                    )
+                else:
+                    cached_ok = int(funded_lock.get("amount_base_units", 0)) >= required_total
+            else:
+                cached_ok = False
             if not cached_ok:
                 if self.funding_verifier is not None:
                     check_funding = self.funding_verifier(
                         {
                             "tip_hex": norm_tip,
                             "ticks": ticks,
+                            "unit_price_base_units": self.unit_price_base_units,
                             "required_base_units": required_total,
                             "network": self.network,
                             "merchant_address": self.merchant_address,
                             "min_blocks_remaining": self.min_blocks_remaining,
                         }
                     )
-                else:
+                elif self.funding_rail == "lock":
                     check_funding = verify_l1_lock_funding(
                         norm_tip,
                         network=self.network,
                         merchant_address=self.merchant_address,
                         required_base_units=required_total,
                         min_blocks_remaining=self.min_blocks_remaining,
+                        seed_base_url=self.seed_base_url,
                     )
+                else:
+                    check_funding = verify_l1_channel_funding(
+                        norm_tip,
+                        network=self.network,
+                        seller_address=self.merchant_address,
+                        required_ticks=ticks,
+                        unit_price_base_units=self.unit_price_base_units,
+                        min_blocks_remaining=self.min_blocks_remaining,
+                        require_confirmed=self.require_confirmed,
+                        seed_base_url=self.seed_base_url,
+                    )
+                    if not check_funding.get("funded") and self.funding_rail == "auto":
+                        lock_check = verify_l1_lock_funding(
+                            norm_tip,
+                            network=self.network,
+                            merchant_address=self.merchant_address,
+                            required_base_units=required_total,
+                            min_blocks_remaining=self.min_blocks_remaining,
+                            seed_base_url=self.seed_base_url,
+                        )
+                        if lock_check.get("funded"):
+                            check_funding = lock_check
                 if not check_funding or not check_funding.get("funded"):
                     return {
                         "paid": False,
                         "collectible_on_chain": False,
                         "funding_status": "rejected",
                         "reason": (check_funding or {}).get(
-                            "reason", "unfunded PayWord channel: no live funded on-chain lock"
+                            "reason", "unfunded PayWord channel: no live funded on-chain channel or lock"
                         ),
                     }
                 funded_lock = check_funding
-                funding_status = "verified_onchain_lock"
+                funding_status = (
+                    "verified_onchain_channel"
+                    if funded_lock.get("rail") == "rfc0022_payword_channel"
+                    else "verified_onchain_lock"
+                )
 
         res = verify_payword_token(
             norm_tip,
@@ -385,9 +632,12 @@ class PayWordGate:
             "updated_at_unix": int(time.time()),
         }
         self._persist()
+        collectible = funding_status in ("verified_onchain_channel", "verified_onchain_lock")
         return {
             "paid": True,
-            "collectible_on_chain": funding_status == "verified_onchain_lock",
+            "collectible_on_chain": collectible,
+            "unilateral_claim_ready": funding_status == "verified_onchain_channel",
+            "channel_id": funded_lock.get("channel_id") if isinstance(funded_lock, dict) else None,
             "funding_status": funding_status,
             "funded_lock": funded_lock,
             "verification_mode": res["mode"],
@@ -422,7 +672,7 @@ class NewsatoshiMcpClient:
             headers={
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-                "User-Agent": "newsatoshi-402-py/0.14.0",
+                "User-Agent": "newsatoshi-402-py/0.15.0",
             },
         )
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
