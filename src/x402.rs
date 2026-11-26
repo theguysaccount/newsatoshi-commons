@@ -639,7 +639,7 @@ pub fn fetch_live_wlove_market() -> Value {
                         "volume_24h_usd": pair.pointer("/volume/h24").cloned().unwrap_or(Value::Null),
                         "dexscreener_url": format!("https://dexscreener.com/base/{BASE_UNISWAP_V3_POOL}"),
                         "uniswap_url": format!("https://app.uniswap.org/swap?chain=base&outputCurrency={BASE_WLOVE_MIRROR}"),
-                        "disclosure": "wLOVE is an ownerless, LP-burned Base ERC-20 discovery & HTLC bridge mirror. Native L1 LOVE is separate, fair-mined via AuxPoW (chainid 20051), and traded peer-to-peer via SHA-256 HTLCs."
+                        "disclosure": "wLOVE is an independent, ownerless Base ERC-20 token (21,000,000 fixed supply; no on-chain bridge connects wLOVE to native L1 LOVE). Native L1 LOVE is separate, mined via SHA-256 AuxPoW (chainid 20051) with perpetual 0.1953125 LOVE/block tail emission, and traded peer-to-peer via SHA-256 HTLCs."
                     });
                 }
             }
@@ -652,7 +652,7 @@ pub fn fetch_live_wlove_market() -> Value {
         "token_address": BASE_WLOVE_MIRROR,
         "pool_address": BASE_UNISWAP_V3_POOL,
         "lp_burned_nft_id": 6689936,
-        "disclosure": "wLOVE is an ownerless, LP-burned Base ERC-20 discovery & HTLC bridge mirror. Native L1 LOVE is separate and traded peer-to-peer via SHA-256 HTLCs."
+        "disclosure": "wLOVE is an independent, ownerless Base ERC-20 token (21,000,000 fixed supply; no on-chain bridge connects wLOVE to native L1 LOVE). Native L1 LOVE is separate and traded peer-to-peer via SHA-256 HTLCs."
     })
 }
 

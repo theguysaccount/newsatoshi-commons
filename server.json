@@ -3,7 +3,7 @@
   "name": "org.newsatoshi.commons/newsatoshi-commons",
   "title": "Newsatoshi Commons & Multi-Chain Crypto Tools",
   "description": "Zero-auth EVM security audit, Bitcoin mempool, BOLT-11 decoder, Base Uniswap V3 & Newsatoshi LOVE.",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "websiteUrl": "https://commons.newsatoshi.org",
   "repository": {
     "url": "https://github.com/theguysaccount/newsatoshi-commons",
