@@ -46,13 +46,13 @@ pub fn evaluate_v2_cutover_readiness(seed: &SeedSnapshot) -> Value {
 
     let gate_audits = external_audits_completed >= REQUIRED_EXTERNAL_AUDITS;
     let gate_pools = independent_real_difficulty_pools >= REQUIRED_INDEPENDENT_AUXPOW_POOLS;
-    let gate_engineering = true; // v0.6.0-zkvm: 10 Lean 4 theorems, Z3 249 constraints, red-team suite, 128-bit STARKs
+    let gate_engineering = true; // v0.8.0-apex: 13 Lean 4 theorems, Z3 249 constraints, 192-bit SHA-384 FRI, LogUp zkVM, ML-KEM P2P, FlyClient MMR
     let ready = gate_audits && gate_pools && gate_engineering;
 
     let mut blockers = Vec::new();
     if !gate_audits {
         blockers.push(format!(
-            "External security audits: {external_audits_completed}/{REQUIRED_EXTERNAL_AUDITS} completed (requires 2 independent reviews of Winterfell segment masking, spend.rs, bond.rs, rollup.rs, zkvm.rs, mission.rs — see docs/AUDIT_SCOPE_V2.md)"
+            "External security audits: {external_audits_completed}/{REQUIRED_EXTERNAL_AUDITS} completed (requires 2 independent reviews of Winterfell segment masking, spend.rs, bond.rs, rollup.rs, zkvm.rs, mission.rs, pq_transport.rs, light.rs — see docs/AUDIT_SCOPE_V2.md)"
         ));
     }
     if !gate_pools {
@@ -68,11 +68,19 @@ pub fn evaluate_v2_cutover_readiness(seed: &SeedSnapshot) -> Value {
         "gates": {
             "engineering_and_formal_proofs": {
                 "passed": gate_engineering,
-                "lean4_theorems": 11,
+                "l1_release_tag": "v0.8.0-apex",
+                "lean4_theorems": 13,
                 "lean4_sorry_count": 0,
                 "z3_spend_constraints": 249,
-                "zk_stark_proven_bits": 128,
+                "zk_stark_proven_bits": 192,
+                "zk_stark_qrom_bits": 128,
+                "sha384_qrom_full_stack": true,
                 "permissionless_l1_zkvm_verified": true,
+                "zkvm_logup_rom_rap": true,
+                "pq_mlkem_p2p_transport": true,
+                "eclipse_netgroup_defense": true,
+                "compact_block_relay": true,
+                "flyclient_mmr_light_client": true,
                 "fair_launch_v2_genesis_cli": true,
                 "audit_scope_doc": "https://github.com/theguysaccount/newsatoshi-rfc0021/blob/main/docs/AUDIT_SCOPE_V2.md"
             },
