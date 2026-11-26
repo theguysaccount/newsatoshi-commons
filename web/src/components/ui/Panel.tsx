@@ -44,7 +44,7 @@ export function Panel({
                 </h2>
               )}
               {subtitle && (
-                <p className="mt-0.5 truncate text-xs text-zinc-500">{subtitle}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">{subtitle}</p>
               )}
             </div>
           </div>

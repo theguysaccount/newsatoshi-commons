@@ -94,7 +94,7 @@ export function OverviewPage({ seed, backing, onNavigate }: OverviewPageProps) {
   const activeSnippet = SNIPPETS[snippetTab];
 
   return (
-    <div className="animate-fade-in mx-auto max-w-[1120px] space-y-20 pb-20 pt-10 sm:pt-16">
+    <div className="animate-fade-in mx-auto max-w-[1120px] space-y-16 pb-20 pt-8 sm:pt-12">
       {/* 1. Editorial Hero */}
       <section className="max-w-3xl">
         <div className="inline-flex items-center gap-2.5 rounded-full border border-white/[0.09] bg-white/[0.025] px-3 py-1 text-[11px] font-medium tracking-wide text-zinc-400">
