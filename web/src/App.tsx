@@ -331,7 +331,7 @@ export default function App() {
                   key={item.id}
                   type="button"
                   onClick={() => navigate(item.id)}
-                  className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition cursor-pointer ${
+                  className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 ${
                     active
                       ? 'bg-white/[0.09] text-zinc-50'
                       : 'text-zinc-400 hover:text-zinc-100'

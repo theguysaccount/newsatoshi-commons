@@ -1100,16 +1100,18 @@ docker compose up -d`;
                         {preset.label}
                       </button>
                     ))}
-                    <input
-                      type="number"
-                      min="0.001"
-                      step="0.1"
-                      value={minerThs}
-                      onChange={(e) => setMinerThs(e.target.value)}
-                      aria-label="Miner hashrate in TH/s"
-                      className="w-20 rounded border border-slate-700 bg-slate-950 px-2 py-0.5 font-mono text-[11px] text-slate-100"
-                    />
-                    <span className="font-mono text-[10px] text-slate-400">TH/s</span>
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                      <input
+                        type="number"
+                        min="0.001"
+                        step="0.1"
+                        value={minerThs}
+                        onChange={(e) => setMinerThs(e.target.value)}
+                        aria-label="Miner hashrate in TH/s"
+                        className="w-20 rounded border border-slate-700 bg-slate-950 px-2 py-0.5 font-mono text-[11px] text-slate-100"
+                      />
+                      <span className="font-mono text-[10px] text-slate-400">TH/s</span>
+                    </span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-[11px]">
                     <div className="rounded border border-slate-800/90 bg-slate-950/75 px-2.5 py-1.5">
