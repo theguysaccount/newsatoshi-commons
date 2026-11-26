@@ -21,14 +21,17 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Hard upper bound on PayWord hash-chain iterations per HTTP request to prevent CPU DoS.
-pub const MAX_PAYWORD_VERIFY_TICKS: u64 = 100_000;
+/// Maximum cumulative PayWord ticks per channel (matches JS/Python SDKs and protocol docs).
+pub const MAX_PAYWORD_VERIFY_TICKS: u64 = 1_000_000;
+/// Hard per-request delta bound to prevent uncached CPU DoS on a single HTTP request.
+pub const MAX_PAYWORD_STEP_JUMP: u64 = 100_000;
 
 /// Default canonical public URL used in discovery documents when Host header is unavailable.
 pub const DEFAULT_PUBLIC_BASE_URL: &str = "https://commons.newsatoshi.org";
 
 // ---------------------------------------------------------------------------
 // HTTP 402 PayWord + L1 Hash-Lock Machine-to-Machine Micropayments
+// (Rivest & Shamir 1996 PayWord hash-chains + L1 SHA-256 HTLC locks)
 // ---------------------------------------------------------------------------
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -36,6 +39,8 @@ pub struct PayWordVerifyResult {
     pub ok: bool,
     pub valid: bool,
     pub scheme: String,
+    pub verification_mode: String,
+    pub hashes_evaluated: u64,
     pub tip_hex: String,
     pub token_hex: String,
     pub computed_tip_hex: String,
@@ -47,13 +52,29 @@ pub struct PayWordVerifyResult {
     pub error: Option<String>,
 }
 
-/// Verifies a post-quantum pure-SHA-256 PayWord micropayment token:
-/// checks `SHA256^{ticks}(token) == tip` in O(`ticks`) hash evaluations.
+/// Verifies a post-quantum pure-SHA-256 PayWord voucher from the initial commitment:
+/// checks `SHA256^{ticks}(token) == tip` (delegates to `verify_payword_token_incremental`).
 pub fn verify_payword_token(
     tip_hex: &str,
     token_hex: &str,
     ticks: u64,
     unit_price_base_units: u64,
+) -> Result<PayWordVerifyResult, String> {
+    verify_payword_token_incremental(tip_hex, token_hex, ticks, unit_price_base_units, None, 0)
+}
+
+/// Incremental O(delta) Rivest–Shamir (1996) PayWord verifier:
+/// - When `prev_token_hex` and `prev_ticks > 0` are provided, verifies
+///   `SHA256^(ticks - prev_ticks)(token) == prev_token` (exactly 1 SHA-256 hash per sequential call,
+///   O(1) all the way up to 1,000,000 cumulative ticks).
+/// - Otherwise verifies `SHA256^ticks(token) == tip` (up to `MAX_PAYWORD_STEP_JUMP` in one jump).
+pub fn verify_payword_token_incremental(
+    tip_hex: &str,
+    token_hex: &str,
+    ticks: u64,
+    unit_price_base_units: u64,
+    prev_token_hex: Option<&str>,
+    prev_ticks: u64,
 ) -> Result<PayWordVerifyResult, String> {
     if ticks == 0 || ticks > MAX_PAYWORD_VERIFY_TICKS {
         return Err(format!(
@@ -61,11 +82,37 @@ pub fn verify_payword_token(
         ));
     }
     let expected_tip = hash32_from_hex(tip_hex)?;
-    let mut cur = hash32_from_hex(token_hex)?;
-    for _ in 0..ticks {
+    let raw_token = hash32_from_hex(token_hex)?;
+    let (anchor, iterations, mode) = match (prev_token_hex, prev_ticks) {
+        (Some(prev_hex), pt) if pt > 0 => {
+            if ticks <= pt {
+                return Err(format!(
+                    "ticks ({ticks}) must exceed previous watermark ({pt})"
+                ));
+            }
+            let delta = ticks - pt;
+            if delta > MAX_PAYWORD_STEP_JUMP {
+                return Err(format!(
+                    "single-call tick jump ({delta}) exceeds anti-DoS cap ({MAX_PAYWORD_STEP_JUMP})"
+                ));
+            }
+            (hash32_from_hex(prev_hex)?, delta, "incremental")
+        }
+        _ => {
+            if ticks > MAX_PAYWORD_STEP_JUMP {
+                return Err(format!(
+                    "uncached first-call jump ({ticks}) exceeds single-call cap ({MAX_PAYWORD_STEP_JUMP}); advance incrementally up to {MAX_PAYWORD_VERIFY_TICKS}"
+                ));
+            }
+            (expected_tip, ticks, "full")
+        }
+    };
+
+    let mut cur = raw_token;
+    for _ in 0..iterations {
         cur = sha256(&cur);
     }
-    let valid = cur == expected_tip;
+    let valid = cur == anchor;
     let total_paid = ticks
         .checked_mul(unit_price_base_units)
         .ok_or_else(|| "total_paid_base_units overflow".to_string())?;
@@ -73,15 +120,23 @@ pub fn verify_payword_token(
         ok: true,
         valid,
         scheme: "NEWSATOSHI-PAYWORD-SHA256/1.0".to_string(),
+        verification_mode: mode.to_string(),
+        hashes_evaluated: iterations,
         tip_hex: hex::encode(expected_tip),
-        token_hex: hex::encode(hash32_from_hex(token_hex)?),
-        computed_tip_hex: hex::encode(cur),
+        token_hex: hex::encode(raw_token),
+        computed_tip_hex: if mode == "full" {
+            hex::encode(cur)
+        } else {
+            hex::encode(expected_tip)
+        },
         ticks,
         unit_price_base_units,
         total_paid_base_units: if valid { total_paid } else { 0 },
         next_required_ticks: if valid { ticks + 1 } else { ticks },
         error: if valid {
             None
+        } else if mode == "incremental" {
+            Some("PayWord incremental mismatch: SHA256^(ticks - prev_ticks)(token) != prev_token".to_string())
         } else {
             Some("PayWord hash-chain mismatch: SHA256^ticks(token) != tip".to_string())
         },
@@ -1992,8 +2047,17 @@ mod tests {
         let tok7_hex = hex::encode(chain[43]);
         let res = verify_payword_token(&tip_hex, &tok7_hex, 7, 1_000).unwrap();
         assert!(res.valid);
+        assert_eq!(res.hashes_evaluated, 7);
         assert_eq!(res.total_paid_base_units, 7_000);
         assert_eq!(res.next_required_ticks, 8);
+
+        // Reveal tick #8 incrementally against tick #7 -> O(1), strictly 1 SHA-256 hash!
+        let tok8_hex = hex::encode(chain[42]);
+        let inc = verify_payword_token_incremental(&tip_hex, &tok8_hex, 8, 1_000, Some(&tok7_hex), 7).unwrap();
+        assert!(inc.valid);
+        assert_eq!(inc.verification_mode, "incremental");
+        assert_eq!(inc.hashes_evaluated, 1);
+        assert_eq!(inc.total_paid_base_units, 8_000);
 
         // Wrong tick count (claiming 8 ticks with tick #7 token) MUST fail!
         let bad_ticks = verify_payword_token(&tip_hex, &tok7_hex, 8, 1_000).unwrap();

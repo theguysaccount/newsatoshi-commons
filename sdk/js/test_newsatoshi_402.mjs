@@ -1,15 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import http from "node:http";
+import os from "node:os";
+import path from "node:path";
 import {
+  MAX_PAYWORD_TICKS,
   generatePayWordChain,
   verifyPayWordToken,
   createPayWordGate,
+  createFilePayWordStore,
+  verifyL1LockFunding,
   fetchWithNewsatoshi402,
 } from "./newsatoshi-402.mjs";
 import { forwardJsonRpcLine } from "./bin/newsatoshi-mcp.mjs";
 
-test("PayWord chain generation, verification, forgery rejection, and replay guard", async () => {
+test("PayWord O(1) incremental verification, forgery rejection, replay guard, and honest unfunded_demo tagging", async () => {
+  assert.equal(MAX_PAYWORD_TICKS, 1_000_000);
   const wallet = await generatePayWordChain(20, 2_500);
   assert.equal(wallet.tipHex.length, 64);
   assert.equal(wallet.remainingTicks, 20);
@@ -17,6 +24,7 @@ test("PayWord chain generation, verification, forgery rejection, and replay guar
   const p1 = wallet.nextPayment(1);
   const ok1 = await verifyPayWordToken(p1.tipHex, p1.tokenHex, p1.ticks, 2_500);
   assert.equal(ok1.valid, true);
+  assert.equal(ok1.hashesEvaluated, 1);
   assert.equal(ok1.totalPaidBaseUnits, 2_500);
 
   // Forged token rejected
@@ -27,8 +35,12 @@ test("PayWord chain generation, verification, forgery rejection, and replay guar
   const wrongTicks = await verifyPayWordToken(p1.tipHex, p1.tokenHex, 2, 2_500);
   assert.equal(wrongTicks.valid, false);
 
-  // End-to-end live local HTTP 402 server + autonomous agent client
-  const gate = createPayWordGate({ unitPriceBaseUnits: 2_500, amountLove: "0.000025" });
+  // Explicit unfunded sandbox mode labels receipts honestly (`collectibleOnChain: false`)
+  const gate = createPayWordGate({
+    unitPriceBaseUnits: 2_500,
+    amountLove: "0.000025",
+    allowUnfundedDemo: true,
+  });
   const server = http.createServer(async (req, res) => {
     const hdr = req.headers["x-newsatoshi-payword"];
     const check = await gate.verifyRequest(typeof hdr === "string" ? hdr : "", req.url || "/infer");
@@ -41,7 +53,7 @@ test("PayWord chain generation, verification, forgery rejection, and replay guar
       return;
     }
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ok: true, ticks: check.ticks, deltaPaid: check.deltaPaidBaseUnits }));
+    res.end(JSON.stringify(check));
   });
 
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -49,27 +61,142 @@ test("PayWord chain generation, verification, forgery rejection, and replay guar
   const url = `http://127.0.0.1:${port}/infer`;
 
   try {
-    // Autonomous client receives 402, reveals tick #2, succeeds with HTTP 200
     const r1 = await fetchWithNewsatoshi402(url, wallet);
     assert.equal(r1.status, 200);
     const body1 = await r1.json();
-    assert.equal(body1.ok, true);
+    assert.equal(body1.paid, true);
+    assert.equal(body1.collectibleOnChain, false);
+    assert.equal(body1.fundingStatus, "unfunded_demo");
     assert.equal(body1.ticks, 2);
 
-    // Replaying tick #1 or tick #2 directly MUST fail with 402
+    // Replay MUST fail with 402
     const replay = await fetch(url, {
       headers: { "X-Newsatoshi-PayWord": p1.headerValue },
     });
     assert.equal(replay.status, 402);
 
-    // Next sequential call reveals tick #3 and succeeds
+    // Next sequential call verifies incrementally in exactly 1 hash (O(1))
     const r2 = await fetchWithNewsatoshi402(url, wallet);
     assert.equal(r2.status, 200);
     const body2 = await r2.json();
     assert.equal(body2.ticks, 3);
-    assert.equal(body2.deltaPaid, 2_500);
+    assert.equal(body2.verificationMode, "incremental");
+    assert.equal(body2.hashesEvaluated, 1);
+    assert.equal(body2.deltaPaidBaseUnits, 2_500);
   } finally {
     server.close();
+  }
+});
+
+test("O(1) incremental verification scales cleanly to 1,000,000 ticks with 1 hash per step", async () => {
+  const wallet = await generatePayWordChain(1_000_000, 1);
+  // Jump to voucher #10,000 in one batch, then advance incrementally by 1
+  const v10k = wallet.nextPayment(10_000);
+  const res10k = await verifyPayWordToken(v10k.tipHex, v10k.tokenHex, v10k.ticks, 1);
+  assert.equal(res10k.valid, true);
+  assert.equal(res10k.hashesEvaluated, 10_000);
+
+  const v10001 = wallet.nextPayment(1);
+  const res10001 = await verifyPayWordToken(v10001.tipHex, v10001.tokenHex, v10001.ticks, 1, {
+    tokenHex: v10k.tokenHex,
+    ticks: v10k.ticks,
+  });
+  assert.equal(res10001.valid, true);
+  assert.equal(res10001.mode, "incremental");
+  assert.equal(res10001.hashesEvaluated, 1);
+
+  // Advance across the entire 1,000,000-tick chain in steps <= 100,000 and prove final voucher #1,000,000 verifies in 1 hash
+  let prev = { tokenHex: v10001.tokenHex, ticks: v10001.ticks };
+  while (wallet.remainingTicks > 1) {
+    const step = Math.min(99_999, wallet.remainingTicks - 1);
+    const nxt = wallet.nextPayment(step);
+    const chk = await verifyPayWordToken(nxt.tipHex, nxt.tokenHex, nxt.ticks, 1, prev);
+    assert.equal(chk.valid, true);
+    prev = { tokenHex: nxt.tokenHex, ticks: nxt.ticks };
+  }
+  const v1M = wallet.nextPayment(1);
+  assert.equal(v1M.ticks, 1_000_000);
+  const chk1M = await verifyPayWordToken(v1M.tipHex, v1M.tokenHex, v1M.ticks, 1, prev);
+  assert.equal(chk1M.valid, true);
+  assert.equal(chk1M.mode, "incremental");
+  assert.equal(chk1M.hashesEvaluated, 1);
+});
+
+test("Production gate with requireFunding rejects unfunded channels, verifies live L1 locks, and persists watermarks across restarts", async () => {
+  const wallet = await generatePayWordChain(10, 1_000);
+  const merchant = "ns1merchant00000000000000000000000000000000000000000000000000000000";
+
+  // 1. Mock L1 seed with NO open lock -> MUST reject
+  const mockEmptyFetch = async (u) => ({
+    ok: true,
+    status: 200,
+    json: async () => (u.includes("/status") ? { height: 5000 } : { open: [] }),
+  });
+  const unfunded = await verifyL1LockFunding({
+    tipHex: wallet.tipHex,
+    merchantAddress: merchant,
+    requiredBaseUnits: 5_000,
+    fetchImpl: mockEmptyFetch,
+  });
+  assert.equal(unfunded.funded, false);
+
+  // 2. Mock L1 seed WITH funded open lock -> MUST accept
+  const mockFundedFetch = async (u) => ({
+    ok: true,
+    status: 200,
+    json: async () =>
+      u.includes("/status")
+        ? { height: 5000 }
+        : { open: [{ id: "lock1", amount: 50_000, timeout: 5100, claim_addr: merchant }] },
+  });
+  const funded = await verifyL1LockFunding({
+    tipHex: wallet.tipHex,
+    merchantAddress: merchant,
+    requiredBaseUnits: 5_000,
+    fetchImpl: mockFundedFetch,
+  });
+  assert.equal(funded.funded, true);
+  assert.equal(funded.amountBaseUnits, 50_000);
+
+  // 3. Durable file store survives server restart & prevents replay + stays O(1)
+  const tmpFile = path.join(os.tmpdir(), `ns402-store-${Date.now()}.json`);
+  try {
+    const store1 = await createFilePayWordStore(tmpFile);
+    const gate1 = createPayWordGate({
+      recipient: merchant,
+      unitPriceBaseUnits: 1_000,
+      requireFunding: true,
+      fundingVerifier: async (req) =>
+        verifyL1LockFunding({ ...req, fetchImpl: mockFundedFetch }),
+      store: store1,
+    });
+    const p1 = wallet.nextPayment(1);
+    const r1 = await gate1.verifyRequest(p1.headerValue);
+    assert.equal(r1.paid, true);
+    assert.equal(r1.collectibleOnChain, true);
+    assert.equal(r1.fundingStatus, "verified_onchain_lock");
+
+    // Simulate process restart with fresh gate reading same file
+    const store2 = await createFilePayWordStore(tmpFile);
+    const gate2 = createPayWordGate({
+      recipient: merchant,
+      unitPriceBaseUnits: 1_000,
+      requireFunding: true,
+      fundingVerifier: async (req) =>
+        verifyL1LockFunding({ ...req, fetchImpl: mockFundedFetch }),
+      store: store2,
+    });
+    const replayAfterRestart = await gate2.verifyRequest(p1.headerValue);
+    assert.equal(replayAfterRestart.paid, false);
+
+    const p2 = wallet.nextPayment(1);
+    const r2 = await gate2.verifyRequest(p2.headerValue);
+    assert.equal(r2.paid, true);
+    assert.equal(r2.verificationMode, "incremental");
+    assert.equal(r2.hashesEvaluated, 1);
+    assert.equal(r2.collectibleOnChain, true);
+  } finally {
+    if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
   }
 });
 

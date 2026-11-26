@@ -1,39 +1,80 @@
 #!/usr/bin/env python3
-"""Unit tests for the zero-dependency Newsatoshi HTTP 402 PayWord Python SDK."""
+"""Unit tests for the zero-dependency Newsatoshi HTTP 402 PayWord Python SDK (v0.14.0)."""
 
+import os
+import tempfile
 import unittest
 
 import newsatoshi_402 as ns402
 
 
 class Newsatoshi402PythonSdkTests(unittest.TestCase):
-    def test_chain_verify_forgery_and_anti_replay_gate(self) -> None:
+    def test_chain_verify_incremental_forgery_and_anti_replay_gate(self) -> None:
+        self.assertEqual(ns402.MAX_PAYWORD_TICKS, 1_000_000)
         wallet = ns402.generate_payword_chain(15, 2_000)
         self.assertEqual(len(wallet.tip_hex), 64)
 
         p1 = wallet.next_payment(1)
         res1 = ns402.verify_payword_token(p1["tip_hex"], p1["token_hex"], p1["ticks"], 2_000)
         self.assertTrue(res1["valid"])
+        self.assertEqual(res1["hashes_evaluated"], 1)
         self.assertEqual(res1["total_paid_base_units"], 2_000)
 
         bad = ns402.verify_payword_token(p1["tip_hex"], "00" * 32, 1, 2_000)
         self.assertFalse(bad["valid"])
 
-        gate = ns402.PayWordGate(min_ticks_increment=1, unit_price_base_units=2_000)
+        gate = ns402.PayWordGate(min_ticks_increment=1, unit_price_base_units=2_000, allow_unfunded_demo=True)
         g1 = gate.verify_header(p1["header_value"])
         self.assertTrue(g1["paid"])
+        self.assertFalse(g1["collectible_on_chain"])
+        self.assertEqual(g1["funding_status"], "unfunded_demo")
         self.assertEqual(g1["delta_paid_base_units"], 2_000)
 
         # Exact replay MUST fail
         replay = gate.verify_header(p1["header_value"])
         self.assertFalse(replay["paid"])
 
-        # Advancing by 2 ticks succeeds and bills strictly delta (4_000)
+        # Advancing by 2 ticks verifies incrementally (only 2 hashes) and bills delta (4_000)
         p3 = wallet.next_payment(2)
         g3 = gate.verify_header(p3["header_value"])
         self.assertTrue(g3["paid"])
+        self.assertEqual(g3["verification_mode"], "incremental")
+        self.assertEqual(g3["hashes_evaluated"], 2)
         self.assertEqual(g3["ticks"], 3)
         self.assertEqual(g3["delta_paid_base_units"], 4_000)
+
+    def test_funding_requirement_and_persistent_state_across_restarts(self) -> None:
+        wallet = ns402.generate_payword_chain(10_005, 1_000)
+        p10k = wallet.next_payment(10_000)
+
+        # Unfunded verifier rejects cleanly
+        reject_gate = ns402.PayWordGate(
+            require_funding=True,
+            funding_verifier=lambda _req: {"funded": False, "reason": "no open lock"},
+        )
+        rej = reject_gate.verify_header(p10k["header_value"])
+        self.assertFalse(rej["paid"])
+        self.assertEqual(rej["funding_status"], "rejected")
+
+        # Funded verifier + persistent state file survives restart and runs O(1) incremental on tick #10,001
+        with tempfile.TemporaryDirectory() as td:
+            sf = os.path.join(td, "watermarks.json")
+            funded_fn = lambda _req: {"funded": True, "amount_base_units": 50_000_000, "lock_id": "abc"}
+            g1 = ns402.PayWordGate(require_funding=True, funding_verifier=funded_fn, state_file=sf)
+            r1 = g1.verify_header(p10k["header_value"])
+            self.assertTrue(r1["paid"])
+            self.assertTrue(r1["collectible_on_chain"])
+            self.assertEqual(r1["funding_status"], "verified_onchain_lock")
+
+            # Reload fresh gate from disk
+            g2 = ns402.PayWordGate(require_funding=True, funding_verifier=funded_fn, state_file=sf)
+            self.assertFalse(g2.verify_header(p10k["header_value"])["paid"])
+            p10001 = wallet.next_payment(1)
+            r2 = g2.verify_header(p10001["header_value"])
+            self.assertTrue(r2["paid"])
+            self.assertEqual(r2["verification_mode"], "incremental")
+            self.assertEqual(r2["hashes_evaluated"], 1)
+            self.assertTrue(r2["collectible_on_chain"])
 
     def test_mcp_client_rejects_non_http_schemes(self) -> None:
         with self.assertRaises(ValueError):
@@ -44,7 +85,7 @@ class Newsatoshi402PythonSdkTests(unittest.TestCase):
         import json
         import threading
 
-        gate = ns402.PayWordGate(min_ticks_increment=1, unit_price_base_units=1_000)
+        gate = ns402.PayWordGate(min_ticks_increment=1, unit_price_base_units=1_000, allow_unfunded_demo=True)
 
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_POST(self) -> None:
