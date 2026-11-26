@@ -6,6 +6,7 @@ use crate::agent::{
     verify_payword_token, AGENT_SKILL_MARKDOWN, DEFAULT_PUBLIC_BASE_URL, INSTALL_SCRIPT_SH,
     LEAN_FORMAL_PROOF, WHITEPAPER_LATEX, WHITEPAPER_MARKDOWN,
 };
+use crate::backing::{fetch_live_backing_summary, BackingProofSummary, CANONICAL_BACKING_VAULT};
 use crate::crypto::{sha256, sha256_concat};
 use crate::hardware::{ExternalDeedPacket, ExternalTelemetryPacket};
 use crate::rpc::{AnchorReceipt, JsonRpcAnchorClient, PROTOCOL_VERSION};
@@ -24,6 +25,11 @@ use crate::storage::{
 use crate::swap::{
     compile_atomic_swap, verify_swap_on_chain, AtomicSwapContract, CompileSwapRequest,
     DualChainSwapVerification,
+};
+use crate::web4::{
+    compile_web4_bounty, compile_web4_charter, render_erc8004_registration,
+    render_gateway_erc8004, validate_web4_service, CreateBountyRequest, RegisterServiceRequest,
+    SpawnCharterRequest,
 };
 use crate::{CheckedWorkProof, StreamingChannel};
 use serde::{Deserialize, Serialize};
@@ -76,12 +82,18 @@ struct CachedSeed {
     snapshot: SeedSnapshot,
 }
 
+struct CachedBacking {
+    fetched_at: Instant,
+    summary: BackingProofSummary,
+}
+
 struct AppState {
     engine: Mutex<CommonsEngine>,
     state_file: PathBuf,
     seed_client: SeedStatusClient,
     mainnet_seed_client: Option<SeedStatusClient>,
     seed_cache: Mutex<Option<CachedSeed>>,
+    backing_cache: Mutex<Option<CachedBacking>>,
     static_dir: Option<PathBuf>,
     admin_token_digest: Option<[u8; 32]>,
     verify_only: bool,
@@ -107,6 +119,30 @@ impl AppState {
             snapshot: snapshot.clone(),
         });
         snapshot
+    }
+
+    fn get_backing_summary(&self, force_refresh: bool) -> BackingProofSummary {
+        let cache = self.backing_cache.lock().unwrap_or_else(|e| e.into_inner());
+        if !force_refresh {
+            if let Some(ref c) = *cache {
+                if c.fetched_at.elapsed() < Duration::from_secs(30) {
+                    return c.summary.clone();
+                }
+            }
+        }
+        drop(cache);
+        let seed = self.get_seed_snapshot(false);
+        let api_state = {
+            let engine = self.engine.lock().unwrap_or_else(|e| e.into_inner());
+            engine.to_api_state()
+        };
+        let summary = fetch_live_backing_summary(&api_state, &seed, false);
+        let mut cache = self.backing_cache.lock().unwrap_or_else(|e| e.into_inner());
+        *cache = Some(CachedBacking {
+            fetched_at: Instant::now(),
+            summary: summary.clone(),
+        });
+        summary
     }
 
     fn client_for_network(&self, network: &str) -> Option<&SeedStatusClient> {
@@ -182,6 +218,7 @@ pub fn spawn_server(config: ServerConfig) -> Result<RunningServer, String> {
         seed_client: SeedStatusClient::new(config.seed_url, Duration::from_secs(5)),
         mainnet_seed_client,
         seed_cache: Mutex::new(None),
+        backing_cache: Mutex::new(None),
         static_dir: config.static_dir,
         admin_token_digest,
         verify_only,
@@ -277,6 +314,7 @@ pub fn run_server_blocking(config: ServerConfig) -> Result<(), String> {
         seed_client: SeedStatusClient::new(config.seed_url, Duration::from_secs(5)),
         mainnet_seed_client,
         seed_cache: Mutex::new(None),
+        backing_cache: Mutex::new(None),
         static_dir: config.static_dir,
         admin_token_digest,
         verify_only,
@@ -569,6 +607,7 @@ fn handle_request(mut req: Request, state: &AppState) {
             }
             "/.well-known/api-catalog" => Some("application/linkset+json; charset=utf-8"),
             "/.well-known/agent.json"
+            | "/.well-known/erc8004.json"
             | "/.well-known/mcp.json"
             | "/.well-known/mcp/server-card.json"
             | "/.well-known/agent-skills/index.json"
@@ -579,6 +618,10 @@ fn handle_request(mut req: Request, state: &AppState) {
             | "/api/state"
             | "/api/seed"
             | "/api/network/metrics"
+            | "/api/backing/summary"
+            | "/api/web4/charters"
+            | "/api/web4/services"
+            | "/api/web4/bounties"
             | "/api/swaps" => Some("application/json; charset=utf-8"),
             _ => None,
         };
@@ -706,6 +749,14 @@ fn handle_request(mut req: Request, state: &AppState) {
             let api_state = state.engine.lock().unwrap_or_else(|e| e.into_inner()).to_api_state();
             respond_json(req, 200, &render_agent_card_json(&base_url, &api_state));
         }
+        (Method::Get, "/.well-known/erc8004.json") => {
+            let base_url = infer_base_url(&req);
+            let rule_hash = {
+                let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
+                hex::encode(engine.rule.rule_hash())
+            };
+            respond_json(req, 200, &render_gateway_erc8004(&base_url, &rule_hash));
+        }
         (Method::Get, "/.well-known/mcp.json") => {
             let base_url = infer_base_url(&req);
             respond_json(req, 200, &render_mcp_manifest_json(&base_url));
@@ -774,12 +825,23 @@ fn handle_request(mut req: Request, state: &AppState) {
                 .and_then(|b| b.as_bool())
                 .unwrap_or(false);
             let seed = state.get_seed_snapshot(force_refresh);
+            let is_backing_tool = rpc_val
+                .get("params")
+                .and_then(|p| p.get("name"))
+                .and_then(|n| n.as_str())
+                == Some("newsatoshi_get_backing_proof");
+            let backing_opt = if is_backing_tool {
+                Some(state.get_backing_summary(force_refresh))
+            } else {
+                None
+            };
             let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
             let (status, maybe_body) = handle_mcp_jsonrpc(
                 &rpc_val,
                 &base_url,
                 &engine,
                 &seed,
+                backing_opt.as_ref(),
                 &state.seed_client,
                 state.mainnet_seed_client.as_ref(),
             );
@@ -937,6 +999,352 @@ fn handle_request(mut req: Request, state: &AppState) {
                 .unwrap_or(1.2);
             let snapshot = state.get_seed_snapshot(force);
             respond_json(req, 200, &compute_network_metrics(&snapshot, ths));
+        }
+        (Method::Get, "/api/backing/summary") => {
+            let force = raw_url.contains("refresh=1") || raw_url.contains("refresh=true");
+            let summary = state.get_backing_summary(force);
+            respond_json(req, 200, &summary);
+        }
+        (Method::Get, "/api/web4/charters") => {
+            let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
+            respond_json(
+                req,
+                200,
+                &json!({
+                    "ok": true,
+                    "canonical_backing_vault": CANONICAL_BACKING_VAULT,
+                    "count": engine.web4_charters.len(),
+                    "charters": engine.web4_charters,
+                }),
+            );
+        }
+        (Method::Post, "/api/web4/charters/compile") => {
+            let base_url = infer_base_url(&req);
+            let body = match read_body_string(&mut req) {
+                Ok(b) => b,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": e }));
+                    return;
+                }
+            };
+            let parsed: SpawnCharterRequest = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": format!("invalid JSON: {e}") }));
+                    return;
+                }
+            };
+            let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
+            let parent = parsed.parent_charter_id.as_deref().and_then(|pid| {
+                engine.web4_charters.iter().find(|c| c.charter_id == pid.trim())
+            });
+            match compile_web4_charter(&parsed, parent, &base_url) {
+                Ok(charter) => {
+                    let erc8004 = render_erc8004_registration(&charter, &base_url);
+                    respond_json(
+                        req,
+                        200,
+                        &json!({
+                            "ok": true,
+                            "persisted": false,
+                            "charter": charter,
+                            "erc8004_registration": erc8004,
+                        }),
+                    );
+                }
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/web4/charters") => {
+            if !is_authorized_operator(&req, state) {
+                respond_unauthorized(req);
+                return;
+            }
+            let base_url = infer_base_url(&req);
+            let body = match read_body_string(&mut req) {
+                Ok(b) => b,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": e }));
+                    return;
+                }
+            };
+            let parsed: SpawnCharterRequest = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": format!("invalid JSON: {e}") }));
+                    return;
+                }
+            };
+            let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
+            let parent = parsed.parent_charter_id.as_deref().and_then(|pid| {
+                engine.web4_charters.iter().find(|c| c.charter_id == pid.trim())
+            });
+            match compile_web4_charter(&parsed, parent, &base_url) {
+                Ok(charter) => {
+                    if !engine.web4_charters.iter().any(|c| c.charter_id == charter.charter_id) {
+                        engine.web4_charters.insert(0, charter.clone());
+                        if engine.web4_charters.len() > 200 {
+                            engine.web4_charters.truncate(200);
+                        }
+                    }
+                    let _ = save_state_atomic(&state.state_file, &engine.to_persisted());
+                    let erc8004 = render_erc8004_registration(&charter, &base_url);
+                    let api_state = engine.to_api_state();
+                    respond_json(
+                        req,
+                        200,
+                        &json!({
+                            "ok": true,
+                            "persisted": true,
+                            "charter": charter,
+                            "erc8004_registration": erc8004,
+                            "state": api_state,
+                        }),
+                    );
+                }
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Get, "/api/web4/services") => {
+            let cap = query_param(&raw_url, "capability")
+                .map(|c| c.trim().to_ascii_lowercase())
+                .filter(|c| !c.is_empty());
+            let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
+            let services: Vec<_> = engine
+                .web4_services
+                .iter()
+                .filter(|s| match &cap {
+                    Some(c) => s.capabilities.iter().any(|x| x == c),
+                    None => true,
+                })
+                .cloned()
+                .collect();
+            respond_json(
+                req,
+                200,
+                &json!({
+                    "ok": true,
+                    "count": services.len(),
+                    "services": services,
+                }),
+            );
+        }
+        (Method::Post, "/api/web4/services/validate") => {
+            let body = match read_body_string(&mut req) {
+                Ok(b) => b,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": e }));
+                    return;
+                }
+            };
+            let parsed: RegisterServiceRequest = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": format!("invalid JSON: {e}") }));
+                    return;
+                }
+            };
+            match validate_web4_service(&parsed) {
+                Ok(svc) => respond_json(req, 200, &json!({ "ok": true, "persisted": false, "service": svc })),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/web4/services") => {
+            if !is_authorized_operator(&req, state) {
+                respond_unauthorized(req);
+                return;
+            }
+            let body = match read_body_string(&mut req) {
+                Ok(b) => b,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": e }));
+                    return;
+                }
+            };
+            let parsed: RegisterServiceRequest = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": format!("invalid JSON: {e}") }));
+                    return;
+                }
+            };
+            match validate_web4_service(&parsed) {
+                Ok(svc) => {
+                    let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
+                    if !engine.web4_services.iter().any(|s| s.service_id == svc.service_id) {
+                        engine.web4_services.insert(0, svc.clone());
+                        if engine.web4_services.len() > 200 {
+                            engine.web4_services.truncate(200);
+                        }
+                    }
+                    let _ = save_state_atomic(&state.state_file, &engine.to_persisted());
+                    let api_state = engine.to_api_state();
+                    respond_json(req, 200, &json!({ "ok": true, "persisted": true, "service": svc, "state": api_state }));
+                }
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Get, "/api/web4/bounties") => {
+            let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
+            respond_json(
+                req,
+                200,
+                &json!({
+                    "ok": true,
+                    "count": engine.web4_bounties.len(),
+                    "bounties": engine.web4_bounties,
+                }),
+            );
+        }
+        (Method::Post, "/api/web4/bounties/compile") => {
+            let body = match read_body_string(&mut req) {
+                Ok(b) => b,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": e }));
+                    return;
+                }
+            };
+            let parsed: CreateBountyRequest = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": format!("invalid JSON: {e}") }));
+                    return;
+                }
+            };
+            match compile_web4_bounty(&parsed) {
+                Ok(bounty) => respond_json(req, 200, &json!({ "ok": true, "persisted": false, "bounty": bounty })),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/web4/bounties") => {
+            if !is_authorized_operator(&req, state) {
+                respond_unauthorized(req);
+                return;
+            }
+            let body = match read_body_string(&mut req) {
+                Ok(b) => b,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": e }));
+                    return;
+                }
+            };
+            let parsed: CreateBountyRequest = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": format!("invalid JSON: {e}") }));
+                    return;
+                }
+            };
+            match compile_web4_bounty(&parsed) {
+                Ok(bounty) => {
+                    let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
+                    if !engine.web4_bounties.iter().any(|b| b.bounty_id == bounty.bounty_id) {
+                        engine.web4_bounties.insert(0, bounty.clone());
+                        if engine.web4_bounties.len() > 200 {
+                            engine.web4_bounties.truncate(200);
+                        }
+                    }
+                    let _ = save_state_atomic(&state.state_file, &engine.to_persisted());
+                    let api_state = engine.to_api_state();
+                    respond_json(req, 200, &json!({ "ok": true, "persisted": true, "bounty": bounty, "state": api_state }));
+                }
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/web4/tools/verify-payword-batch") => {
+            // Dogfooded HTTP 402 PayWord-gated utility endpoint:
+            // If unpaid, emits dual-rail HTTP 402 challenge; if paid with valid X-Newsatoshi-PayWord
+            // header or JSON payment object, verifies the SHA-256 PayWord token and returns verified status.
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let parsed: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+            let pay_hdr = req
+                .headers()
+                .iter()
+                .find(|h| h.field.equiv("X-Newsatoshi-PayWord"))
+                .map(|h| h.value.as_str().to_string());
+            let mut tip_opt = parsed.get("tip_hex").and_then(|v| v.as_str()).map(ToString::to_string);
+            let mut tok_opt = parsed.get("token_hex").and_then(|v| v.as_str()).map(ToString::to_string);
+            let mut ticks_opt = parsed.get("ticks").and_then(|v| v.as_u64());
+            if let Some(hdr) = pay_hdr {
+                for kv in hdr.split(',') {
+                    if let Some((k, v)) = kv.trim().split_once('=') {
+                        match k.trim() {
+                            "tip" => tip_opt = Some(v.trim().to_string()),
+                            "token" => tok_opt = Some(v.trim().to_string()),
+                            "ticks" => ticks_opt = v.trim().parse::<u64>().ok(),
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            match (tip_opt, tok_opt, ticks_opt) {
+                (Some(tip), Some(tok), Some(ticks)) => {
+                    match verify_payword_token(&tip, &tok, ticks, 1_000) {
+                        Ok(res) if res.valid => {
+                            respond_json(
+                                req,
+                                200,
+                                &json!({
+                                    "ok": true,
+                                    "paid": true,
+                                    "settlement_rail": "NEWSATOSHI-PAYWORD-SHA256/1.0",
+                                    "backing_vault": CANONICAL_BACKING_VAULT,
+                                    "verification": res,
+                                }),
+                            );
+                        }
+                        Ok(res) => respond_json(req, 402, &json!({ "ok": false, "paid": false, "verification": res })),
+                        Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+                    }
+                }
+                _ => {
+                    let challenge = build_http_402_challenge(
+                        "/api/web4/tools/verify-payword-batch",
+                        "0.001",
+                        "mainnet",
+                        "",
+                        1_000,
+                    );
+                    respond_json(req, 402, &challenge);
+                }
+            }
+        }
+        (Method::Get, p) if p.starts_with("/api/web4/charters/") && p.ends_with("/erc8004.json") => {
+            let base_url = infer_base_url(&req);
+            let cid = p
+                .trim_start_matches("/api/web4/charters/")
+                .trim_end_matches("/erc8004.json");
+            let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some(ch) = engine.web4_charters.iter().find(|c| c.charter_id == cid) {
+                respond_json(req, 200, &render_erc8004_registration(ch, &base_url));
+            } else if cid == "charter-genesis-commons" {
+                // Canonical ERC-8004 card for Genesis Charter #1 anchored on Base Mainnet (0x7a8183...eb47)
+                respond_json(
+                    req,
+                    200,
+                    &json!({
+                        "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+                        "name": "Newsatoshi Commons Genesis Utility (Charter #1)",
+                        "description": "Verify-only public gateway, Lean 4.36 verified STARK verifier, Official MCP Registry server, and 4-chain SHA-256 HTLC & Proof-of-Backing coordinator.",
+                        "active": true,
+                        "charter_id": "charter-genesis-commons",
+                        "charter_id_bytes32": crate::backing::GENESIS_BASE_CHARTER_ID_HEX,
+                        "base_anchor_tx": crate::backing::GENESIS_BASE_ANCHOR_TX,
+                        "base_genesis_deposit_tx": crate::backing::GENESIS_BASE_DEPOSIT_TX,
+                        "backing_vault": CANONICAL_BACKING_VAULT,
+                        "backing_bps": 2000,
+                        "x402Support": true,
+                        "paywordSupport": true,
+                        "services": [
+                            { "name": "MCP", "endpoint": format!("{base_url}/mcp"), "version": "2025-03-26" },
+                            { "name": "BackingProof", "endpoint": format!("{base_url}/api/backing/summary"), "version": "1.0" },
+                            { "name": "Lean4Kernel", "endpoint": format!("{base_url}/formal/NewsatoshiCovenants.lean"), "version": "4.36.0" }
+                        ]
+                    }),
+                );
+            } else {
+                respond_problem_404(req, p, &base_url);
+            }
         }
         (Method::Get, "/api/swaps") => {
             let engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());

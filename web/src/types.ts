@@ -1,6 +1,6 @@
 export type SignatureScheme = 'xmss' | 'slh_dsa';
 
-export type WorkspaceTab = 'cockpit' | 'explorer' | 'swaps' | 'economics' | 'legal';
+export type WorkspaceTab = 'cockpit' | 'web4' | 'explorer' | 'swaps' | 'economics' | 'legal';
 
 export interface HealthResponse {
   ok: boolean;
@@ -491,4 +491,121 @@ export interface VerifyStarkResponse {
   proof_bytes_len: number;
   security_bits: number;
   error?: string;
+}
+
+export interface ChainBackingSnapshot {
+  chain: string;
+  chain_id: number;
+  native_symbol: string;
+  vault_address: string;
+  explorer_url: string;
+  sourcify_url: string;
+  usdc_address: string;
+  live: boolean;
+  native_reserve_wei: string;
+  native_reserve_formatted: string;
+  usdc_reserve_raw: number;
+  usdc_reserve_formatted: string;
+  deposits_count: number;
+  anchored_charters_count: number;
+  error?: string | null;
+}
+
+export interface BackingProofSummary {
+  ok: boolean;
+  fetched_at_unix: number;
+  canonical_vault_address: string;
+  canonical_htlc_address: string;
+  genesis_base_charter_id: string;
+  genesis_base_anchor_tx: string;
+  genesis_base_deposit_tx: string;
+  chains: ChainBackingSnapshot[];
+  total_eth_wei: string;
+  total_eth_formatted: string;
+  total_pol_wei: string;
+  total_pol_formatted: string;
+  total_usdc_raw: number;
+  total_usdc_formatted: string;
+  total_vault_deposits: number;
+  total_onchain_anchored_charters: number;
+  mainnet_issued_love?: number | null;
+  mainnet_height?: number | null;
+  verified_rwa_parcels: number;
+  verified_rwa_kwh: number;
+  verified_stark_proofs: number;
+  commons_treasury_love: number;
+  eth_wei_per_issued_love?: number | null;
+  usdc_micro_per_issued_love?: number | null;
+  registered_web4_charters: number;
+  registered_web4_services: number;
+  open_web4_bounties: number;
+}
+
+export interface Web4Charter {
+  charter_id: string;
+  charter_id_bytes32: string;
+  name: string;
+  category: string;
+  mission: string;
+  parent_charter_id?: string | null;
+  lineage_depth: number;
+  constitution_hash: string;
+  covenant_rule_hash: string;
+  max_spend_per_call_love: number;
+  ops_bps: number;
+  reinvest_bps: number;
+  backing_bps: number;
+  payout_love_address: string;
+  evm_treasury_address: string;
+  slh_dsa_pubkey_hex?: string | null;
+  primary_evm_chain: string;
+  backing_vault_address: string;
+  erc8004_uri: string;
+  cast_anchor_command: string;
+  cast_deposit_eth_command: string;
+  web4_kit_launch_command: string;
+  created_at_unix: number;
+}
+
+export interface SpawnCharterPayload {
+  name: string;
+  category: 'paid_api' | 'compute_node' | 'physical_rwa' | 'liquidity_maker' | 'agent_collective';
+  mission: string;
+  parent_charter_id?: string;
+  max_spend_per_call_love: number;
+  ops_bps: number;
+  reinvest_bps: number;
+  backing_bps: number;
+  payout_love_address: string;
+  evm_treasury_address: string;
+  primary_evm_chain: 'base' | 'arbitrum' | 'optimism' | 'polygon';
+}
+
+export interface Web4ServiceRecord {
+  service_id: string;
+  charter_id: string;
+  name: string;
+  endpoint_url: string;
+  capabilities: string[];
+  description: string;
+  unit_price_love_base_units: number;
+  x402_usdc_micro?: number | null;
+  payword_recipient_address: string;
+  evm_payto_address?: string | null;
+  registered_at_unix: number;
+}
+
+export interface Web4BountyRecord {
+  bounty_id: string;
+  charter_id: string;
+  title: string;
+  description: string;
+  spec_hash_hex: string;
+  settlement_rail: string;
+  evm_chain?: string | null;
+  reward_amount: string;
+  reward_asset: string;
+  escrow_lock_command: string;
+  status: string;
+  created_at_unix: number;
 }

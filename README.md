@@ -4,7 +4,8 @@
 [![Release](https://img.shields.io/github/v/release/theguysaccount/newsatoshi-commons)](https://github.com/theguysaccount/newsatoshi-commons/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](LICENSE)
 [![Live Gateway](https://img.shields.io/badge/Live-commons.newsatoshi.org-10b981)](https://commons.newsatoshi.org)
-[![MCP](https://img.shields.io/badge/MCP-Streamable%20HTTP%20(9%20Tools)-38bdf8)](https://commons.newsatoshi.org/mcp)
+[![MCP](https://img.shields.io/badge/MCP-Streamable%20HTTP%20(14%20Tools)-38bdf8)](https://commons.newsatoshi.org/mcp)
+[![ERC-8004](https://img.shields.io/badge/ERC--8004-Web4%20Sovereign%20Identity-a855f7)](https://commons.newsatoshi.org/.well-known/erc8004.json)
 
 ### What We Actually Built (Beyond Passive Sound Money)
 Bitcoin freed money from banks — and left it sitting idle in a vault. The second you spend Bitcoin into a charity, energy project, land trust, or company, humans take custody and can drift, embezzle, or capture the treasury.
@@ -18,12 +19,13 @@ Bitcoin freed money from banks — and left it sitting idle in a vault. The seco
 
 ---
 
-**Technical Stack:** Complete open-source, zero-custody infrastructure for **Newsatoshi (`LOVE` / `NEWSATOSHI/2.1`)** — NIST FIPS 205 SLH-DSA + XMSS covenants, **Winterfell 0.13** transparent STARK proofs, 4 trustless multi-chain SHA-256 HTLC buy roads, 1-command AuxPoW Stratum merge-mining, Streamable HTTP MCP (9 tools), zero-dependency JS & Python HTTP `402` PayWord SDKs, and a Live Verify-Only Telemetry Mirror & Cockpit.
+**Technical Stack:** Complete open-source, zero-custody infrastructure for **Newsatoshi (`LOVE` / `NEWSATOSHI/2.1`)** — NIST FIPS 205 SLH-DSA + XMSS covenants, **Winterfell 0.13** transparent STARK proofs, immutable 4-chain EVM **Proof-of-Backing Vault** (`NewsatoshiBackingVault.sol`), 4 trustless multi-chain SHA-256 HTLC buy roads, Web4 Business Charter Forge + ERC-8004 Dual Identity Bridge, 1-command AuxPoW Stratum merge-mining, Streamable HTTP MCP (**14 live tools**), zero-dependency JS & Python dual `PayWord + x402` HTTP `402` SDKs, runnable `web4-kit/` sovereign agent business daemon, and a Live Verify-Only Telemetry Mirror & Cockpit.
 
-- **Live Verify-Only Gateway:** `https://commons.newsatoshi.org` (`0` server private keys, security-audited `v0.10.0`)
+- **Live Verify-Only Gateway:** `https://commons.newsatoshi.org` (`0` server private keys, security-audited `v0.11.0`)
 - **Whitepaper & Lean 4.36.0 Formal Proof (9 Theorems, 355 Lines, 0 `sorry`, 0 Mathlib):** [`https://commons.newsatoshi.org/whitepaper`](https://commons.newsatoshi.org/whitepaper) · [`formal/NewsatoshiCovenants.lean`](formal/NewsatoshiCovenants.lean) · [`docs/newsatoshi_2_1_whitepaper.tex`](docs/newsatoshi_2_1_whitepaper.tex)
+- **Live 4-Chain Sovereign Backing Vault (`NewsatoshiBackingVault.sol`, ownerless, 0 withdrawal path):** `0x37Ed94525DBE408fA72cDd156409875666679265` ([BaseScan](https://basescan.org/address/0x37Ed94525DBE408fA72cDd156409875666679265) · [Arbiscan](https://arbiscan.io/address/0x37Ed94525DBE408fA72cDd156409875666679265) · [OP Etherscan](https://optimistic.etherscan.io/address/0x37Ed94525DBE408fA72cDd156409875666679265) · [Polygonscan](https://polygonscan.com/address/0x37Ed94525DBE408fA72cDd156409875666679265) — live genesis Charter #1 + `0.001 ETH` backing deposit proven on Base: [`0xc354e0…bf5c`](https://basescan.org/tx/0xc354e0cca5bd2f0e9ac22193ef6f4ea505393ab4be4177251f9f47ca1c10bf5c) · live API: `/api/backing/summary`)
 - **Live Multi-Chain EVM HTLC (`Base 8453 · Arbitrum 42161 · Optimism 10 · Polygon 137`, ownerless, all 4 Sourcify `exact_match`):** `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987` ([BaseScan](https://basescan.org/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987) · [Arbiscan](https://arbiscan.io/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987) · [OP Etherscan](https://optimistic.etherscan.io/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987) · [Polygonscan](https://polygonscan.com/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987) — live SHA-256 atomic `lockEth` → `claim` proven on all 4 chains; see [`bridges/README.md`](bridges/README.md))
-- **AI Agent Discovery:** `POST /mcp` · `/llms.txt` · `/llms-full.txt` · `/docs` · `/developers` · `/.well-known/agent.json` · `/.well-known/mcp/server-card.json` · `/.well-known/api-catalog` · `/.well-known/agent-skills/index.json` · `/openapi.json`
+- **AI Agent & Web4 Discovery:** `POST /mcp` (14 tools, published on Official MCP Registry) · `/.well-known/erc8004.json` · `/api/backing/summary` · `/api/web4/charters` · `/api/web4/services` · `/api/web4/bounties` · `/llms.txt` · `/llms-full.txt` · `/docs` · `/developers` · `/.well-known/agent.json` · `/.well-known/mcp/server-card.json` · `/.well-known/api-catalog` · `/.well-known/agent-skills/index.json` · `/openapi.json`
 - **Live L1 Seed Reference:** `https://newsatoshi.org/mainnet/status` (Mainnet, `auxpow_chainid = 20051`, `50 LOVE/block`) & `https://newsatoshi-seed.fly.dev/status` (Testnet)
 - **RFC-0021 L1 Soft-Fork Prototype (`0xb4`):** `https://github.com/theguysaccount/newsatoshi-rfc0021`
 
@@ -33,11 +35,16 @@ curl -fsSL https://commons.newsatoshi.org/install.sh | sh
 ```
 Installs `newsatoshi-commons`, `newsatoshi-swap`, and `newsatoshi-hw-signer` into `~/.local/bin` (with automatic `SHA256SUMS.txt` verification and `cargo install` fallback).
 
-### Transacting & Monetizing as an AI Agent (60-Second Setup)
-1. **Connect Streamable HTTP MCP (`POST https://commons.newsatoshi.org/mcp`):** Zero auth required for 9 live tools (network status, live AuxPoW mining yield economics, multi-chain BTC/Lightning/Solana/Base HTLC swap compilation, dual-chain lock verification, HTTP `402` challenge generation + PayWord verification, and Winterfell STARK verification).
-2. **Install the Agent Skill:** `npx skills add theguysaccount/newsatoshi-commons` (`https://commons.newsatoshi.org/skills/newsatoshi-agent-payments/SKILL.md`).
-3. **Add a 3-Line HTTP `402` PayWord Paywall (Zero Dependencies):**
-   - **Node 18+ / Cloudflare Workers / Vercel Edge:** `sdk/js/newsatoshi-402.mjs` (`generatePayWordChain`, `createPayWordGate`, `fetchWithNewsatoshi402`, `NewsatoshiMcpClient`)
+### Transacting, Monetizing & Launching a Web4 Business (60-Second Setup)
+1. **Connect Streamable HTTP MCP (`POST https://commons.newsatoshi.org/mcp`):** Zero auth required for **14 live tools** (network status, live 4-chain Proof-of-Backing reserves, Web4 Business Charter compilation with Lean 4 monotonic child bounds, ERC-8004 identity registration, 402 service & HTLC bounty discovery, live AuxPoW mining yield economics, multi-chain BTC/Lightning/Solana/Base HTLC swap compilation, dual-chain lock verification, HTTP `402` challenge generation + PayWord verification, and Winterfell STARK verification).
+2. **Spawn a Sovereign Autonomous Web4 Business Daemon (`web4-kit/`):**
+   ```bash
+   node web4-kit/agent-business.mjs --check   # Live 4-chain Proof-of-Backing & survival-tier check
+   node web4-kit/agent-business.mjs           # Runs a live PayWord + x402 paid API + ERC-8004 manifest
+   ```
+3. **Install the Agent Skill:** `npx skills add theguysaccount/newsatoshi-commons` (`https://commons.newsatoshi.org/skills/newsatoshi-agent-payments/SKILL.md`).
+4. **Add a 3-Line Dual `PayWord + x402` HTTP `402` Paywall (Zero Dependencies):**
+   - **Node 18+ / Cloudflare Workers / Vercel Edge:** `sdk/js/newsatoshi-402.mjs` (`generatePayWordChain`, `createPayWordGate`, `createDual402Gate`, `fetchWithNewsatoshi402`, `NewsatoshiMcpClient`)
    - **Python 3 (FastAPI / Flask / stdlib):** `sdk/python/newsatoshi_402.py` (`generate_payword_chain`, `PayWordGate`, `NewsatoshiMcpClient`)
 
 ### 4 Trustless Multi-Chain Buy Roads (Zero Exchanges · Zero Wrapped IOUs · Zero Custody)

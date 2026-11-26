@@ -3,6 +3,7 @@ import type {
   AcquireParcelResponse,
   AnchorResponse,
   AtomicSwapContract,
+  BackingProofSummary,
   CommonsState,
   CompileSwapPayload,
   ConfirmAnchorPayload,
@@ -12,6 +13,7 @@ import type {
   RecordFundingPayload,
   RecordFundingResponse,
   SeedStatusResponse,
+  SpawnCharterPayload,
   StreamSettlePayload,
   StreamSettleResponse,
   TelemetryPayload,
@@ -19,6 +21,9 @@ import type {
   VerifyAnchorResponse,
   VerifyStarkResponse,
   VerifySwapPayload,
+  Web4BountyRecord,
+  Web4Charter,
+  Web4ServiceRecord,
 } from '../types';
 import {
   normalizeAnchorReceipt,
@@ -374,6 +379,79 @@ export async function actionVerifySwap(
   return {
     ok: Boolean(raw.ok),
     verification: raw.verification as DualChainSwapVerification | undefined,
+    state: raw.state ? normalizeCommonsState(raw.state) : undefined,
+    error: typeof raw.error === 'string' ? raw.error : undefined,
+  };
+}
+
+export async function getBackingSummary(forceRefresh = false): Promise<BackingProofSummary | null> {
+  try {
+    const q = forceRefresh ? '?refresh=1' : '';
+    const { status, data } = await fetchJson<BackingProofSummary>(`/api/backing/summary${q}`, { method: 'GET' }, 15000);
+    return status === 200 ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getWeb4Registries(): Promise<{
+  charters: Web4Charter[];
+  services: Web4ServiceRecord[];
+  bounties: Web4BountyRecord[];
+}> {
+  const [cRes, sRes, bRes] = await Promise.all([
+    fetchJson<{ charters?: Web4Charter[] }>('/api/web4/charters', { method: 'GET' }, 8000).catch(() => ({ data: {} })),
+    fetchJson<{ services?: Web4ServiceRecord[] }>('/api/web4/services', { method: 'GET' }, 8000).catch(() => ({ data: {} })),
+    fetchJson<{ bounties?: Web4BountyRecord[] }>('/api/web4/bounties', { method: 'GET' }, 8000).catch(() => ({ data: {} })),
+  ]);
+  return {
+    charters: Array.isArray((cRes.data as { charters?: Web4Charter[] })?.charters)
+      ? ((cRes.data as { charters: Web4Charter[] }).charters)
+      : [],
+    services: Array.isArray((sRes.data as { services?: Web4ServiceRecord[] })?.services)
+      ? ((sRes.data as { services: Web4ServiceRecord[] }).services)
+      : [],
+    bounties: Array.isArray((bRes.data as { bounties?: Web4BountyRecord[] })?.bounties)
+      ? ((bRes.data as { bounties: Web4BountyRecord[] }).bounties)
+      : [],
+  };
+}
+
+export async function actionCompileWeb4Charter(payload: SpawnCharterPayload): Promise<{
+  ok: boolean;
+  charter?: Web4Charter;
+  erc8004_registration?: Record<string, unknown>;
+  error?: string;
+}> {
+  const { data: raw } = await fetchJson<Record<string, unknown>>(
+    '/api/web4/charters/compile',
+    { method: 'POST', body: JSON.stringify(payload) },
+    10000
+  );
+  return {
+    ok: Boolean(raw.ok),
+    charter: raw.charter as Web4Charter | undefined,
+    erc8004_registration: raw.erc8004_registration as Record<string, unknown> | undefined,
+    error: typeof raw.error === 'string' ? raw.error : undefined,
+  };
+}
+
+export async function actionPublishWeb4Charter(payload: SpawnCharterPayload): Promise<{
+  ok: boolean;
+  charter?: Web4Charter;
+  erc8004_registration?: Record<string, unknown>;
+  state?: CommonsState;
+  error?: string;
+}> {
+  const { data: raw } = await fetchJson<Record<string, unknown>>(
+    '/api/web4/charters',
+    { method: 'POST', body: JSON.stringify(payload) },
+    10000
+  );
+  return {
+    ok: Boolean(raw.ok),
+    charter: raw.charter as Web4Charter | undefined,
+    erc8004_registration: raw.erc8004_registration as Record<string, unknown> | undefined,
     state: raw.state ? normalizeCommonsState(raw.state) : undefined,
     error: typeof raw.error === 'string' ? raw.error : undefined,
   };
