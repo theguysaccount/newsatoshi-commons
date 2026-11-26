@@ -1,6 +1,6 @@
 {
   "name": "@newsatoshi/402",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "description": "Zero-dependency post-quantum HTTP 402 PayWord middleware, stdio MCP bridge, zero-API-key EVM/BTC/BOLT-11/Uniswap V3 tools, and Streamable HTTP MCP client for Newsatoshi (LOVE).",
   "type": "module",
   "main": "./newsatoshi-402.mjs",
