@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "newsatoshi-402"
-version = "0.17.0"
+version = "0.18.0"
 description = "Zero-dependency post-quantum HTTP 402 PayWord, x402, zero-API-key EVM/BTC/BOLT-11/Uniswap V3 crypto tools, and Streamable HTTP MCP client/middleware for Newsatoshi (LOVE)"
 readme = "../../README.md"
 requires-python = ">=3.9"

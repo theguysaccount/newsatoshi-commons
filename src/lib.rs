@@ -4,8 +4,10 @@ pub mod agent;
 pub mod backing;
 pub mod crypto;
 pub mod crypto_tools;
+pub mod cutover;
 pub mod hardware;
 pub mod launchpad;
+pub mod p2p;
 pub mod rpc;
 pub mod seed;
 pub mod server;
@@ -14,6 +16,7 @@ pub mod storage;
 pub mod swap;
 pub mod web4;
 pub mod x402;
+pub mod zktls;
 
 pub use crypto::{
     derive_leaf_seed, hash32_from_hex, merkle_leaf_hash, merkle_node_hash, sha256, sha256_concat,

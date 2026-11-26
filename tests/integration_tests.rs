@@ -2038,7 +2038,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 27);
+    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 30);
 
     let agent_card_v3: Value = serde_json::from_str(
         &ureq::get(&format!("{base}/.well-known/agent-card.json"))
@@ -2176,7 +2176,49 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 27);
+    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 30);
+
+    // Honest v2 cutover readiness gate & Bonded P2P Desk smoke tests
+    let cutover: Value = serde_json::from_str(
+        &ureq::get(&format!("{base}/api/v2/cutover-readiness"))
+            .call()
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(cutover["ok"], true);
+    assert_eq!(cutover["ready_for_v2_activation"], false);
+    assert_eq!(cutover["gates"]["external_security_audits"]["completed"], 0);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["lean4_theorems"], 10);
+
+    let p2p_list: Value = serde_json::from_str(
+        &ureq::get(&format!("{base}/api/p2p/offers"))
+            .call()
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(p2p_list["active_bonded_makers"], 0);
+
+    let p2p_offer: Value = serde_json::from_str(
+        &ureq::post(&format!("{base}/api/p2p/compile-offer"))
+            .header("Content-Type", "application/json")
+            .send(&format!(
+                r#"{{"maker_label":"Wise-Bonded-Desk","maker_bond_id_hex":"{}","maker_love_address":"nsd1maker000000000000000000000000000000000000000000000000000000","payment_rail":"wise","price_fiat_cents_per_love":50,"min_trade_love_base_units":100000000,"max_trade_love_base_units":500000000,"declared_bond_stake_base_units":750000000,"expected_tls_server_name":"api.wise.com"}}"#,
+                "aa".repeat(32)
+            ))
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(p2p_offer["ok"], true);
+    assert_eq!(p2p_offer["offer"]["collateral_coverage_bps"], 15_000);
 
     // RFC-0027 Native Mission Launchpad compile + bonding-curve quote over HTTP & MCP
     let compiled_mission: Value = serde_json::from_str(

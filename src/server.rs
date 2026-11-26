@@ -1384,6 +1384,107 @@ fn handle_request(mut req: Request, state: &AppState) {
                 Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
             }
         }
+        (Method::Post, "/api/zktls/verify") => {
+            let body = match read_body_string(&mut req) {
+                Ok(b) => b,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": e }));
+                    return;
+                }
+            };
+            let parsed: crate::zktls::ZkTlsProofPayload = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": format!("invalid zkTLS JSON: {e}") }));
+                    return;
+                }
+            };
+            match crate::zktls::verify_zktls_proof(&parsed) {
+                Ok(report) => respond_json(req, 200, &report),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "valid": false, "error": e })),
+            }
+        }
+        (Method::Get, "/api/v2/cutover-readiness") => {
+            let force = raw_url.contains("refresh=1") || raw_url.contains("refresh=true");
+            let snapshot = state.get_seed_snapshot(force);
+            respond_json(req, 200, &crate::cutover::evaluate_v2_cutover_readiness(&snapshot));
+        }
+        (Method::Get, "/api/p2p/offers") => {
+            // Honest zero initial state: never seed fake market makers or fake liquidity!
+            respond_json(
+                req,
+                200,
+                &json!({
+                    "ok": true,
+                    "active_bonded_makers": 0,
+                    "offers": [],
+                    "supported_rails": crate::p2p::SUPPORTED_FIAT_RAILS,
+                    "compile_endpoint": "/api/p2p/compile-offer",
+                    "verify_settlement_endpoint": "/api/p2p/verify-settlement"
+                }),
+            );
+        }
+        (Method::Post, "/api/p2p/compile-offer") => {
+            let base_url = infer_base_url(&req);
+            let body = match read_body_string(&mut req) {
+                Ok(b) => b,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": e }));
+                    return;
+                }
+            };
+            let parsed: crate::p2p::BondedP2pOfferRequest = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": format!("invalid JSON: {e}") }));
+                    return;
+                }
+            };
+            match crate::p2p::compile_bonded_p2p_offer(&parsed, &base_url) {
+                Ok(offer) => respond_json(req, 200, &json!({ "ok": true, "persisted": false, "offer": offer })),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/p2p/verify-settlement") => {
+            let body = match read_body_string(&mut req) {
+                Ok(b) => b,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": e }));
+                    return;
+                }
+            };
+            let parsed: Value = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": format!("invalid JSON: {e}") }));
+                    return;
+                }
+            };
+            let offer_id = parsed.get("offer_id_hex").and_then(|v| v.as_str()).unwrap_or("");
+            let bond_id = parsed.get("maker_bond_id_hex").and_then(|v| v.as_str()).unwrap_or("");
+            let settled_love = parsed
+                .get("settled_love_base_units")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let proof_val = match parsed.get("zktls_proof") {
+                Some(v) => v.clone(),
+                None => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": "missing required 'zktls_proof' object" }));
+                    return;
+                }
+            };
+            let proof: crate::zktls::ZkTlsProofPayload = match serde_json::from_value(proof_val) {
+                Ok(p) => p,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": format!("invalid zktls_proof: {e}") }));
+                    return;
+                }
+            };
+            match crate::p2p::verify_p2p_settlement_with_zktls(offer_id, bond_id, settled_love, &proof) {
+                Ok(report) => respond_json(req, 200, &report),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "verified": false, "error": e })),
+            }
+        }
         (Method::Post, "/api/web4/charters") => {
             if !is_authorized_operator(&req, state) {
                 respond_unauthorized(req);

@@ -718,7 +718,10 @@ pub fn render_mcp_server_card_json(base_url: &str) -> Value {
             "newsatoshi_launch_agent_mission",
             "newsatoshi_quote_launchpad_curve",
             "newsatoshi_inspect_mission_launchpad",
-            "newsatoshi_format_swarm_task_claim"
+            "newsatoshi_format_swarm_task_claim",
+            "newsatoshi_verify_zktls_proof",
+            "newsatoshi_check_v2_cutover_readiness",
+            "newsatoshi_compile_bonded_p2p_offer"
         ],
         "resources": [
             "newsatoshi://llms.txt",
@@ -798,7 +801,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 - Commons Treasury Balance: `{bal} LOVE` (`nonce={nonce}`, `parcels={parcels}`, `kwh={kwh}`, `starks={starks}`)
 
 ## Agent Interfaces (Zero Auth Required for All Reads, Compilers & Verifiers)
-- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **27 live tools** (including 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, RFC-0023/0024/0025/0026 clearinghouse substrate tools, and 4 RFC-0027 Mission Launchpad & AI Agent Swarm tools).
+- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **30 live tools** (including 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, RFC-0023/0024/0025/0026/0027 clearinghouse & Mission Launchpad tools, real cryptographic zkTLS verification, Mainnet v2 cutover readiness gate, and Bonded zkTLS P2P Desk tools).
 - **Zero-Install Stdio MCP Bridge & CLI (Node 18+, Zero Dependencies):** `npx -y github:theguysaccount/newsatoshi-commons` (`inspect`, `btc-fees`, `decode-bolt11`, `quote-base`, `verify-tx`, `payword-demo`, or stdio MCP `serve`).
 - [x402 v2 & Zero-Gas PayWord Discovery]({base_url}/.well-known/x402): 4 live monetized endpoints accepting Base/Arbitrum/Polygon USDC (`x402 v2`, `$0.001`) OR unfreezeable `<1ms` zero-gas SHA-256 PayWords (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).
 - [MCP Server Card]({base_url}/.well-known/mcp/server-card.json) & [MCP Registry Manifest]({base_url}/server.json): Standard MCP discovery cards (`org.newsatoshi.commons/newsatoshi-commons`).
@@ -862,7 +865,7 @@ Add to Claude Desktop, Cursor, Codex, Antigravity, or any Streamable HTTP MCP ho
   }}
 }}
 ```
-Available MCP tools (27 live tools — zero API keys required):
+Available MCP tools (30 live tools — zero API keys required):
 - `crypto_inspect_evm_contract` — Live multi-chain EVM smart contract security audit (bytecode, EIP-1967 proxy/admin slots, `owner()` admin risk, ERC-20 metadata, Sourcify v2 exact-match verification across Ethereum, Base, Arbitrum, Optimism & Polygon)
 - `crypto_bitcoin_mempool_oracle` — Live Bitcoin chain tip, recommended sat/vB fee tiers (`fastest`, `30m`, `60m`, `economy`), and mempool backlog
 - `crypto_decode_bolt11_invoice` — Pure-Rust BOLT-11 Lightning invoice decoder (network, sats/msats, payment hash, expiry, description)
@@ -890,6 +893,9 @@ Available MCP tools (27 live tools — zero API keys required):
 - `newsatoshi_quote_launchpad_curve` — Compute exact integer RFC-0027 bonding-curve buy/redeem quotes matching L1 & Lean 4 Theorem 9
 - `newsatoshi_inspect_mission_launchpad` — Query an RFC-0027 L1 Mission Launchpad (`/api/mission?id=...`) with Merkle proof
 - `newsatoshi_format_swarm_task_claim` — Compute deterministic RFC-0027 `nsMISSTASK` & `nsMISSCLAIM` signing digests
+- `newsatoshi_verify_zktls_proof` — Cryptographically verify real `reclaim_v1` (EIP-191 secp256k1 ecrecover), `tlsnotary_v1` (Ed25519/secp256k1 + Merkle selective redaction), or `newsatoshi_pq_notary_v1` (FIPS 205 SLH-DSA) zkTLS proofs into L1 `RFC-0024` `BondAttest` receipts
+- `newsatoshi_check_v2_cutover_readiness` — Honest live Mainnet v2 cutover gate checking external audits (0/2), real-difficulty independent Bitcoin AuxPoW pools (0/3), and formal proof status
+- `newsatoshi_compile_bonded_p2p_offer` — Compile a zero-custody RFC-0024 Trust-Bonded zkTLS P2P Fiat/USDC <-> LOVE market-maker quote (100%+ bond coverage required)
 
 Stdio MCP Bridge (for stdio-only hosts such as Claude Desktop, Cursor, Cline, or shell scripts):
 ```json
@@ -1472,6 +1478,65 @@ pub fn render_openapi_json(base_url: &str) -> Value {
                         "400": err_ref.clone()
                     }
                 }
+            },
+            "/api/zktls/verify": {
+                "post": {
+                    "operationId": "verifyZkTlsProof",
+                    "summary": "Cryptographically verify reclaim_v1, tlsnotary_v1, or newsatoshi_pq_notary_v1 zkTLS proofs",
+                    "description": "Performs real secp256k1 EIP-191 ecrecover, Ed25519/secp256k1 or FIPS 205 SLH-DSA notary verification, and SHA-256 selective-disclosure Merkle opening verification, outputting a canonical L1 RFC-0024 BondAttest receipt hash.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Cryptographic zkTLS verification report", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
+            },
+            "/api/v2/cutover-readiness": {
+                "get": {
+                    "operationId": "getV2CutoverReadiness",
+                    "summary": "Live Mainnet v2 cutover readiness gate (audits, independent AuxPoW pools, formal proofs)",
+                    "description": "Reports honest live Mainnet v2 readiness status and blocking gates (external audits completed vs required, real-difficulty independent Bitcoin AuxPoW pools observed vs required).",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "200": json_ok("Mainnet v2 cutover readiness report", "#/components/schemas/GenericApiResponse")
+                    }
+                }
+            },
+            "/api/p2p/compile-offer": {
+                "post": {
+                    "operationId": "compileBondedP2pOffer",
+                    "summary": "Compile a zero-custody RFC-0024 Trust-Bonded zkTLS P2P Fiat/USDC <-> LOVE offer",
+                    "description": "Enforces >=100% L1 Trust Bond coverage and outputs deterministic offer_id_hex plus zkTLS settlement steps.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Compiled bonded P2P offer", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
+            },
+            "/api/p2p/verify-settlement": {
+                "post": {
+                    "operationId": "verifyBondedP2pSettlement",
+                    "summary": "Verify a bonded P2P fiat/USDC <-> LOVE settlement using a cryptographic zkTLS proof",
+                    "description": "Verifies the attached reclaim_v1/tlsnotary_v1/newsatoshi_pq_notary_v1 proof and binds it into an RFC-0024 BondAttest receipt digest.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Verified bonded P2P settlement", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
             }
         }
     })
@@ -1831,6 +1896,62 @@ pub fn mcp_tools_list() -> Value {
                         "proof_hash_hex": { "type": "string", "description": "Optional 64-hex SHA-256 hash of verified proof artifact (required to compute claim_task_message_hex)" },
                         "contributor_apk_hex": { "type": "string", "description": "Optional 64-hex shielded contributor apk (required to compute claim_task_message_hex)" },
                         "miner_fee": { "type": "integer", "default": 0, "description": "L1 miner fee deducted from gross reward on claim" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_verify_zktls_proof",
+                "description": "Cryptographically verify a real zkTLS / MPC-TLS presentation (reclaim_v1 secp256k1 EIP-191 ecrecover, tlsnotary_v1 Ed25519/secp256k1 + selective-disclosure Merkle proofs, or newsatoshi_pq_notary_v1 FIPS 205 SLH-DSA) and bind it into a canonical L1 RFC-0024 BondAttest receipt hash.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["protocol"],
+                    "properties": {
+                        "protocol": { "type": "string", "enum": ["reclaim_v1", "tlsnotary_v1", "newsatoshi_pq_notary_v1"] },
+                        "provider": { "type": "string", "description": "Reclaim provider string (for reclaim_v1)" },
+                        "parameters": { "type": "string", "description": "Reclaim canonical parameters JSON string" },
+                        "context": { "type": "string" },
+                        "owner": { "type": "string" },
+                        "timestampS": { "type": "integer" },
+                        "epoch": { "type": "integer" },
+                        "signatures": { "type": "array", "items": { "type": "string" } },
+                        "trusted_attestors": { "type": "array", "items": { "type": "string" } },
+                        "session_header": { "type": "object", "description": "TLSNotary SessionHeader (for tlsnotary_v1 / newsatoshi_pq_notary_v1)" },
+                        "signature_scheme": { "type": "string", "enum": ["ed25519", "secp256k1"], "default": "ed25519" },
+                        "notary_pubkey_hex": { "type": "string" },
+                        "notary_signature_hex": { "type": "string" },
+                        "notary_slh_pubkey_hex": { "type": "string" },
+                        "notary_slh_signature_hex": { "type": "string" },
+                        "trusted_notary_pubkeys": { "type": "array", "items": { "type": "string" } },
+                        "disclosed_chunks": { "type": "array", "items": { "type": "object" } },
+                        "expected_server_name": { "type": "string" },
+                        "required_substrings": { "type": "array", "items": { "type": "string" } }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_check_v2_cutover_readiness",
+                "description": "Evaluate the live Mainnet v2 cutover readiness gate honestly: reports external audit completion (requires >=2), independent real-difficulty Bitcoin AuxPoW pools observed (requires >=3), and formal proof verification status.",
+                "inputSchema": { "type": "object", "properties": {} }
+            },
+            {
+                "name": "newsatoshi_compile_bonded_p2p_offer",
+                "description": "Compile a zero-custody RFC-0024 Trust-Bonded zkTLS P2P fiat/USDC <-> native shielded LOVE market-maker quote enforcing >=100% L1 bond collateral coverage and real zkTLS settlement binding.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["maker_label", "maker_bond_id_hex", "maker_love_address", "payment_rail", "price_fiat_cents_per_love", "min_trade_love_base_units", "max_trade_love_base_units", "declared_bond_stake_base_units", "expected_tls_server_name"],
+                    "properties": {
+                        "maker_label": { "type": "string" },
+                        "maker_bond_id_hex": { "type": "string", "description": "64-hex RFC-0024 L1 Trust Bond ID" },
+                        "maker_love_address": { "type": "string", "description": "Shielded ns1... or nsd1... address" },
+                        "side": { "type": "string", "enum": ["sell_love", "buy_love"], "default": "sell_love" },
+                        "payment_rail": { "type": "string", "enum": ["wise", "revolut", "zelle", "venmo", "sepa_instant", "faster_payments", "base_usdc"] },
+                        "fiat_currency": { "type": "string", "default": "USD" },
+                        "price_fiat_cents_per_love": { "type": "integer", "minimum": 1 },
+                        "min_trade_love_base_units": { "type": "integer", "minimum": 1 },
+                        "max_trade_love_base_units": { "type": "integer", "minimum": 1 },
+                        "declared_bond_stake_base_units": { "type": "integer", "minimum": 1 },
+                        "required_zktls_protocol": { "type": "string", "enum": ["reclaim_v1", "tlsnotary_v1", "newsatoshi_pq_notary_v1"], "default": "tlsnotary_v1" },
+                        "expected_tls_server_name": { "type": "string", "description": "e.g. api.wise.com or api.revolut.com" }
                     }
                 }
             }
@@ -2408,6 +2529,20 @@ pub fn handle_mcp_jsonrpc(
                         (Err(e), _, _, _) | (_, Err(e), _, _) | (_, _, Err(e), _) | (_, _, _, Err(e)) => Err(e),
                     }
                 }
+                "newsatoshi_verify_zktls_proof" => {
+                    serde_json::from_value::<crate::zktls::ZkTlsProofPayload>(args)
+                        .map_err(|e| format!("invalid zkTLS proof payload: {e}"))
+                        .and_then(|p| crate::zktls::verify_zktls_proof(&p))
+                }
+                "newsatoshi_check_v2_cutover_readiness" => {
+                    Ok(crate::cutover::evaluate_v2_cutover_readiness(seed_snapshot))
+                }
+                "newsatoshi_compile_bonded_p2p_offer" => {
+                    serde_json::from_value::<crate::p2p::BondedP2pOfferRequest>(args)
+                        .map_err(|e| format!("invalid bonded P2P offer arguments: {e}"))
+                        .and_then(|req| crate::p2p::compile_bonded_p2p_offer(&req, base_url))
+                        .map(|offer| json!({ "ok": true, "persisted": false, "offer": offer }))
+                }
                 other => Err(format!("unknown MCP tool '{other}'")),
             };
 
@@ -2513,6 +2648,6 @@ mod tests {
             &client,
             None,
         );
-        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 27);
+        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 30);
     }
 }
