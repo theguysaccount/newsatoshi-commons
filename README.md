@@ -5,6 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](LICENSE)
 [![Live Gateway](https://img.shields.io/badge/Live-commons.newsatoshi.org-10b981)](https://commons.newsatoshi.org)
 [![MCP](https://img.shields.io/badge/MCP-Streamable%20HTTP%20(14%20Tools)-38bdf8)](https://commons.newsatoshi.org/mcp)
+[![Newsatoshi Commons MCP connector](https://glama.ai/mcp/connectors/org.newsatoshi.commons/newsatoshi-commons/badges/score.svg)](https://glama.ai/mcp/connectors/org.newsatoshi.commons/newsatoshi-commons)
 [![ERC-8004](https://img.shields.io/badge/ERC--8004-Web4%20Sovereign%20Identity-a855f7)](https://commons.newsatoshi.org/.well-known/erc8004.json)
 
 ### What We Actually Built (Beyond Passive Sound Money)
