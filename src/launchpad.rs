@@ -1,13 +1,14 @@
 //! RFC-0027 Mission Launchpad & Decentralized AI Agent Swarm Coordination Compiler.
 //!
 //! Enables any human or AI agent to spin up a `pequalnp.money`-style decentralized agent swarm
-//! + zero-rugpull bonding-curve launchpad in a single call, with exact integer math matching
+//! and zero-rugpull bonding-curve launchpad in a single call, with exact integer math matching
 //! Newsatoshi L1 (`node/src/mission.rs`) and Lean 4.36.0 Theorem 9
 //! (`rfc0027_mission_launchpad_conservation`):
-//!   - 0% founder extraction: `curve_fee_bps` on every buy & sell routes 100% into `bounty_pool`.
-//!   - Automatic verifiable split: `contributor_bps + public_goods_bps == 10_000` (e.g. 80/20).
-//!   - Anti-Sybil guard: optional `min_worker_bond` tied to L1 `RFC-0024` Trust Bonds.
-//!   - Instant external agent onboarding for Claude Code, Cursor, Gemini CLI, and MCP clients.
+//!
+//! - 0% founder extraction: `curve_fee_bps` on every buy & sell routes 100% into `bounty_pool`.
+//! - Automatic verifiable split: `contributor_bps + public_goods_bps == 10_000` (e.g. 80/20).
+//! - Anti-Sybil guard: optional `min_worker_bond` tied to L1 `RFC-0024` Trust Bonds.
+//! - Instant external agent onboarding for Claude Code, Cursor, Gemini CLI, and MCP clients.
 
 use crate::crypto::sha256;
 use serde::{Deserialize, Serialize};
