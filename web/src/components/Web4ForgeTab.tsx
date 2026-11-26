@@ -3,6 +3,8 @@ import {
   ArrowUpRight,
   CheckCircle2,
   RefreshCw,
+  ShieldCheck,
+  Wallet,
 } from 'lucide-react';
 import {
   actionCompileWeb4Charter,
@@ -18,6 +20,8 @@ import type {
   Web4Charter,
   Web4ServiceRecord,
 } from '../types';
+import { useWallet } from '../wallet/WalletContext';
+import { QuickBackCard } from './QuickBackCard';
 import { CopyButton, HashPill } from './ui/CopyButton';
 import { Panel } from './ui/Panel';
 
@@ -38,8 +42,10 @@ export function Web4ForgeTab({
   onStateUpdated,
   onNotice,
 }: Web4ForgeTabProps) {
+  const { evmAddress, loveAddress, openModal } = useWallet();
   const [backing, setBacking] = useState<BackingProofSummary | null>(null);
   const [loadingBacking, setLoadingBacking] = useState(false);
+  const [showQuickBack, setShowQuickBack] = useState(false);
   const [charters, setCharters] = useState<Web4Charter[]>([]);
   const [services, setServices] = useState<Web4ServiceRecord[]>([]);
   const [bounties, setBounties] = useState<Web4BountyRecord[]>([]);
@@ -53,9 +59,17 @@ export function Web4ForgeTab({
   const [opsBps, setOpsBps] = useState('6000');
   const [reinvestBps, setReinvestBps] = useState('2000');
   const [backingBps, setBackingBps] = useState('2000');
-  const [payoutLove, setPayoutLove] = useState('');
-  const [evmTreasury, setEvmTreasury] = useState('');
+  const [payoutLove, setPayoutLove] = useState(loveAddress);
+  const [evmTreasury, setEvmTreasury] = useState(evmAddress || '');
   const [evmChain, setEvmChain] = useState<SpawnCharterPayload['primary_evm_chain']>('base');
+
+  useEffect(() => {
+    if (evmAddress && !evmTreasury) setEvmTreasury(evmAddress);
+  }, [evmAddress, evmTreasury]);
+
+  useEffect(() => {
+    if (loveAddress && !payoutLove) setPayoutLove(loveAddress);
+  }, [loveAddress, payoutLove]);
 
   const [compiling, setCompiling] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -151,18 +165,34 @@ export function Web4ForgeTab({
         title="On-Chain Reserve Vault"
         subtitle="Immutable, non-withdrawable contract polled live via eth_call across 4 EVM mainnets"
         action={
-          <button
-            type="button"
-            onClick={() => void loadLive(true)}
-            disabled={loadingBacking}
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.1] bg-white/[0.03] px-3 py-1 text-[11px] font-medium text-zinc-300 transition hover:border-white/[0.2] hover:text-white cursor-pointer disabled:opacity-50"
-          >
-            <RefreshCw className={`h-3 w-3 ${loadingBacking ? 'animate-spin' : ''}`} />
-            <span>Refresh RPC</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowQuickBack((v) => !v)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-[11px] font-semibold text-zinc-950 transition hover:bg-white cursor-pointer"
+            >
+              <ShieldCheck className="h-3 w-3" />
+              <span>{showQuickBack ? 'Hide Deposit' : '1-Click Back Vault'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => void loadLive(true)}
+              disabled={loadingBacking}
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.1] bg-white/[0.03] px-3 py-1 text-[11px] font-medium text-zinc-300 transition hover:border-white/[0.2] hover:text-white cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3 w-3 ${loadingBacking ? 'animate-spin' : ''}`} />
+              <span>Refresh RPC</span>
+            </button>
+          </div>
         }
       >
         <div className="space-y-5">
+          {showQuickBack && (
+            <QuickBackCard
+              onBacked={() => void loadLive(true)}
+              onNotice={onNotice}
+            />
+          )}
           {/* Canonical Address Strip */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-[#0a0a0d] px-4 py-3 text-xs">
             <div className="flex flex-wrap items-center gap-2.5">
@@ -444,7 +474,19 @@ export function Web4ForgeTab({
 
               <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                 <div>
-                  <label className={LABEL_CLASS}>Newsatoshi Payout Address</label>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <label className="text-[11px] font-medium text-zinc-400">
+                      Newsatoshi Payout Address
+                    </label>
+                    <a
+                      href="https://newsatoshi.org/wallet/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] text-emerald-300 hover:underline"
+                    >
+                      Get ns1… wallet ↗
+                    </a>
+                  </div>
                   <input
                     type="text"
                     required
@@ -455,7 +497,22 @@ export function Web4ForgeTab({
                   />
                 </div>
                 <div>
-                  <label className={LABEL_CLASS}>EVM Treasury Address</label>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <label className="text-[11px] font-medium text-zinc-400">
+                      EVM Treasury Address
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (evmAddress) setEvmTreasury(evmAddress);
+                        else openModal();
+                      }}
+                      className="inline-flex items-center gap-1 text-[10px] text-emerald-300 hover:underline cursor-pointer"
+                    >
+                      <Wallet className="h-3 w-3" />
+                      <span>{evmAddress ? 'Use Connected' : 'Connect Wallet'}</span>
+                    </button>
+                  </div>
                   <input
                     type="text"
                     required

@@ -2,12 +2,19 @@ import { useState } from 'react';
 import { ArrowRight, ArrowUpRight, Check, ExternalLink } from 'lucide-react';
 import type { BackingProofSummary, PrimaryView, ProtocolSubTab, SeedStatusResponse } from '../types';
 import { formatL1IssuedLove } from '../api/normalize';
+import { InstantSwapCard } from './InstantSwapCard';
+import type { SwapHubSection } from './SwapsMiningTab';
 import { CopyButton, truncateHash } from './ui/CopyButton';
 
 interface OverviewPageProps {
   seed: SeedStatusResponse | null;
   backing: BackingProofSummary | null;
-  onNavigate: (view: PrimaryView, protocolTab?: ProtocolSubTab) => void;
+  onNavigate: (
+    view: PrimaryView,
+    protocolTab?: ProtocolSubTab,
+    swapSection?: SwapHubSection
+  ) => void;
+  onNotice: (kind: 'success' | 'error', message: string) => void;
 }
 
 type SnippetTab = 'mcp' | 'web4' | 'lean' | 'cli';
@@ -113,7 +120,7 @@ const CANONICAL_CONTRACTS = [
   },
 ] as const;
 
-export function OverviewPage({ seed, backing, onNavigate }: OverviewPageProps) {
+export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPageProps) {
   const [snippetTab, setSnippetTab] = useState<SnippetTab>('mcp');
   const ms = seed?.mainnet_live ? seed.mainnet_status : null;
   const liveChainsCount = backing ? backing.chains.filter((c) => c.live).length : 0;
@@ -121,52 +128,62 @@ export function OverviewPage({ seed, backing, onNavigate }: OverviewPageProps) {
 
   return (
     <div className="animate-fade-in mx-auto max-w-[1120px] space-y-16 pb-20 pt-8 sm:pt-12">
-      {/* 1. Editorial Hero */}
-      <section className="max-w-3xl">
-        <div className="inline-flex items-center gap-2.5 rounded-full border border-white/[0.09] bg-white/[0.025] px-3 py-1 text-[11px] font-medium tracking-wide text-zinc-400">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          <span className="font-mono uppercase text-zinc-300">NEWSATOSHI / 2.1</span>
-          <span className="text-zinc-600">·</span>
-          <span>Post-Quantum · Lean 4 Verified · 4 Mainnets</span>
+      {/* 1. Editorial Hero + Live 1-Click Base Swap Above the Fold */}
+      <section className="grid grid-cols-1 items-start gap-8 lg:grid-cols-12 lg:gap-10">
+        <div className="lg:col-span-7">
+          <div className="inline-flex items-center gap-2.5 rounded-full border border-white/[0.09] bg-white/[0.025] px-3 py-1 text-[11px] font-medium tracking-wide text-zinc-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            <span className="font-mono uppercase text-zinc-300">NEWSATOSHI / 2.1</span>
+            <span className="text-zinc-600">·</span>
+            <span>Post-Quantum · Lean 4 Verified · 4 Mainnets</span>
+          </div>
+
+          <h1 className="font-display mt-6 text-[2.75rem] leading-[1.03] tracking-[-0.02em] text-zinc-50 sm:text-[4rem]">
+            Money that proves its math, backs itself, and pays{' '}
+            <span className="italic text-zinc-400">machines.</span>
+          </h1>
+
+          <p className="mt-5 max-w-xl text-[15px] leading-[1.7] text-zinc-400 sm:text-[16px]">
+            Newsatoshi (<span className="font-mono text-[14px] text-zinc-200">LOVE</span>) combines
+            Bitcoin merge-mined security with post-quantum spending covenants, an ownerless 4-chain
+            backing vault, and sub-millisecond HTTP 402 rails. Connect your wallet to swap in on Base
+            in one click — zero forms, zero custody.
+          </p>
+
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => onNavigate('bridge', undefined, 'setup')}
+              className="inline-flex items-center gap-2 rounded-full bg-zinc-50 px-5 py-2.5 text-[13px] font-semibold text-zinc-950 transition hover:bg-white cursor-pointer"
+            >
+              <span>Easy 30-Sec Setup</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onNavigate('build')}
+              className="inline-flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.03] px-5 py-2.5 text-[13px] font-medium text-zinc-200 transition hover:border-white/[0.24] hover:bg-white/[0.06] cursor-pointer"
+            >
+              <span>Back &amp; Build</span>
+            </button>
+
+            <a
+              href="/whitepaper"
+              className="inline-flex items-center gap-1.5 px-3 py-2.5 text-[13px] font-medium text-zinc-400 transition hover:text-zinc-100"
+            >
+              <span>Whitepaper</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </a>
+          </div>
         </div>
 
-        <h1 className="font-display mt-6 text-[2.9rem] leading-[1.03] tracking-[-0.02em] text-zinc-50 sm:text-[4.35rem]">
-          Money that proves its math, backs itself, and pays{' '}
-          <span className="italic text-zinc-400">machines.</span>
-        </h1>
-
-        <p className="mt-6 max-w-2xl text-[15px] leading-[1.7] text-zinc-400 sm:text-[17px]">
-          Newsatoshi (<span className="font-mono text-[14px] text-zinc-200">LOVE</span>) combines
-          Bitcoin merge-mined security with post-quantum spending covenants, an ownerless 4-chain
-          backing vault, and sub-millisecond HTTP 402 rails — so autonomous businesses and physical
-          assets can earn, hold, and compound capital without a custodian.
-        </p>
-
-        <div className="mt-9 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => onNavigate('build')}
-            className="inline-flex items-center gap-2 rounded-full bg-zinc-50 px-5 py-2.5 text-[13px] font-semibold text-zinc-950 transition hover:bg-white cursor-pointer"
-          >
-            <span>Launch a Web4 Business</span>
-            <ArrowRight className="h-4 w-4" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate('bridge')}
-            className="inline-flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.03] px-5 py-2.5 text-[13px] font-medium text-zinc-200 transition hover:border-white/[0.24] hover:bg-white/[0.06] cursor-pointer"
-          >
-            <span>Bridge or Mine LOVE</span>
-          </button>
-
-          <a
-            href="/whitepaper"
-            className="inline-flex items-center gap-1.5 px-3 py-2.5 text-[13px] font-medium text-zinc-400 transition hover:text-zinc-100"
-          >
-            <span>Read Whitepaper</span>
-            <ArrowUpRight className="h-3.5 w-3.5" />
-          </a>
+        <div className="lg:col-span-5">
+          <InstantSwapCard
+            compact
+            onNotice={onNotice}
+            onOpenBridge={() => onNavigate('bridge', undefined, 'bridge')}
+          />
         </div>
       </section>
 
@@ -294,26 +311,26 @@ export function OverviewPage({ seed, backing, onNavigate }: OverviewPageProps) {
 
           <button
             type="button"
-            onClick={() => onNavigate('bridge')}
+            onClick={() => onNavigate('bridge', undefined, 'swap')}
             className="surface-card surface-card-hover group flex flex-col justify-between rounded-2xl p-6 text-left cursor-pointer"
           >
             <div>
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[11px] text-zinc-500">02</span>
                 <span className="rounded-full border border-white/[0.08] px-2.5 py-0.5 text-[10px] font-medium text-zinc-400">
-                  Zero-Custody Liquidity
+                  1-Click Swap &amp; Bridge
                 </span>
               </div>
               <h3 className="mt-5 text-[17px] font-medium tracking-tight text-zinc-100">
-                Bridge or merge-mine LOVE
+                Swap, bridge, or merge-mine
               </h3>
               <p className="mt-2 text-[13px] leading-relaxed text-zinc-400">
-                Swap directly from Bitcoin, Lightning, Solana, Base, Arbitrum, Optimism, or Polygon
-                via SHA-256 atomic HTLCs — or point existing SHA-256 hashpower with zero extra watts.
+                Swap ETH or USDC into Base wLOVE in one wallet signature, lock zero-custody 4-chain
+                SHA-256 HTLCs, or merge-mine native L1 LOVE with zero extra electricity.
               </p>
             </div>
             <div className="mt-7 inline-flex items-center gap-1.5 text-[13px] font-medium text-zinc-200 transition group-hover:text-white">
-              <span>Open Bridge &amp; Mining</span>
+              <span>Open Swap &amp; Setup</span>
               <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
             </div>
           </button>

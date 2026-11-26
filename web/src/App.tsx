@@ -9,6 +9,7 @@ import {
   RotateCcw,
   Terminal,
   Unlock,
+  Wallet,
   WifiOff,
 } from 'lucide-react';
 import {
@@ -32,8 +33,12 @@ import { CockpitTab } from './components/CockpitTab';
 import { EconomicsTab } from './components/EconomicsTab';
 import { LegalAirlockTab } from './components/LegalAirlockTab';
 import { OverviewPage } from './components/OverviewPage';
-import { SwapsMiningTab } from './components/SwapsMiningTab';
+import { SwapsMiningTab, type SwapHubSection } from './components/SwapsMiningTab';
+import { WalletModal } from './components/WalletModal';
 import { Web4ForgeTab } from './components/Web4ForgeTab';
+import { truncateHash } from './components/ui/CopyButton';
+import { chainById, formatCompactToken } from './wallet/evm';
+import { WalletProvider, useWallet } from './wallet/WalletContext';
 import type {
   AcquireParcelPayload,
   BackingProofSummary,
@@ -57,8 +62,8 @@ interface ToastNotice {
 
 const PRIMARY_NAV: { id: PrimaryView; label: string }[] = [
   { id: 'overview', label: 'Overview' },
+  { id: 'bridge', label: 'Swap' },
   { id: 'build', label: 'Back & Build' },
-  { id: 'bridge', label: 'Bridge & Mine' },
   { id: 'protocol', label: 'Protocol' },
 ];
 
@@ -72,15 +77,28 @@ const PROTOCOL_TABS: { id: ProtocolSubTab; label: string }[] = [
 function readInitialView(): PrimaryView {
   try {
     const p = new URLSearchParams(window.location.search).get('view');
-    if (p === 'build' || p === 'bridge' || p === 'protocol' || p === 'overview') return p;
+    if (p === 'swap' || p === 'bridge') return 'bridge';
+    if (p === 'build' || p === 'protocol' || p === 'overview') return p;
   } catch {
     // ignore
   }
   return 'overview';
 }
 
-export default function App() {
+function readInitialSwapSection(): SwapHubSection {
+  try {
+    const t = new URLSearchParams(window.location.search).get('tab');
+    if (t === 'swap' || t === 'back' || t === 'bridge' || t === 'setup') return t;
+  } catch {
+    // ignore
+  }
+  return 'swap';
+}
+
+function AppShell() {
+  const { evmAddress, evmChainId, balances, openModal } = useWallet();
   const [view, setView] = useState<PrimaryView>(readInitialView);
+  const [swapSection, setSwapSection] = useState<SwapHubSection>(readInitialSwapSection);
   const [protocolTab, setProtocolTab] = useState<ProtocolSubTab>('explorer');
   const [loading, setLoading] = useState<boolean>(true);
   const [connected, setConnected] = useState<boolean>(false);
@@ -97,19 +115,35 @@ export default function App() {
   const [hasOperatorToken, setHasOperatorToken] = useState<boolean>(() => Boolean(getOperatorToken()));
   const toastTimer = useRef<number | null>(null);
 
-  const navigate = useCallback((nextView: PrimaryView, subTab?: ProtocolSubTab) => {
-    setView(nextView);
-    if (subTab) setProtocolTab(subTab);
-    try {
-      const url = new URL(window.location.href);
-      if (nextView === 'overview') url.searchParams.delete('view');
-      else url.searchParams.set('view', nextView);
-      window.history.replaceState({}, '', url.toString());
-    } catch {
-      // ignore
-    }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+  const navigate = useCallback(
+    (nextView: PrimaryView, subTab?: ProtocolSubTab, nextSwapSection?: SwapHubSection) => {
+      setView(nextView);
+      if (subTab) setProtocolTab(subTab);
+      if (nextSwapSection) setSwapSection(nextSwapSection);
+      try {
+        const url = new URL(window.location.href);
+        if (nextView === 'overview') {
+          url.searchParams.delete('view');
+          url.searchParams.delete('tab');
+        } else if (nextView === 'bridge') {
+          url.searchParams.set('view', 'swap');
+          if (nextSwapSection && nextSwapSection !== 'swap') {
+            url.searchParams.set('tab', nextSwapSection);
+          } else {
+            url.searchParams.delete('tab');
+          }
+        } else {
+          url.searchParams.set('view', nextView);
+          url.searchParams.delete('tab');
+        }
+        window.history.replaceState({}, '', url.toString());
+      } catch {
+        // ignore
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    []
+  );
 
   const showToast = useCallback((kind: 'success' | 'error', message: string) => {
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
@@ -361,13 +395,13 @@ export default function App() {
             })}
           </nav>
 
-          {/* Right: Quiet Live Mainnet Pill + Whitepaper Link */}
-          <div className="hidden items-center gap-3 md:flex">
+          {/* Right: Quiet Live Mainnet Pill + Connect Wallet Button */}
+          <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={() => navigate('protocol', 'explorer')}
               title="Inspect live Mainnet & Testnet blocks"
-              className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1 font-mono text-[11px] text-zinc-300 transition hover:border-white/[0.18] hover:text-white cursor-pointer"
+              className="hidden items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1 font-mono text-[11px] text-zinc-300 transition hover:border-white/[0.18] hover:text-white cursor-pointer lg:inline-flex"
             >
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
@@ -375,17 +409,47 @@ export default function App() {
                 }`}
               />
               <span className="tabular-nums">
-                {mainnetHeight ? `Mainnet #${mainnetHeight.toLocaleString()}` : 'Mainnet'}
+                {mainnetHeight ? `#${mainnetHeight.toLocaleString()}` : 'Mainnet'}
               </span>
             </button>
 
             <a
               href="/whitepaper"
-              className="inline-flex items-center gap-1 text-[13px] font-medium text-zinc-400 transition hover:text-zinc-100"
+              className="hidden items-center gap-1 text-[13px] font-medium text-zinc-400 transition hover:text-zinc-100 md:inline-flex"
             >
               <span>Whitepaper</span>
               <ArrowUpRight className="h-3.5 w-3.5" />
             </a>
+
+            <button
+              type="button"
+              onClick={openModal}
+              className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                evmAddress
+                  ? 'border border-emerald-500/35 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20'
+                  : 'bg-zinc-100 text-zinc-950 hover:bg-white'
+              }`}
+            >
+              {evmAddress ? (
+                <>
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  <span className="hidden font-mono text-[11px] sm:inline">
+                    {chainById(evmChainId)?.shortName ?? 'EVM'}
+                  </span>
+                  <span className="font-mono text-[11px]">{truncateHash(evmAddress, 5, 4)}</span>
+                  {balances.baseWloveWei > 0n && (
+                    <span className="hidden rounded-full bg-emerald-400/20 px-1.5 py-0.5 font-mono text-[10px] text-emerald-200 xl:inline">
+                      {formatCompactToken(balances.baseWloveWei, 18)} wLOVE
+                    </span>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Wallet className="h-3.5 w-3.5" />
+                  <span>Connect Wallet</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       </header>
@@ -409,7 +473,12 @@ export default function App() {
       {/* Main Content */}
       <main className="mx-auto w-full max-w-[1200px] flex-1 px-4 sm:px-6">
         {view === 'overview' ? (
-          <OverviewPage seed={seed} backing={backing} onNavigate={navigate} />
+          <OverviewPage
+            seed={seed}
+            backing={backing}
+            onNavigate={navigate}
+            onNotice={showToast}
+          />
         ) : view === 'build' ? (
           <div className="animate-fade-in py-10">
             <div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.07] pb-6">
@@ -496,21 +565,24 @@ export default function App() {
           <div className="animate-fade-in py-10">
             <div className="mb-8 border-b border-white/[0.07] pb-6">
               <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-zinc-500">
-                Bridge &amp; Mine
+                Swap, Bridge &amp; Easy Setup
               </p>
               <h1 className="font-display mt-1.5 text-3xl tracking-tight text-zinc-50 sm:text-5xl">
-                Zero-Custody Buy Roads &amp; AuxPoW Mining
+                Connect, Swap In, and Start in Seconds
               </h1>
               <p className="mt-2 max-w-2xl text-sm text-zinc-400">
-                Compile SHA-256 atomic HTLCs from Bitcoin, Lightning, Solana, Base, Arbitrum,
-                Optimism, or Polygon, verify both legs live, or calculate Bitcoin merge-mining
-                yield.
+                Swap ETH or USDC directly into Base wLOVE in one signature, back the 4-chain vault,
+                bridge trustlessly to native L1 LOVE, or set up AI agents and merge-mining with zero
+                manual form filling.
               </p>
             </div>
             <SwapsMiningTab
               state={state}
               seed={seed}
+              backing={backing}
               hasOperatorToken={hasOperatorToken}
+              initialSection={swapSection}
+              onRefreshBacking={refreshBacking}
               onStateUpdated={setState}
               onNotice={showToast}
             />
@@ -726,6 +798,16 @@ export default function App() {
           </div>
         </div>
       </footer>
+      {/* Global Multi-Wallet Modal */}
+      <WalletModal onNotice={showToast} />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <WalletProvider>
+      <AppShell />
+    </WalletProvider>
   );
 }
