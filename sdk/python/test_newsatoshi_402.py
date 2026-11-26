@@ -238,6 +238,71 @@ class Newsatoshi402PythonSdkTests(unittest.TestCase):
             srv.shutdown()
             srv.server_close()
 
+    def test_clearinghouse_scoped_session_zktls_and_rollup_withdraw(self):
+        # 1. RFC-0025 Scoped Agent Session Policy enforcement
+        sess = ns402.ScopedAgentSession(
+            session_id="agent-ops-1",
+            max_per_call=10_000,
+            max_per_hour=25_000,
+            max_total=50_000,
+            min_counterparty_bond=100_000_000,
+            max_counterparty_slashes=0,
+            allowed_endpoints=["https://api.compute.example/"],
+            profit_sweep_address="ns1treasury",
+            expiry_unix=2_000_000_000,
+        )
+        # Missing bond -> rejected
+        r_nobond = sess.authorize_spend(5_000, "https://api.compute.example/v1", None, now_unix=1_800_000_000)
+        self.assertFalse(r_nobond["allowed"])
+        # Slashed counterparty -> rejected
+        r_slash = sess.authorize_spend(
+            5_000,
+            "https://api.compute.example/v1",
+            {"found": True, "stake": 200_000_000, "slash_count": 1},
+            now_unix=1_800_000_000,
+        )
+        self.assertFalse(r_slash["allowed"])
+        # Clean bonded counterparty -> allowed!
+        good_bond = {"found": True, "stake": 500_000_000, "slash_count": 0}
+        r_ok = sess.authorize_spend(10_000, "https://api.compute.example/v1", good_bond, now_unix=1_800_000_000)
+        self.assertTrue(r_ok["allowed"])
+        self.assertEqual(r_ok["total_spent"], 10_000)
+        # Disallowed endpoint -> rejected
+        r_bad_ep = sess.authorize_spend(5_000, "https://evil.example/drain", good_bond, now_unix=1_800_000_000)
+        self.assertFalse(r_bad_ep["allowed"])
+
+        # 2. Tier-1 zkTLS Web2 Attestation Verifier
+        att = {
+            "domain": "api.wise.com",
+            "http_status": 200,
+            "timestamp_unix": 1_800_000_000,
+            "proof_digest_hex": "aa" * 32,
+            "response_body": {"status": "COMPLETED", "amount_usd": 100, "recipient": "acct-99"},
+        }
+        zk_ok = ns402.verify_zktls_attestation(
+            att,
+            expected_domain="api.wise.com",
+            required_fields={"status": "COMPLETED", "amount_usd": lambda v: v >= 100},
+            now_unix=1_800_000_050,
+        )
+        self.assertTrue(zk_ok["valid"])
+        self.assertEqual(len(zk_ok["receipt_hash_hex"]), 64)
+
+        # 3. RFC-0023 RollupWithdraw binary tx encoder + bondCommitMessageHex
+        wtx = ns402.encode_rollup_withdraw_tx(
+            "11" * 32,
+            1,
+            "22" * 32,
+            "33" * 32,
+            400_000_000,
+            10_000,
+            {"key": "22" * 32, "value_hash": "44" * 32, "siblings": ["55" * 32]},
+        )
+        self.assertEqual(wtx[0], 2)
+        self.assertEqual(wtx[1], 19)
+        self.assertEqual(len(wtx), 2 + 32 + 8 + 32 + 32 + 8 + 8 + 32 + 32 + 2 + 32)
+        self.assertEqual(len(ns402.bond_commit_message_hex("11" * 32, 7, "aa" * 32)), 64)
+
 
 if __name__ == "__main__":
     unittest.main()

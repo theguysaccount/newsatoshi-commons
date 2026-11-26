@@ -1664,6 +1664,58 @@ pub fn mcp_tools_list() -> Value {
                         "tx_hash": { "type": "string", "description": "Transaction hash (0x... for EVM or 64-hex txid for Bitcoin)" }
                     }
                 }
+            },
+            {
+                "name": "newsatoshi_inspect_trust_bond",
+                "description": "Query an RFC-0024 L1 Universal Trust Bond (active LOVE collateral stake, settled volume, slash history, arbiter quorum, and canonical Merkle proof) from an L1 node or return the RFC-0024 substrate schema.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["bond_id_hex"],
+                    "properties": {
+                        "bond_id_hex": { "type": "string", "description": "64-hex RFC-0024 Trust Bond ID" },
+                        "seed_url": { "type": "string", "description": "Optional L1 node base URL (defaults to live Mainnet seed)" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_inspect_rollup_vault",
+                "description": "Query an RFC-0023 Sovereign L2 Rollup Vault (vk_hash, state_root, deposit_acc, TVL, settled L2 tx count, withdraw_roots, and canonical Merkle proof) from an L1 node.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["rollup_id_hex"],
+                    "properties": {
+                        "rollup_id_hex": { "type": "string", "description": "64-hex RFC-0023 Sovereign L2 Rollup ID" },
+                        "seed_url": { "type": "string", "description": "Optional L1 node base URL (defaults to live Mainnet seed)" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_get_protocol_signaling",
+                "description": "Query RFC-0026 live BIP-9 collective protocol signaling & base-layer monetary ossification telemetry from an L1 node.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "seed_url": { "type": "string", "description": "Optional L1 node base URL (defaults to live Mainnet seed)" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_create_scoped_session_policy",
+                "description": "Compile a deterministic RFC-0025 policy-constrained AI agent session policy (max_per_call, max_per_hour, max_total, min_counterparty_bond, profit_sweep_address, expiry) and canonical SHA-256 policy digest without exposing root spending keys.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["session_id", "max_per_call", "max_per_hour", "max_total"],
+                    "properties": {
+                        "session_id": { "type": "string", "description": "Unique agent session identifier" },
+                        "max_per_call": { "type": "integer", "description": "Max spend per call in base units (1 LOVE = 100,000,000)" },
+                        "max_per_hour": { "type": "integer", "description": "Sliding 1-hour spend cap in base units" },
+                        "max_total": { "type": "integer", "description": "Lifetime session spend cap in base units" },
+                        "min_counterparty_bond": { "type": "integer", "description": "Minimum RFC-0024 L1 Trust Bond stake required on counterparties" },
+                        "max_counterparty_slashes": { "type": "integer", "description": "Maximum tolerated slash count on counterparties (default 0)" },
+                        "profit_sweep_address": { "type": "string", "description": "Shielded ns1.../nsd1... address for automated profit sweeps" },
+                        "ttl_seconds": { "type": "integer", "description": "Session validity duration in seconds (default 86400)" }
+                    }
+                }
             }
         ]
     })
@@ -2009,6 +2061,120 @@ pub fn handle_mcp_jsonrpc(
                     let tx_hash = args.get("tx_hash").and_then(|v| v.as_str()).unwrap_or("");
                     verify_tx_receipt(chain, tx_hash)
                 }
+                "newsatoshi_inspect_trust_bond" => {
+                    let bid = args.get("bond_id_hex").and_then(|v| v.as_str()).unwrap_or("").trim().to_ascii_lowercase();
+                    if bid.len() != 64 || !bid.chars().all(|c| c.is_ascii_hexdigit()) {
+                        Err("bond_id_hex must be 64 hex characters".into())
+                    } else {
+                        let base = args
+                            .get("seed_url")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.trim_end_matches('/').to_string())
+                            .unwrap_or_else(|| "https://newsatoshi.org/mainnet".to_string());
+                        let url = format!("{base}/api/bond?id={bid}");
+                        match ureq::get(&url).call() {
+                            Ok(mut resp) => {
+                                let txt = resp.body_mut().read_to_string().unwrap_or_default();
+                                let val: Value = serde_json::from_str(&txt).unwrap_or_else(|_| json!({ "raw": txt }));
+                                Ok(json!({ "ok": true, "endpoint": url, "rfc": "RFC-0024", "bond": val }))
+                            }
+                            Err(e) => Ok(json!({
+                                "ok": true,
+                                "endpoint": url,
+                                "rfc": "RFC-0024",
+                                "live_node_supports_rfc0024": false,
+                                "note": format!("Target node did not return /api/bond ({e}); RFC-0024 Universal Trust Bonds are height-gated in v0.4.0-substrate (active on regtest/dry/v2)."),
+                                "bond_id_hex": bid
+                            })),
+                        }
+                    }
+                }
+                "newsatoshi_inspect_rollup_vault" => {
+                    let rid = args.get("rollup_id_hex").and_then(|v| v.as_str()).unwrap_or("").trim().to_ascii_lowercase();
+                    if rid.len() != 64 || !rid.chars().all(|c| c.is_ascii_hexdigit()) {
+                        Err("rollup_id_hex must be 64 hex characters".into())
+                    } else {
+                        let base = args
+                            .get("seed_url")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.trim_end_matches('/').to_string())
+                            .unwrap_or_else(|| "https://newsatoshi.org/mainnet".to_string());
+                        let url = format!("{base}/api/rollup?id={rid}");
+                        match ureq::get(&url).call() {
+                            Ok(mut resp) => {
+                                let txt = resp.body_mut().read_to_string().unwrap_or_default();
+                                let val: Value = serde_json::from_str(&txt).unwrap_or_else(|_| json!({ "raw": txt }));
+                                Ok(json!({ "ok": true, "endpoint": url, "rfc": "RFC-0023", "rollup": val }))
+                            }
+                            Err(e) => Ok(json!({
+                                "ok": true,
+                                "endpoint": url,
+                                "rfc": "RFC-0023",
+                                "live_node_supports_rfc0023": false,
+                                "note": format!("Target node did not return /api/rollup ({e}); RFC-0023 Sovereign L2 Rollup Vaults are height-gated in v0.4.0-substrate (active on regtest/dry/v2)."),
+                                "rollup_id_hex": rid
+                            })),
+                        }
+                    }
+                }
+                "newsatoshi_get_protocol_signaling" => {
+                    let base = args
+                        .get("seed_url")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.trim_end_matches('/').to_string())
+                        .unwrap_or_else(|| "https://newsatoshi.org/mainnet".to_string());
+                    let url = format!("{base}/api/signaling");
+                    match ureq::get(&url).call() {
+                        Ok(mut resp) => {
+                            let txt = resp.body_mut().read_to_string().unwrap_or_default();
+                            let val: Value = serde_json::from_str(&txt).unwrap_or_else(|_| json!({ "raw": txt }));
+                            Ok(json!({ "ok": true, "endpoint": url, "rfc": "RFC-0026", "signaling": val }))
+                        }
+                        Err(e) => Ok(json!({
+                            "ok": true,
+                            "endpoint": url,
+                            "rfc": "RFC-0026",
+                            "live_node_supports_rfc0026": false,
+                            "note": format!("Target node did not return /api/signaling ({e}); RFC-0026 BIP-9 signaling uses AuxPoW-safe header version bits 1..=7 in v0.4.0-substrate."),
+                            "auxpow_safe_bits": [1, 2, 3, 4, 5, 6, 7]
+                        })),
+                    }
+                }
+                "newsatoshi_create_scoped_session_policy" => {
+                    let session_id = args.get("session_id").and_then(|v| v.as_str()).unwrap_or("").trim();
+                    let max_per_call = args.get("max_per_call").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let max_per_hour = args.get("max_per_hour").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let max_total = args.get("max_total").and_then(|v| v.as_u64()).unwrap_or(0);
+                    if session_id.is_empty() || max_per_call == 0 || max_per_hour == 0 || max_total == 0 {
+                        Err("session_id, max_per_call, max_per_hour, and max_total must be positive".into())
+                    } else {
+                        let min_bond = args.get("min_counterparty_bond").and_then(|v| v.as_u64()).unwrap_or(0);
+                        let max_slashes = args.get("max_counterparty_slashes").and_then(|v| v.as_u64()).unwrap_or(0);
+                        let sweep = args.get("profit_sweep_address").and_then(|v| v.as_str()).unwrap_or("");
+                        let ttl = args.get("ttl_seconds").and_then(|v| v.as_u64()).unwrap_or(86_400);
+                        let now = unix_now();
+                        let expiry = now.saturating_add(ttl);
+                        let canon = format!("nsSESSPOL1|{session_id}|{max_per_call}|{max_per_hour}|{max_total}|{min_bond}|{max_slashes}|{sweep}|{expiry}");
+                        let policy_digest = hex::encode(sha256(canon.as_bytes()));
+                        Ok(json!({
+                            "ok": true,
+                            "rfc": "RFC-0025",
+                            "policy_digest_hex": policy_digest,
+                            "policy": {
+                                "session_id": session_id,
+                                "max_per_call": max_per_call,
+                                "max_per_hour": max_per_hour,
+                                "max_total": max_total,
+                                "min_counterparty_bond": min_bond,
+                                "max_counterparty_slashes": max_slashes,
+                                "profit_sweep_address": sweep,
+                                "issued_at_unix": now,
+                                "expiry_unix": expiry
+                            },
+                            "sdk_hint": "Pass this policy to createScopedAgentSession(...) in @newsatoshi/402 or ScopedAgentSession(...) in newsatoshi-402."
+                        }))
+                    }
+                }
                 other => Err(format!("unknown MCP tool '{other}'")),
             };
 
@@ -2114,6 +2280,6 @@ mod tests {
             &client,
             None,
         );
-        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 19);
+        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 23);
     }
 }

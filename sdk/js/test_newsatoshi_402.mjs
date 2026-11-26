@@ -17,6 +17,11 @@ import {
   encodeChannelExpireTx,
   submitL1ChannelClaim,
   fetchWithNewsatoshi402,
+  createScopedAgentSession,
+  verifyZkTlsAttestation,
+  detectOptimisticEquivocation,
+  encodeRollupWithdrawTx,
+  createClearinghouseClient,
 } from "./newsatoshi-402.mjs";
 import { forwardJsonRpcLine } from "./bin/newsatoshi-mcp.mjs";
 
@@ -346,4 +351,109 @@ test("RFC-0022 L1 channel funding check, Merkle proof verification, and 70-byte 
   assert.equal(sub.ok, true);
   assert.equal(sub.txBytes, 7930);
   assert.equal(postedBody.length, 7930);
+});
+
+test("Clearinghouse SDK: Scoped Agent Session, Tier-1 zkTLS, Tier-2 Equivocation, RollupWithdraw & 5-line Client", async () => {
+  let now = 1_800_000_000;
+  const session = createScopedAgentSession({
+    sessionId: "ai-trader-01",
+    maxPerCall: 10_000,
+    maxPerHour: 25_000,
+    maxTotal: 50_000,
+    minCounterpartyBond: 100_000_000,
+    maxCounterpartySlashes: 0,
+    allowedEndpoints: ["https://api.gpu.example/"],
+    profitSweepAddress: "ns1sweep",
+    expiryUnix: 1_900_000_000,
+    nowSec: () => now,
+  });
+
+  // Unbonded or slashed counterparty denied
+  assert.equal((await session.authorizeSpend({ amount: 5_000, endpoint: "https://api.gpu.example/run" })).allowed, false);
+  assert.equal(
+    (await session.authorizeSpend({
+      amount: 5_000,
+      endpoint: "https://api.gpu.example/run",
+      counterpartyBond: { found: true, stake: 500_000_000, slashCount: 1 },
+    })).allowed,
+    false
+  );
+
+  // Clean bonded counterparty + 5-line ClearinghouseClient succeeds
+  const wallet = await generatePayWordChain(10, 5_000);
+  const bondId = "aa".repeat(32);
+  const mockFetch = async (url) => {
+    if (url.includes(`/api/bond?id=${bondId}`)) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          found: true,
+          confirmed: true,
+          height: 10,
+          id: bondId,
+          stake: 500_000_000,
+          slash_count: 0,
+          settled_count: 42,
+        }),
+      };
+    }
+    return { ok: true, status: 200, json: async () => ({ result: "gpu-inference-ok" }) };
+  };
+
+  const client = createClearinghouseClient({
+    session,
+    paywordWallet: wallet,
+    seedBaseUrl: "http://127.0.0.1:9999",
+    fetchImpl: mockFetch,
+  });
+  const callRes = await client.callBondedApi("https://api.gpu.example/v1/infer", {
+    bondIdHex: bondId,
+    ticks: 1,
+    unitPriceBaseUnits: 5_000,
+  });
+  assert.equal(callRes.auth.allowed, true);
+  assert.equal(callRes.counterpartyBond.stake, 500_000_000);
+
+  // Tier-1 zkTLS Web2 Attestation Verifier
+  const zkOk = await verifyZkTlsAttestation(
+    {
+      domain: "api.revolut.com",
+      httpStatus: 200,
+      timestampUnix: now - 10,
+      proofDigestHex: "bb".repeat(32),
+      responseBody: { state: "COMPLETED", amount: 250 },
+    },
+    {
+      expectedDomain: "api.revolut.com",
+      requiredFields: { state: "COMPLETED", amount: (v) => v >= 200 },
+      nowSec: () => now,
+    }
+  );
+  assert.equal(zkOk.valid, true);
+  assert.equal(zkOk.receiptHashHex.length, 64);
+
+  // Tier-2 Optimistic Equivocation Detector
+  const eq = await detectOptimisticEquivocation({
+    bondIdHex: bondId,
+    contextNonce: 12,
+    payloadHashAHex: "11".repeat(32),
+    payloadHashBHex: "22".repeat(32),
+  });
+  assert.equal(eq.equivocated, true);
+  assert.notEqual(eq.msgAHex, eq.msgBHex);
+
+  // RFC-0023 RollupWithdraw encoder
+  const wtx = encodeRollupWithdrawTx({
+    rollupIdHex: "11".repeat(32),
+    batchSeq: 1,
+    withdrawalIdHex: "22".repeat(32),
+    recipientApkHex: "33".repeat(32),
+    amount: 400_000_000,
+    minerFee: 10_000,
+    merkleProof: { key: "22".repeat(32), value_hash: "44".repeat(32), siblings: ["55".repeat(32)] },
+  });
+  assert.equal(wtx[0], 2);
+  assert.equal(wtx[1], 19);
+  assert.equal(wtx.length, 2 + 32 + 8 + 32 + 32 + 8 + 8 + 32 + 32 + 2 + 32);
 });

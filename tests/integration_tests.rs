@@ -2176,7 +2176,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 19);
+    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 23);
 
     let install_sh = ureq::get(&format!("{base}/install.sh"))
         .call()
