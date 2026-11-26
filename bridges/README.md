@@ -37,6 +37,19 @@ Non-custodial, ownerless Proof-of-Backing reserve & Web4 business charter anchor
 | **Optimism** | `10` | [OP Etherscan](https://optimistic.etherscan.io/address/0x37Ed94525DBE408fA72cDd156409875666679265) · [Sourcify](https://repo.sourcify.dev/10/0x37Ed94525DBE408fA72cDd156409875666679265) | [`0x153204…cca4`](https://optimistic.etherscan.io/tx/0x15320488f4a23e999e1a5036f8eb629c3259357be139bd14cd258e26e7e8cca4) | Live & ready for `depositEth` / `depositErc20` / `registerCharterAnchor` |
 | **Polygon PoS** | `137` | [Polygonscan](https://polygonscan.com/address/0x37Ed94525DBE408fA72cDd156409875666679265) · [Sourcify](https://repo.sourcify.dev/137/0x37Ed94525DBE408fA72cDd156409875666679265) | [`0xbe08c5…e97`](https://polygonscan.com/tx/0xbe08c50f1d29aab8efcfa017d6832ee56dc24f95f796f0458296caaf84dc0e97) | Live & ready for `depositEth` / `depositErc20` / `registerCharterAnchor` |
 
+### 3. `NewsatoshiBaseMirror.sol` (`wLOVE`) & Burned Uniswap V3 Pool on Base Mainnet
+
+- **Token (`wLOVE`, 0 owner, 0 mint, 0 tax, Sourcify `exact_match`):** [`0x0A3ccFb3fF981a22A264Aa05CD8b77d06C2732A3`](https://basescan.org/address/0x0A3ccFb3fF981a22A264Aa05CD8b77d06C2732A3) · [Sourcify](https://repo.sourcify.dev/8453/0x0A3ccFb3fF981a22A264Aa05CD8b77d06C2732A3)
+- **Uniswap V3 `wLOVE / WETH` (1%) Full-Range Pool:** [`0x08ddc8C3fc09ACdab6802a13B26631f47ABcB888`](https://basescan.org/address/0x08ddc8C3fc09ACdab6802a13B26631f47ABcB888) · [Uniswap](https://app.uniswap.org/swap?chain=base&outputCurrency=0x0A3ccFb3fF981a22A264Aa05CD8b77d06C2732A3) · [DEXScreener](https://dexscreener.com/base/0x08ddc8C3fc09ACdab6802a13B26631f47ABcB888) · [GeckoTerminal](https://www.geckoterminal.com/base/pools/0x08ddc8c3fc09acdab6802a13b26631f47abcb888)
+- **Permanent LP Burn Proof:** 100% of the `21,000,000 wLOVE` supply + `0.006 WETH` seeded into LP NFT `#6689936` ([Mint TX](https://basescan.org/tx/0xd4e83efbae91d6aa92b4cb4c34b7731df8f8508530224879e1186f7173f30ea8)) and permanently burned to `0x000000000000000000000000000000000000dEaD` ([Burn TX](https://basescan.org/tx/0x378a7f94ea9d6d4dcb4d3baa8e46e9b0936d4aecb1aca0420d94f2671b64c4bc)). Deployer holds `0 wLOVE`. First live Uniswap V3 swap ([TX](https://basescan.org/tx/0xbf082f81c1a3f1b0ef1783583011627b02c8a4e8437d7e1197258a318f09f24a)) deposited straight into `NewsatoshiBackingVault` ([TX](https://basescan.org/tx/0xfc60f6cee788aa85e31ddba179790019e002fe6135918287d5c21047f8ed011d)).
+
+### 4. Official On-Chain ERC-8004 Agent Identity (`0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`)
+
+- **Base (`8453`):** Agent NFT `#1229992` ([TX](https://basescan.org/tx/0x0eda4629e7976d29edeccaef5bae3453e8fe434a66c77e6443b8047257468bbe))
+- **Arbitrum One (`42161`):** Agent NFT `#1692` ([TX](https://arbiscan.io/tx/0x5f915f240194e285c97f874ab25c569a87fa0279a6f59f7c0c3cf1634ad351e2))
+- **Optimism (`10`):** Agent NFT `#42519` ([TX](https://optimistic.etherscan.io/tx/0x0a469889afe20774a1210c4fd93f27924c0c7043884b1177e51d22506bc27ac6))
+- **Polygon PoS (`137`):** Agent NFT `#715` ([TX](https://polygonscan.com/tx/0x2d097bf8a65e48a283c75c1f6771d0401cc501921f841fc14463227c6d5cfe9a))
+
 ## Deploying to Additional EVM Chains (`NewsatoshiHtlc.sol`)
 
 Zero constructor arguments, zero owner, zero upgradeability:
