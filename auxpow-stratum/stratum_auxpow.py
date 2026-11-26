@@ -270,6 +270,33 @@ class StratumJob:
         ]
 
 
+def extract_payout_address(worker_name: str) -> Optional[str]:
+    """Extract a valid Newsatoshi L1 payout address from a Stratum username (`<ns1...>.rig`)."""
+    raw = (worker_name or "").strip()
+    if not raw:
+        return None
+    prefix = raw.split(".", 1)[0].strip()
+    if (
+        prefix.startswith(("ns1", "nsd1", "nst1"))
+        and 20 <= len(prefix) <= 140
+        and prefix.isascii()
+        and prefix.isalnum()
+    ):
+        return prefix
+    return None
+
+
+def mask_worker_label(worker_name: Optional[str]) -> str:
+    raw = (worker_name or "worker").strip()
+    if "." in raw:
+        addr, rig = raw.split(".", 1)
+        if extract_payout_address(addr):
+            return f"{addr[:6]}…{addr[-4:]}.{rig[:24]}"
+    if extract_payout_address(raw):
+        return f"{raw[:6]}…{raw[-4:]}"
+    return raw[:32]
+
+
 class AuxPowStratumServer:
     def __init__(
         self,
@@ -280,6 +307,8 @@ class AuxPowStratumServer:
         coinbase_tag: bytes = b"/newsatoshi-auxpow/",
         poll_interval: float = 2.0,
         worker_diff: Optional[float] = None,
+        public_host: Optional[str] = None,
+        stratum_port: int = 3333,
     ) -> None:
         self.ns_rpc = ns_rpc
         self.payout_address = payout_address
@@ -288,8 +317,11 @@ class AuxPowStratumServer:
         self.coinbase_tag = coinbase_tag
         self.poll_interval = poll_interval
         self.configured_worker_diff = worker_diff
+        self.public_host = public_host or "pool.newsatoshi.org"
+        self.stratum_port = stratum_port
 
         self.jobs: Dict[str, StratumJob] = {}
+        self.jobs_by_payout: Dict[Optional[str], StratumJob] = {}
         self.current_job: Optional[StratumJob] = None
         self.job_seq = 0
         self.extranonce_seq = 0
@@ -302,6 +334,7 @@ class AuxPowStratumServer:
         self.aux_blocks_submitted = 0
         self.aux_blocks_accepted = 0
         self.btc_blocks_accepted = 0
+        self.recent_share_diffs: List[Tuple[float, float]] = []
         self.last_aux_hash: Optional[str] = None
         self.last_error: Optional[str] = None
 
@@ -316,9 +349,10 @@ class AuxPowStratumServer:
         # Clamp sensibly so Bitaxe/ASICs submit periodic shares and always catch aux blocks
         return max(1e-6, min(aux_diff, 16.0))
 
-    def refresh_template_sync(self) -> Optional[StratumJob]:
-        if self.payout_address:
-            aux = self.ns_rpc.call("createauxblock", [self.payout_address])
+    def refresh_template_sync(self, payout_override: Optional[str] = None) -> Optional[StratumJob]:
+        target_payout = payout_override or self.payout_address
+        if target_payout:
+            aux = self.ns_rpc.call("createauxblock", [target_payout])
         else:
             aux = self.ns_rpc.call("getauxblock", [])
 
@@ -328,11 +362,12 @@ class AuxPowStratumServer:
         aux_target_int = int.from_bytes(bytes.fromhex(aux["_target"]), "little")
         aux_coinbase_value = int(aux["coinbasevalue"])
 
+        prev_job = self.jobs_by_payout.get(payout_override)
         # Reuse job if aux block hash unchanged and not stale (< 20s)
         if (
-            self.current_job is not None
-            and self.current_job.aux_hash == aux_hash
-            and (time.time() - self.current_job.created_at) < 20.0
+            prev_job is not None
+            and prev_job.aux_hash == aux_hash
+            and (time.time() - prev_job.created_at) < 20.0
             and self.btc_rpc is None
         ):
             return None
@@ -402,35 +437,73 @@ class AuxPowStratumServer:
             btc_raw_txs=btc_raw_txs,
         )
         self.jobs[job_id] = job
-        # Keep only the latest 16 jobs in RAM
-        if len(self.jobs) > 16:
-            oldest = sorted(self.jobs.keys())[:-16]
+        # Keep only the latest 64 jobs in RAM (supports up to ~32 simultaneous per-miner payout templates)
+        if len(self.jobs) > 64:
+            oldest = sorted(self.jobs.keys())[:-64]
             for k in oldest:
                 self.jobs.pop(k, None)
-        self.current_job = job
+        self.jobs_by_payout[payout_override] = job
+        if payout_override is None:
+            self.current_job = job
         self.last_aux_hash = aux_hash
         self.last_error = None
         return job
 
+    def estimated_hashrate_ghs(self) -> float:
+        now = time.time()
+        cutoff = now - 300.0
+        self.recent_share_diffs = [(ts, d) for ts, d in self.recent_share_diffs if ts >= cutoff]
+        if not self.recent_share_diffs:
+            return 0.0
+        window = max(30.0, min(300.0, now - self.started_at))
+        total_diff = sum(d for _, d in self.recent_share_diffs)
+        return round((total_diff * 4_294_967_296.0) / window / 1e9, 4)
+
     def status_dict(self) -> Dict[str, Any]:
         job = self.current_job
+        now = time.time()
+        unique_payouts = {
+            c.get("payout_address")
+            for c in self.clients.values()
+            if c.get("payout_address")
+        }
+        workers_public = [
+            {
+                "worker": mask_worker_label(c.get("worker")),
+                "custom_payout": bool(c.get("payout_address")),
+                "difficulty": c.get("difficulty", 1.0),
+                "shares_accepted": c.get("shares_accepted", 0),
+                "connected_secs": max(0, int(now - c.get("connected_at", now))),
+            }
+            for c in list(self.clients.values())[:64]
+        ]
+        net_diff = round(DIFF1_TARGET / max(1, job.aux_target_int), 4) if job else None
         return {
             "ok": self.last_error is None,
-            "protocol": "NEWSATOSHI-AUXPOW-STRATUM/1.0",
+            "online": True,
+            "protocol": "NEWSATOSHI-AUXPOW-STRATUM/1.1",
+            "stratum_url": f"stratum+tcp://{self.public_host}:{self.stratum_port}",
             "auxpow_chainid": AUXPOW_CHAIN_ID,
-            "mode": "dual_btc_love" if self.btc_rpc is not None else "standalone_auxpow",
-            "uptime_secs": max(0, int(time.time()) - self.started_at),
+            "pool_fee_pct": 0.0,
+            "payout_mode": "direct_solo_coinbase",
+            "mode": "dual_btc_love" if self.btc_rpc is not None else "standalone_auxpow_solo",
+            "uptime_secs": max(0, int(now) - self.started_at),
             "connected_workers": len(self.clients),
+            "unique_payout_addresses": len(unique_payouts),
+            "estimated_pool_hashrate_ghs": self.estimated_hashrate_ghs(),
             "shares_accepted": self.shares_accepted,
             "shares_rejected": self.shares_rejected,
             "aux_blocks_submitted": self.aux_blocks_submitted,
             "aux_blocks_accepted": self.aux_blocks_accepted,
             "btc_blocks_accepted": self.btc_blocks_accepted,
+            "active_workers": workers_public,
             "current_template": {
                 "job_id": job.job_id,
                 "aux_hash": job.aux_hash,
                 "aux_height": job.aux_height,
                 "aux_bits": job.aux_bits,
+                "network_difficulty": net_diff,
+                "coinbase_value_love": round(job.aux_coinbase_value / 1e8, 4),
                 "worker_difficulty": self._effective_worker_diff(job),
             }
             if job
@@ -443,11 +516,18 @@ class AuxPowStratumServer:
         writer.write(line)
         await writer.drain()
 
-    async def _broadcast_job(self, job: StratumJob, clean_jobs: bool = True) -> None:
+    async def _broadcast_job(
+        self,
+        job: StratumJob,
+        clean_jobs: bool = True,
+        payout_filter: Optional[str] = None,
+    ) -> None:
         diff = self._effective_worker_diff(job)
         dead: List[int] = []
         for cid, c in list(self.clients.items()):
             if not c.get("subscribed"):
+                continue
+            if c.get("payout_address") != payout_filter:
                 continue
             try:
                 c["difficulty"] = diff
@@ -466,9 +546,26 @@ class AuxPowStratumServer:
     async def poll_loop(self) -> None:
         while True:
             try:
-                new_job = await asyncio.to_thread(self.refresh_template_sync)
-                if new_job is not None:
-                    await self._broadcast_job(new_job, clean_jobs=True)
+                payout_keys: List[Optional[str]] = [None]
+                seen_custom = {
+                    c.get("payout_address")
+                    for c in list(self.clients.values())
+                    if c.get("payout_address")
+                }
+                payout_keys.extend(sorted(seen_custom))
+                # Prune cached jobs for disconnected payout addresses
+                active_set = set(payout_keys)
+                for stale_key in list(self.jobs_by_payout.keys()):
+                    if stale_key not in active_set:
+                        self.jobs_by_payout.pop(stale_key, None)
+                for pkey in payout_keys:
+                    try:
+                        new_job = await asyncio.to_thread(self.refresh_template_sync, pkey)
+                        if new_job is not None:
+                            await self._broadcast_job(new_job, clean_jobs=True, payout_filter=pkey)
+                    except Exception as exc:
+                        if pkey is None:
+                            self.last_error = str(exc)
             except Exception as exc:
                 self.last_error = str(exc)
             await asyncio.sleep(self.poll_interval)
@@ -492,8 +589,11 @@ class AuxPowStratumServer:
             "subscribed": False,
             "authorized": False,
             "worker": None,
+            "payout_address": None,
             "difficulty": 1.0,
             "version_mask": 0,
+            "shares_accepted": 0,
+            "connected_at": time.time(),
         }
         self.clients[cid] = client_state
 
@@ -583,7 +683,36 @@ class AuxPowStratumServer:
                     worker_name = str(params[0]) if params else "worker"
                     client_state["authorized"] = True
                     client_state["worker"] = worker_name
+                    custom_addr = extract_payout_address(worker_name)
                     await self._send_json(writer, {"id": req_id, "result": True, "error": None})
+                    if custom_addr:
+                        try:
+                            custom_job = self.jobs_by_payout.get(custom_addr)
+                            if custom_job is None or (time.time() - custom_job.created_at) >= 15.0:
+                                custom_job = await asyncio.to_thread(
+                                    self.refresh_template_sync, custom_addr
+                                ) or self.jobs_by_payout.get(custom_addr)
+                            if custom_job is not None:
+                                client_state["payout_address"] = custom_addr
+                                diff = self._effective_worker_diff(custom_job)
+                                client_state["difficulty"] = diff
+                                await self._send_json(
+                                    writer,
+                                    {"id": None, "method": "mining.set_difficulty", "params": [diff]},
+                                )
+                                await self._send_json(
+                                    writer,
+                                    {
+                                        "id": None,
+                                        "method": "mining.notify",
+                                        "params": custom_job.notify_params(True),
+                                    },
+                                )
+                        except Exception as exc:
+                            print(
+                                f"[auxpow-stratum] custom payout '{mask_worker_label(worker_name)}' fallback: {exc}",
+                                flush=True,
+                            )
 
                 elif method == "mining.submit":
                     ok, err = await self._process_submit(client_state, params)
@@ -678,6 +807,8 @@ class AuxPowStratumServer:
             return False, [23, "low difficulty share", None]
 
         self.shares_accepted += 1
+        client["shares_accepted"] = int(client.get("shares_accepted", 0)) + 1
+        self.recent_share_diffs.append((time.time(), float(client.get("difficulty", 1.0))))
 
         # Check Newsatoshi AuxPoW target!
         if hash_int <= job.aux_target_int:
@@ -695,9 +826,10 @@ class AuxPowStratumServer:
                         flush=True,
                     )
                     # Immediately fetch next template for workers
-                    new_job = await asyncio.to_thread(self.refresh_template_sync)
+                    pkey = client.get("payout_address")
+                    new_job = await asyncio.to_thread(self.refresh_template_sync, pkey)
                     if new_job is not None:
-                        await self._broadcast_job(new_job, clean_jobs=True)
+                        await self._broadcast_job(new_job, clean_jobs=True, payout_filter=pkey)
                 else:
                     print(
                         f"[auxpow-stratum] Newsatoshi node rejected aux block {job.aux_hash[:16]}...",
@@ -782,6 +914,8 @@ async def run_server(args: argparse.Namespace) -> None:
         coinbase_tag=args.tag.encode("utf-8"),
         poll_interval=args.poll_interval,
         worker_diff=args.worker_diff,
+        public_host=args.public_host,
+        stratum_port=args.stratum_port,
     )
 
     # Fetch initial template (non-fatal if node is still syncing)
@@ -833,6 +967,10 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "--worker-diff",
         type=float,
         default=float(os.environ["WORKER_DIFF"]) if os.environ.get("WORKER_DIFF") else None,
+    )
+    p.add_argument(
+        "--public-host",
+        default=os.environ.get("PUBLIC_STRATUM_HOST", "pool.newsatoshi.org"),
     )
     return p.parse_args(argv)
 

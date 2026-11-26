@@ -8,6 +8,7 @@ use crate::agent::{
 };
 use crate::backing::{fetch_live_backing_summary, BackingProofSummary, CANONICAL_BACKING_VAULT};
 use crate::crypto::{sha256, sha256_concat};
+use crate::crypto_tools::inspect_evm_contract;
 use crate::hardware::{ExternalDeedPacket, ExternalTelemetryPacket};
 use crate::rpc::{AnchorReceipt, JsonRpcAnchorClient, PROTOCOL_VERSION};
 use crate::seed::{
@@ -34,7 +35,7 @@ use crate::web4::{
 use crate::x402::{
     authorize_dual_402, build_bridge_quote_response, build_x402_v2_challenge,
     render_well_known_x402, route_spec_bridge_quote, route_spec_compile_htlc,
-    route_spec_verify_payword,
+    route_spec_evm_security_scan, route_spec_verify_payword,
 };
 use crate::{CheckedWorkProof, StreamingChannel};
 use serde::{Deserialize, Serialize};
@@ -917,6 +918,80 @@ fn handle_request(mut req: Request, state: &AppState) {
                     err_body["error"] = json!(e);
                     respond_x402_challenge(req, &hdr_b64, &err_body);
                 }
+            }
+        }
+        (Method::Post, "/api/x402/evm-security-scan") => {
+            let base_url = infer_base_url(&req);
+            let spec = route_spec_evm_security_scan();
+            let (challenge_obj, hdr_b64, challenge_body) = build_x402_v2_challenge(&base_url, &spec);
+            let payword_hdr = header_value_ci(&req, "X-Newsatoshi-PayWord");
+            let x402_hdr = header_value_ci(&req, "Payment-Signature")
+                .or_else(|| header_value_ci(&req, "X-Payment"));
+            match authorize_dual_402(payword_hdr.as_deref(), x402_hdr.as_deref(), &challenge_obj) {
+                Ok(Some(receipt)) => {
+                    let body = read_body_string(&mut req).unwrap_or_default();
+                    let parsed: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+                    let chain = parsed.get("chain").and_then(|v| v.as_str()).unwrap_or("base");
+                    let address = parsed.get("address").and_then(|v| v.as_str()).unwrap_or("");
+                    match inspect_evm_contract(chain, address) {
+                        Ok(mut scan) => {
+                            if let Some(obj) = scan.as_object_mut() {
+                                obj.insert("settlement".to_string(), json!(receipt));
+                            }
+                            respond_x402_paid(req, &scan, receipt.payment_response_b64.as_deref());
+                        }
+                        Err(e) => respond_json(
+                            req,
+                            400,
+                            &json!({ "ok": false, "error": e, "settlement": receipt }),
+                        ),
+                    }
+                }
+                Ok(None) => respond_x402_challenge(req, &hdr_b64, &challenge_body),
+                Err(e) => {
+                    let mut err_body = challenge_body;
+                    err_body["error"] = json!(e);
+                    respond_x402_challenge(req, &hdr_b64, &err_body);
+                }
+            }
+        }
+        (Method::Get, "/api/pool/status") => {
+            let pool_url = std::env::var("COMMONS_POOL_STATUS_URL")
+                .ok()
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or_else(|| "https://pool.newsatoshi.org/status".to_string());
+            let agent: ureq::Agent = ureq::Agent::config_builder()
+                .timeout_global(Some(Duration::from_secs(5)))
+                .http_status_as_error(false)
+                .build()
+                .into();
+            match agent
+                .get(&pool_url)
+                .header("User-Agent", "newsatoshi-commons/0.12")
+                .call()
+            {
+                Ok(mut resp) if resp.status().as_u16() < 400 => {
+                    let txt = resp.body_mut().read_to_string().unwrap_or_default();
+                    if let Ok(val) = serde_json::from_str::<Value>(&txt) {
+                        respond_json(req, 200, &val);
+                    } else {
+                        respond_json(
+                            req,
+                            200,
+                            &json!({ "ok": false, "online": false, "error": "malformed pool status JSON" }),
+                        );
+                    }
+                }
+                Ok(resp) => respond_json(
+                    req,
+                    200,
+                    &json!({ "ok": false, "online": false, "error": format!("pool HTTP {}", resp.status().as_u16()) }),
+                ),
+                Err(e) => respond_json(
+                    req,
+                    200,
+                    &json!({ "ok": false, "online": false, "error": e.to_string() }),
+                ),
             }
         }
         (Method::Get, "/.well-known/mcp.json") => {

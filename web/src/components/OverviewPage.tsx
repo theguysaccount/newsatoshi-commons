@@ -25,7 +25,7 @@ const SNIPPETS: Record<
 > = {
   mcp: {
     label: 'MCP Server',
-    caption: '14 zero-auth tools on the Official MCP Registry (org.newsatoshi.commons/newsatoshi-commons)',
+    caption: '19 zero-auth tools (EVM security scan, BTC mempool, BOLT-11, Uniswap V3 & Newsatoshi LOVE)',
     code: `{
   "mcpServers": {
     "newsatoshi": {
@@ -255,7 +255,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
               <span className="font-mono text-[10px] text-zinc-400">MCP · ERC-8004</span>
             </div>
             <div className="mt-2.5 font-mono text-2xl font-medium tracking-tight text-zinc-100">
-              14 Live Tools
+              19 Live Tools
             </div>
             <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-zinc-500">
               <span className="truncate font-mono text-[11px]">commons.newsatoshi.org/mcp</span>

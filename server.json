@@ -1,9 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "org.newsatoshi.commons/newsatoshi-commons",
-  "title": "Newsatoshi Commons (LOVE)",
-  "description": "Post-quantum machine money (LOVE): 4-chain Proof-of-Backing, Web4 charters, 402 PayWords & STARKs.",
-  "version": "0.11.0",
+  "title": "Newsatoshi Commons & Multi-Chain Crypto Tools",
+  "description": "Zero-auth EVM security audit, Bitcoin mempool, BOLT-11 decoder, Base Uniswap V3 & Newsatoshi LOVE.",
+  "version": "0.12.0",
   "websiteUrl": "https://commons.newsatoshi.org",
   "repository": {
     "url": "https://github.com/theguysaccount/newsatoshi-commons",
