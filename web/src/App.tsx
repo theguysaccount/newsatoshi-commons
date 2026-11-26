@@ -375,7 +375,10 @@ function AppShell() {
           </button>
 
           {/* 4 Primary Views */}
-          <nav className="flex items-center gap-1 overflow-x-auto" aria-label="Primary">
+          <nav
+            className="flex min-w-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-1"
+            aria-label="Primary"
+          >
             {PRIMARY_NAV.map((item) => {
               const active = view === item.id;
               return (
@@ -383,7 +386,7 @@ function AppShell() {
                   key={item.id}
                   type="button"
                   onClick={() => navigate(item.id)}
-                  className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 ${
+                  className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 text-[12px] font-medium transition cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 sm:px-3.5 sm:text-[13px] ${
                     active
                       ? 'bg-white/[0.09] text-zinc-50'
                       : 'text-zinc-400 hover:text-zinc-100'
@@ -396,12 +399,12 @@ function AppShell() {
           </nav>
 
           {/* Right: Quiet Live Mainnet Pill + Connect Wallet Button */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex shrink-0 items-center gap-2.5">
             <button
               type="button"
               onClick={() => navigate('protocol', 'explorer')}
               title="Inspect live Mainnet & Testnet blocks"
-              className="hidden items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1 font-mono text-[11px] text-zinc-300 transition hover:border-white/[0.18] hover:text-white cursor-pointer lg:inline-flex"
+              className="hidden shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1 font-mono text-[11px] text-zinc-300 transition hover:border-white/[0.18] hover:text-white cursor-pointer lg:inline-flex"
             >
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
@@ -415,7 +418,7 @@ function AppShell() {
 
             <a
               href="/whitepaper"
-              className="hidden items-center gap-1 text-[13px] font-medium text-zinc-400 transition hover:text-zinc-100 md:inline-flex"
+              className="hidden shrink-0 items-center gap-1 whitespace-nowrap text-[13px] font-medium text-zinc-400 transition hover:text-zinc-100 lg:inline-flex"
             >
               <span>Whitepaper</span>
               <ArrowUpRight className="h-3.5 w-3.5" />
@@ -424,7 +427,7 @@ function AppShell() {
             <button
               type="button"
               onClick={openModal}
-              className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
+              className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer ${
                 evmAddress
                   ? 'border border-emerald-500/35 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20'
                   : 'bg-zinc-100 text-zinc-950 hover:bg-white'
@@ -446,7 +449,8 @@ function AppShell() {
               ) : (
                 <>
                   <Wallet className="h-3.5 w-3.5" />
-                  <span>Connect Wallet</span>
+                  <span className="sm:hidden">Connect</span>
+                  <span className="hidden sm:inline">Connect Wallet</span>
                 </>
               )}
             </button>
