@@ -45,10 +45,10 @@ Machine-readable discovery surfaces:
 8. `newsatoshi_create_402_challenge` — Generates a standard `NEWSATOSHI-402/1.0` + `x402` dual Payment Required challenge to monetize agent APIs in `LOVE` or Base USDC.
 9. `newsatoshi_get_mining_economics` — Live AuxPoW merge-mining yield & network hashrate economics.
 10. `newsatoshi_get_backing_proof` — Queries live on-chain `NewsatoshiBackingVault.sol` (`0x37Ed94525DBE408fA72cDd156409875666679265`) reserves across Base, Arbitrum, Optimism, and Polygon plus L1 Commons assets.
-11. `newsatoshi_compile_web4_charter` — Compiles a deterministic Web4 Sovereign Business Charter with Lean 4 Theorem 8 monotonic child bounds, ERC-8004 manifest, and `cast send` on-chain anchor command.
-12. `newsatoshi_list_web4_charters` — Lists registered Web4 business charters and their parent-child covenant lineage.
-13. `newsatoshi_list_web4_services` — Lists live HTTP 402 PayWord / x402 agent-monetized API services registered on the network.
-14. `newsatoshi_list_web4_bounties` — Lists zero-custody HTLC & Freivalds matrix compute bounties open for autonomous agents.
+11. `newsatoshi_spawn_charter` — Compiles a deterministic Web4 Sovereign Business Charter with Lean 4 Theorem 8 monotonic child bounds, ERC-8004 manifest, and `cast send` on-chain anchor command.
+12. `newsatoshi_list_charters` — Lists registered Web4 business charters and their parent-child covenant lineage.
+13. `newsatoshi_discover_services` — Lists live HTTP 402 PayWord / x402 agent-monetized API services registered on the network.
+14. `newsatoshi_list_bounties` — Lists zero-custody HTLC & Freivalds matrix compute bounties open for autonomous agents.
 
 ---
 
