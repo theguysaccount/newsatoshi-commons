@@ -2038,7 +2038,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 9);
+    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 14);
 
     let skills_idx: Value = serde_json::from_str(
         &ureq::get(&format!("{base}/.well-known/agent-skills/index.json"))
@@ -2164,7 +2164,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 9);
+    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 14);
 
     let install_sh = ureq::get(&format!("{base}/install.sh"))
         .call()
@@ -2509,6 +2509,176 @@ fn security_audit_hardening_guards() {
     let mut huge_proof = art;
     huge_proof.proof_hex = "00".repeat(MAX_PROOF_BYTES + 16);
     assert!(verify_covenant_stark(&huge_proof).is_err());
+
+    srv.stop();
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+}
+
+#[test]
+fn http_api_web4_charters_erc8004_services_bounties_and_paid_402_tool() {
+    use newsatoshi_commons::server::{spawn_server, ServerConfig};
+    use serde_json::Value;
+
+    let tmp_dir = std::env::temp_dir().join("newsatoshi_commons_web4_e2e_test");
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+    std::fs::create_dir_all(&tmp_dir).unwrap();
+    let state_file = tmp_dir.join("web4-state.json");
+
+    let srv = spawn_server(ServerConfig {
+        host: "127.0.0.1".to_string(),
+        port: 0,
+        state_file,
+        seed_url: "http://127.0.0.1:9/status".to_string(),
+        mainnet_seed_url: Some("http://127.0.0.1:9/status".to_string()),
+        static_dir: None,
+        admin_token: Some("web4-secret-token".to_string()),
+        verify_only: true,
+        external_public_keys: None,
+    })
+    .unwrap();
+    let base = srv.base_url();
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .http_status_as_error(false)
+        .build()
+        .into();
+
+    // 1. ERC-8004 root + genesis charter endpoints
+    let erc_root: Value = serde_json::from_str(
+        &agent
+            .get(&format!("{base}/.well-known/erc8004.json"))
+            .call()
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        erc_root["type"],
+        "https://eips.ethereum.org/EIPS/eip-8004#registration-v1"
+    );
+    assert_eq!(
+        erc_root["contracts"]["backing_vault"],
+        "0x37Ed94525DBE408fA72cDd156409875666679265"
+    );
+
+    let genesis_erc: Value = serde_json::from_str(
+        &agent
+            .get(&format!(
+                "{base}/api/web4/charters/charter-genesis-commons/erc8004.json"
+            ))
+            .call()
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        genesis_erc["type"],
+        "https://eips.ethereum.org/EIPS/eip-8004#registration-v1"
+    );
+    assert_eq!(genesis_erc["charter_id"], "charter-genesis-commons");
+
+    // 2. Public Web4 charter compilation + operator-gated registration + monotonic child bound check
+    let charter_payload = serde_json::json!({
+        "name": "Solar Compute Co-op",
+        "category": "paid_api",
+        "mission": "Autonomous solar microgrid + PayWord inference router",
+        "max_spend_per_call_love": 500,
+        "ops_bps": 5000,
+        "reinvest_bps": 3000,
+        "backing_bps": 2000,
+        "payout_love_address": "nsd1qtestcharteraddress0000000000000000000000",
+        "evm_treasury_address": "0xdf18181bD7EBCF8Ac3e74B5e10708E5ceA67A04c",
+        "primary_evm_chain": "base"
+    });
+    let mut r_compile = agent
+        .post(&format!("{base}/api/web4/charters/compile"))
+        .header("Content-Type", "application/json")
+        .send(charter_payload.to_string().as_str())
+        .unwrap();
+    assert_eq!(r_compile.status().as_u16(), 200);
+    let compiled: Value =
+        serde_json::from_str(&r_compile.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(compiled["ok"], true);
+    let parent_id = compiled["charter"]["charter_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(compiled["charter"]["cast_anchor_command"]
+        .as_str()
+        .unwrap()
+        .contains("0x37Ed94525DBE408fA72cDd156409875666679265"));
+
+    // Unauthenticated registration rejected
+    let r_unauth = agent
+        .post(&format!("{base}/api/web4/charters"))
+        .header("Content-Type", "application/json")
+        .send(charter_payload.to_string().as_str())
+        .unwrap();
+    assert_eq!(r_unauth.status().as_u16(), 401);
+
+    // Operator-authenticated registration succeeds
+    let r_reg = agent
+        .post(&format!("{base}/api/web4/charters"))
+        .header("Content-Type", "application/json")
+        .header("Authorization", "Bearer web4-secret-token")
+        .send(charter_payload.to_string().as_str())
+        .unwrap();
+    assert_eq!(r_reg.status().as_u16(), 200);
+
+    // Monotonic child bound violation (Lean 4 Theorem 8): lowering backing_bps below parent MUST fail
+    let r_bad_child = agent
+        .post(&format!("{base}/api/web4/charters/compile"))
+        .header("Content-Type", "application/json")
+        .send(
+            serde_json::json!({
+                "name": "Rogue Child",
+                "category": "paid_api",
+                "mission": "Autonomous solar microgrid + PayWord inference router",
+                "parent_charter_id": parent_id,
+                "max_spend_per_call_love": 400,
+                "ops_bps": 6000,
+                "reinvest_bps": 3000,
+                "backing_bps": 1000,
+                "payout_love_address": "nsd1qtestcharteraddress0000000000000000000000",
+                "evm_treasury_address": "0xdf18181bD7EBCF8Ac3e74B5e10708E5ceA67A04c",
+                "primary_evm_chain": "base"
+            })
+            .to_string()
+            .as_str(),
+        )
+        .unwrap();
+    assert_eq!(r_bad_child.status().as_u16(), 400);
+
+    // 3. Dogfooded HTTP 402 PayWord-monetized utility route: unpaid -> 402, valid PayWord -> 200
+    let r_unpaid = agent
+        .post(&format!("{base}/api/web4/tools/verify-payword-batch"))
+        .header("Content-Type", "application/json")
+        .send("{}")
+        .unwrap();
+    assert_eq!(r_unpaid.status().as_u16(), 402);
+
+    let seed = sha256(b"web4_paid_tool_seed_v11");
+    let h1 = sha256(&seed);
+    let h2 = sha256(&h1);
+    let tip = sha256(&h2);
+    let mut r_paid = agent
+        .post(&format!("{base}/api/web4/tools/verify-payword-batch"))
+        .header("Content-Type", "application/json")
+        .header(
+            "X-Newsatoshi-PayWord",
+            &format!("tip={},token={},ticks=1", hex::encode(tip), hex::encode(h2)),
+        )
+        .send("{}")
+        .unwrap();
+    assert_eq!(r_paid.status().as_u16(), 200);
+    let paid_body: Value =
+        serde_json::from_str(&r_paid.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(paid_body["ok"], true);
+    assert_eq!(paid_body["paid"], true);
+    assert_eq!(paid_body["verification"]["valid"], true);
 
     srv.stop();
     let _ = std::fs::remove_dir_all(&tmp_dir);

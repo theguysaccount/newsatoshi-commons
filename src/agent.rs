@@ -6,11 +6,13 @@
 //! Zero fake data: all network heights, balances, lock verifications, and STARK proofs
 //! come strictly from live Newsatoshi L1 nodes and the persisted Commons engine.
 
+use crate::backing::{fetch_live_backing_summary, BackingProofSummary, CANONICAL_BACKING_VAULT};
 use crate::crypto::{hash32_from_hex, sha256};
 use crate::seed::{SeedSnapshot, SeedStatusClient, AUXPOW_CHAIN_ID, MAINNET_GENESIS_HASH, TESTNET_GENESIS_HASH};
 use crate::stark::verify_covenant_stark;
 use crate::storage::{ApiStateView, CommonsEngine};
 use crate::swap::{compile_atomic_swap, verify_swap_on_chain, CompileSwapRequest};
+use crate::web4::{compile_web4_charter, render_erc8004_registration, SpawnCharterRequest};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -282,6 +284,7 @@ pub fn render_sitemap_xml(base_url: &str) -> String {
         ("/llms-full.txt", "0.9", "daily"),
         ("/openapi.json", "0.8", "daily"),
         ("/.well-known/agent.json", "0.8", "daily"),
+        ("/.well-known/erc8004.json", "0.85", "daily"),
         ("/.well-known/mcp.json", "0.8", "daily"),
         ("/.well-known/mcp/server-card.json", "0.8", "daily"),
         ("/.well-known/api-catalog", "0.8", "daily"),
@@ -291,6 +294,10 @@ pub fn render_sitemap_xml(base_url: &str) -> String {
         ("/install.sh", "0.8", "weekly"),
         ("/api/health", "0.6", "hourly"),
         ("/api/network/metrics", "0.8", "hourly"),
+        ("/api/backing/summary", "0.9", "hourly"),
+        ("/api/web4/charters", "0.85", "hourly"),
+        ("/api/web4/services", "0.85", "hourly"),
+        ("/api/web4/bounties", "0.85", "hourly"),
         ("/api/state", "0.7", "hourly"),
         ("/api/swaps", "0.7", "hourly"),
     ];
@@ -621,7 +628,12 @@ pub fn render_mcp_server_card_json(base_url: &str) -> Value {
             "newsatoshi_verify_stark_proof",
             "newsatoshi_agent_quickstart",
             "newsatoshi_create_402_challenge",
-            "newsatoshi_get_mining_economics"
+            "newsatoshi_get_mining_economics",
+            "newsatoshi_get_backing_proof",
+            "newsatoshi_spawn_charter",
+            "newsatoshi_list_charters",
+            "newsatoshi_discover_services",
+            "newsatoshi_list_bounties"
         ],
         "resources": [
             "newsatoshi://llms.txt",
@@ -695,11 +707,13 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 - {mainnet_line}
 - {testnet_line}
 - Live Verified EVM HTLC (`Base 8453 · Arbitrum 42161 · Optimism 10 · Polygon 137`, ownerless, all 4 Sourcify `exact_match`): `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987` (Native ETH/POL & Canonical USDC)
+- Live Verified Multi-Chain Proof-of-Backing Vault (`Base 8453 · Arbitrum 42161 · Optimism 10 · Polygon 137`, ownerless, 0 admin withdraw, all 4 Sourcify `exact_match`): `{backing_vault}` (`GET {base_url}/api/backing/summary`)
+- Official MCP Registry (`active`): `org.newsatoshi.commons/newsatoshi-commons` (`/.well-known/erc8004.json` ERC-8004 dual identity)
 - Commons Covenant Rule Hash: `{rule_hash}` (`verify_only={verify_only}`, `{key_mode}`)
 - Commons Treasury Balance: `{bal} LOVE` (`nonce={nonce}`, `parcels={parcels}`, `kwh={kwh}`, `starks={starks}`)
 
 ## Agent Interfaces (Zero Auth Required for All Reads, Compilers & Verifiers)
-- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with 9 live tools.
+- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with 14 live tools.
 - [MCP Server Card]({base_url}/.well-known/mcp/server-card.json) & [MCP Registry Manifest]({base_url}/server.json): Standard MCP discovery cards.
 - [A2A Agent Card]({base_url}/.well-known/agent.json): Machine-readable Agent-to-Agent capability manifest.
 - [RFC 9727 API Catalog]({base_url}/.well-known/api-catalog) & [OpenAPI 3.1 Schema]({base_url}/openapi.json): Complete REST API schema for multi-chain swaps, dual-chain lock verification, HTTP 402 PayWord verification, STARK verification, and offline signed telemetry/deeds.
@@ -724,6 +738,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 - RFC-0021 Native L1 `OP_VERIFY_COVENANT_STARK` (`0xb4`): https://github.com/theguysaccount/newsatoshi-rfc0021
 ",
         proto = state.protocol_version,
+        backing_vault = CANONICAL_BACKING_VAULT,
         rule_hash = state.covenant_rule_hash,
         verify_only = state.verify_only,
         key_mode = if state.verify_only || !state.signing_keys_loaded {
@@ -1404,6 +1419,57 @@ pub fn mcp_tools_list() -> Value {
                         "refresh": { "type": "boolean", "default": false }
                     }
                 }
+            },
+            {
+                "name": "newsatoshi_get_backing_proof",
+                "description": "Fetch live verifiable multi-chain Proof-of-Backing reserves across the ownerless NewsatoshiBackingVault.sol (0x37Ed94525DBE408fA72cDd156409875666679265) on Base, Arbitrum, Optimism & Polygon plus live Newsatoshi L1 supply, RWA deeds, and backing-per-LOVE ratios.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "refresh": { "type": "boolean", "default": false }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_spawn_charter",
+                "description": "Compile a sovereign Web4 Autonomous Business Charter with Lean 4-verified monotonic child spending caps, exact basis-point ops/reinvest/backing splits (summing to 10000), ERC-8004 dual identity JSON, and ready-to-run NewsatoshiBackingVault.sol anchor/deposit commands.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["name", "mission", "max_spend_per_call_love", "ops_bps", "reinvest_bps", "backing_bps", "payout_love_address", "evm_treasury_address"],
+                    "properties": {
+                        "name": { "type": "string" },
+                        "category": { "type": "string", "enum": ["paid_api", "compute_node", "physical_rwa", "liquidity_maker", "agent_collective"], "default": "paid_api" },
+                        "mission": { "type": "string" },
+                        "parent_charter_id": { "type": "string", "description": "Optional parent charter_id; enforces Lean 4 monotonic cap & backing_bps inheritance" },
+                        "max_spend_per_call_love": { "type": "integer", "minimum": 1 },
+                        "ops_bps": { "type": "integer", "minimum": 0, "maximum": 10000 },
+                        "reinvest_bps": { "type": "integer", "minimum": 0, "maximum": 10000 },
+                        "backing_bps": { "type": "integer", "minimum": 0, "maximum": 10000 },
+                        "payout_love_address": { "type": "string" },
+                        "evm_treasury_address": { "type": "string" },
+                        "primary_evm_chain": { "type": "string", "enum": ["base", "arbitrum", "optimism", "polygon"], "default": "base" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_list_charters",
+                "description": "List all persisted sovereign Web4 business charters with their covenant_rule_hash, backing_bps, lineage depth, and ERC-8004 URIs.",
+                "inputSchema": { "type": "object", "properties": {} }
+            },
+            {
+                "name": "newsatoshi_discover_services",
+                "description": "Discover live HTTP 402 PayWord & x402 paid AI/compute/data services registered by Web4 businesses, optionally filtered by capability tag.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "capability": { "type": "string", "description": "Optional capability tag filter (e.g. inference, compute, stark, audit)" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_list_bounties",
+                "description": "List open zero-custody work & compute bounties backed by Newsatoshi L1 Freivalds jobs or multi-chain SHA-256 HTLC locks.",
+                "inputSchema": { "type": "object", "properties": {} }
             }
         ]
     })
@@ -1416,6 +1482,7 @@ pub fn handle_mcp_jsonrpc(
     base_url: &str,
     engine: &CommonsEngine,
     seed_snapshot: &SeedSnapshot,
+    backing_snapshot: Option<&BackingProofSummary>,
     testnet_client: &SeedStatusClient,
     mainnet_client: Option<&SeedStatusClient>,
 ) -> (u16, Option<Value>) {
@@ -1667,6 +1734,63 @@ pub fn handle_mcp_jsonrpc(
                         .unwrap_or(1.2);
                     Ok(compute_network_metrics(seed_snapshot, ths))
                 }
+                "newsatoshi_get_backing_proof" => {
+                    if let Some(snap) = backing_snapshot {
+                        Ok(serde_json::to_value(snap).unwrap_or_default())
+                    } else {
+                        let api_state = engine.to_api_state();
+                        let fresh = fetch_live_backing_summary(&api_state, seed_snapshot, false);
+                        Ok(serde_json::to_value(fresh).unwrap_or_default())
+                    }
+                }
+                "newsatoshi_spawn_charter" => {
+                    serde_json::from_value::<SpawnCharterRequest>(args)
+                        .map_err(|e| format!("invalid spawn charter arguments: {e}"))
+                        .and_then(|req| {
+                            let parent = req.parent_charter_id.as_deref().and_then(|pid| {
+                                engine.web4_charters.iter().find(|c| c.charter_id == pid.trim())
+                            });
+                            let charter = compile_web4_charter(&req, parent, base_url)?;
+                            let erc8004 = render_erc8004_registration(&charter, base_url);
+                            Ok(json!({
+                                "ok": true,
+                                "persisted": false,
+                                "charter": charter,
+                                "erc8004_registration": erc8004
+                            }))
+                        })
+                }
+                "newsatoshi_list_charters" => Ok(json!({
+                    "ok": true,
+                    "count": engine.web4_charters.len(),
+                    "canonical_backing_vault": CANONICAL_BACKING_VAULT,
+                    "charters": engine.web4_charters
+                })),
+                "newsatoshi_discover_services" => {
+                    let cap = args
+                        .get("capability")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.trim().to_ascii_lowercase())
+                        .filter(|s| !s.is_empty());
+                    let filtered: Vec<_> = engine
+                        .web4_services
+                        .iter()
+                        .filter(|s| match &cap {
+                            Some(c) => s.capabilities.iter().any(|x| x == c),
+                            None => true,
+                        })
+                        .collect();
+                    Ok(json!({
+                        "ok": true,
+                        "count": filtered.len(),
+                        "services": filtered
+                    }))
+                }
+                "newsatoshi_list_bounties" => Ok(json!({
+                    "ok": true,
+                    "count": engine.web4_bounties.len(),
+                    "bounties": engine.web4_bounties
+                })),
                 other => Err(format!("unknown MCP tool '{other}'")),
             };
 
@@ -1747,6 +1871,7 @@ mod tests {
             DEFAULT_PUBLIC_BASE_URL,
             &engine,
             &snap,
+            None,
             &client,
             None,
         );
@@ -1758,9 +1883,10 @@ mod tests {
             DEFAULT_PUBLIC_BASE_URL,
             &engine,
             &snap,
+            None,
             &client,
             None,
         );
-        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 9);
+        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 14);
     }
 }

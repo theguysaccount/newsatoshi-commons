@@ -10,6 +10,7 @@ import {
   Loader2,
   Lock,
   RefreshCw,
+  Rocket,
   RotateCcw,
   Scale,
   Server,
@@ -40,6 +41,7 @@ import { InnovationHero } from './components/InnovationHero';
 import { LegalAirlockTab } from './components/LegalAirlockTab';
 import { SwapsMiningTab } from './components/SwapsMiningTab';
 import { TopL1Rail } from './components/TopL1Rail';
+import { Web4ForgeTab } from './components/Web4ForgeTab';
 import type {
   AcquireParcelPayload,
   CommonsState,
@@ -273,6 +275,7 @@ export default function App() {
 
   const tabs: { id: WorkspaceTab; label: string; icon: typeof Activity }[] = [
     { id: 'cockpit', label: 'Commons Ledger', icon: Activity },
+    { id: 'web4', label: 'Web4 Forge & Backing', icon: Rocket },
     { id: 'explorer', label: 'Live L1 Explorer', icon: Globe },
     { id: 'swaps', label: 'Swaps & Mining', icon: ArrowLeftRight },
     { id: 'economics', label: 'Unit Economics Calculator', icon: Calculator },
@@ -472,6 +475,12 @@ export default function App() {
             <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
             Connecting to local Newsatoshi Commons Rust node…
           </div>
+        ) : activeTab === 'web4' ? (
+          <Web4ForgeTab
+            hasOperatorToken={hasOperatorToken}
+            onStateUpdated={setState}
+            onNotice={showToast}
+          />
         ) : activeTab === 'explorer' ? (
           <ChainExplorerTab
             seed={seed}

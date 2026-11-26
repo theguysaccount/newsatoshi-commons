@@ -188,12 +188,20 @@ class NewsatoshiMcpClient:
         return self.rpc("tools/call", {"name": name, "arguments": arguments or {}})
 
 
+CANONICAL_EVM_HTLC = "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987"
+CANONICAL_BACKING_VAULT = "0x37Ed94525DBE408fA72cDd156409875666679265"
+
+
 def build_402_challenge(
     resource: str = "/api/inference",
     amount_love: str = "0.01",
     network: str = "mainnet",
     recipient: str = "<RECIPIENT_NSD1_OR_NS1_ADDRESS>",
     unit_price_base_units: int = 1_000,
+    evm_pay_to: Optional[str] = None,
+    x402_usdc_micro: int = 1_000,
+    charter_id: str = "",
+    backing_bps: int = 2000,
 ) -> Dict[str, Any]:
     net = "testnet" if network == "testnet" else "mainnet"
     ts = int(time.time())
@@ -210,4 +218,15 @@ def build_402_challenge(
         "issued_at_unix": ts,
         "www_authenticate": f'Newsatoshi-402 realm="newsatoshi", network="{net}", amount="{amount_love}"',
         "unit_price_base_units": unit_price_base_units,
+        "x402": {
+            "scheme": "exact",
+            "network": "eip155:8453",
+            "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            "maxAmountRequired": str(x402_usdc_micro),
+            "payTo": evm_pay_to or CANONICAL_BACKING_VAULT,
+            "htlcBridge": CANONICAL_EVM_HTLC,
+            "backingVault": CANONICAL_BACKING_VAULT,
+            "charterId": charter_id,
+            "backingBps": backing_bps,
+        },
     }

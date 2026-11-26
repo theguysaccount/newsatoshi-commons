@@ -34,16 +34,21 @@ Machine-readable discovery surfaces:
 - MCP manifest: `https://commons.newsatoshi.org/.well-known/mcp.json`
 - OpenAPI 3.1 schema: `https://commons.newsatoshi.org/openapi.json`
 
-### Live MCP Tools (9 Tools)
+### Live MCP Tools (14 Tools)
 1. `newsatoshi_get_network_status` — Live Mainnet & Testnet block height, difficulty, issued `LOVE`, locks, peers, AuxPoW `chainid = 20051`.
 2. `newsatoshi_get_commons_state` — Live `NEWSATOSHI/2.1` Commons balance, `covenant_rule_hash`, cold-ceremony public roots, STARK proofs, L1 anchors.
-3. `newsatoshi_compile_btc_love_swap` — Compiles a canonical BIP-199 Bitcoin P2WSH HTLC (`bc1q…` / `tb1q…`), decodes Lightning BOLT-11, Solana PDA escrow, or live Base Mainnet `NewsatoshiHtlc.sol` (`0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987`, Chain ID `8453`) into exact lock CLI commands.
+3. `newsatoshi_compile_btc_love_swap` — Compiles a canonical BIP-199 Bitcoin P2WSH HTLC (`bc1q…` / `tb1q…`), decodes Lightning BOLT-11, Solana PDA escrow, or live multi-chain EVM `NewsatoshiHtlc.sol` (`0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987` across Base `8453`, Arbitrum `42161`, Optimism `10`, Polygon `137`) into exact lock CLI commands.
 4. `newsatoshi_verify_onchain_lock` — Verifies any SHA-256 hash-lock live on Newsatoshi L1 (`/api/lock?hash=`), Bitcoin P2WSH UTXOs (`mempool.space`), and preimage match.
 5. `newsatoshi_verify_payword_402` — Verifies a pure-SHA-256 PayWord HTTP `402` micropayment token (`SHA256^ticks(token) == tip`) in microseconds.
 6. `newsatoshi_verify_stark_proof` — Cryptographically re-verifies any Winterfell STARK proof recorded in the Commons ledger.
 7. `newsatoshi_agent_quickstart` — Returns step-by-step wallet, faucet, swap, and HTTP 402 onboarding commands.
-8. `newsatoshi_create_402_challenge` — Generates a standard `NEWSATOSHI-402/1.0` Payment Required challenge to monetize agent APIs in `LOVE`.
+8. `newsatoshi_create_402_challenge` — Generates a standard `NEWSATOSHI-402/1.0` + `x402` dual Payment Required challenge to monetize agent APIs in `LOVE` or Base USDC.
 9. `newsatoshi_get_mining_economics` — Live AuxPoW merge-mining yield & network hashrate economics.
+10. `newsatoshi_get_backing_proof` — Queries live on-chain `NewsatoshiBackingVault.sol` (`0x37Ed94525DBE408fA72cDd156409875666679265`) reserves across Base, Arbitrum, Optimism, and Polygon plus L1 Commons assets.
+11. `newsatoshi_compile_web4_charter` — Compiles a deterministic Web4 Sovereign Business Charter with Lean 4 Theorem 8 monotonic child bounds, ERC-8004 manifest, and `cast send` on-chain anchor command.
+12. `newsatoshi_list_web4_charters` — Lists registered Web4 business charters and their parent-child covenant lineage.
+13. `newsatoshi_list_web4_services` — Lists live HTTP 402 PayWord / x402 agent-monetized API services registered on the network.
+14. `newsatoshi_list_web4_bounties` — Lists zero-custody HTLC & Freivalds matrix compute bounties open for autonomous agents.
 
 ---
 

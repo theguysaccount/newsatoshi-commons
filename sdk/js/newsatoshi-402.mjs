@@ -333,3 +333,65 @@ export class NewsatoshiMcpClient {
     return this.rpc("tools/call", { name, arguments: args });
   }
 }
+
+export const CANONICAL_EVM_HTLC = "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987";
+export const CANONICAL_BACKING_VAULT = "0x37Ed94525DBE408fA72cDd156409875666679265";
+
+/**
+ * Dual-rail Web4 HTTP 402 gate: accepts zero-gas Newsatoshi SHA-256 PayWords
+ * AND advertises x402 Base USDC + NewsatoshiBackingVault revenue-backing metadata
+ * so both Newsatoshi agents and Conway Automaton / Coinbase x402 agents can pay seamlessly.
+ */
+export function createDual402Gate({
+  recipient,
+  evmPayTo,
+  charterId = "",
+  backingBps = 2000,
+  unitPriceBaseUnits = 1000,
+  amountLove = "0.001",
+  x402UsdcMicro = 1000,
+  network = "mainnet",
+  allowedTips = null,
+} = {}) {
+  const inner = createPayWordGate({
+    recipient,
+    unitPriceBaseUnits,
+    amountLove,
+    network,
+    allowedTips,
+  });
+
+  return {
+    ...inner,
+    async verifyRequest(headerValue, resource = "/api/resource") {
+      const res = await inner.verifyRequest(headerValue, resource);
+      if (res.paid) {
+        const backingUnits = Math.floor((res.deltaPaidBaseUnits * backingBps) / 10000);
+        return {
+          ...res,
+          backingBps,
+          backingAllocationBaseUnits: backingUnits,
+          opsAllocationBaseUnits: res.deltaPaidBaseUnits - backingUnits,
+          backingVault: CANONICAL_BACKING_VAULT,
+        };
+      }
+      return {
+        ...res,
+        challenge: {
+          ...res.challenge,
+          x402: {
+            scheme: "exact",
+            network: "eip155:8453",
+            asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            maxAmountRequired: String(x402UsdcMicro),
+            payTo: evmPayTo || CANONICAL_BACKING_VAULT,
+            htlcBridge: CANONICAL_EVM_HTLC,
+            backingVault: CANONICAL_BACKING_VAULT,
+            charterId,
+            backingBps,
+          },
+        },
+      };
+    },
+  };
+}

@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "org.newsatoshi.commons/newsatoshi-commons",
   "title": "Newsatoshi Commons (LOVE)",
-  "description": "Post-quantum machine money (LOVE): multi-chain HTLC swaps, HTTP 402 PayWords & STARK verification.",
-  "version": "0.10.0",
+  "description": "Post-quantum machine money (LOVE): 4-chain Proof-of-Backing, Web4 charters, 402 PayWords & STARKs.",
+  "version": "0.11.0",
   "websiteUrl": "https://commons.newsatoshi.org",
   "repository": {
     "url": "https://github.com/theguysaccount/newsatoshi-commons",
