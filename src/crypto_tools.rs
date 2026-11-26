@@ -380,10 +380,10 @@ pub fn inspect_evm_contract(chain: &str, address: &str) -> Result<Value, String>
             }
         }
 
-        // Sourcify live source verification check
+        // Sourcify v2 live source verification check
         let agent = http_agent();
         let sc_url = format!(
-            "https://sourcify.dev/server/check-by-addresses?addresses={addr}&chainIds={}",
+            "https://sourcify.dev/server/v2/contract/{}/{addr}",
             net.chain_id
         );
         if let Ok(mut resp) = agent
@@ -391,15 +391,13 @@ pub fn inspect_evm_contract(chain: &str, address: &str) -> Result<Value, String>
             .header("User-Agent", "newsatoshi-commons/0.12")
             .call()
         {
-            if let Ok(txt) = resp.body_mut().read_to_string() {
-                if let Ok(arr) = serde_json::from_str::<Value>(&txt) {
-                    if let Some(st) = arr
-                        .as_array()
-                        .and_then(|a| a.first())
-                        .and_then(|o| o.get("status"))
-                        .and_then(|s| s.as_str())
-                    {
-                        sourcify_status = st.to_string();
+            let sc_status = resp.status().as_u16();
+            if sc_status == 404 {
+                sourcify_status = "unverified".to_string();
+            } else if let Ok(txt) = resp.body_mut().read_to_string() {
+                if let Ok(obj) = serde_json::from_str::<Value>(&txt) {
+                    if let Some(m) = obj.get("match").and_then(|s| s.as_str()) {
+                        sourcify_status = m.to_string();
                     }
                 }
             }
@@ -418,10 +416,15 @@ pub fn inspect_evm_contract(chain: &str, address: &str) -> Result<Value, String>
         if owner_addr.is_some() {
             risk_flags.push("ACTIVE_OWNER_PRIVILEGE");
         }
-        if sourcify_status == "false" {
+        if sourcify_status == "unverified" || sourcify_status == "false" {
             risk_flags.push("UNVERIFIED_ON_SOURCIFY");
         }
-        if !is_proxy && is_ownerless && (sourcify_status == "perfect" || sourcify_status == "partial")
+        if !is_proxy
+            && is_ownerless
+            && matches!(
+                sourcify_status.as_str(),
+                "exact_match" | "match" | "perfect" | "partial"
+            )
         {
             risk_flags.push("IMMUTABLE_OWNERLESS_VERIFIED");
         }
