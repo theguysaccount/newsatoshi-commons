@@ -121,7 +121,6 @@ pub fn build_x402_v2_challenge(base_url: &str, spec: &X402RouteSpec) -> (Value, 
             "scheme": "exact",
             "network": "eip155:8453",
             "amount": spec.amount_usdc_atomic,
-            "maxAmountRequired": spec.amount_usdc_atomic,
             "asset": BASE_USDC_ADDRESS,
             "payTo": pay_to,
             "maxTimeoutSeconds": 300,
@@ -134,7 +133,6 @@ pub fn build_x402_v2_challenge(base_url: &str, spec: &X402RouteSpec) -> (Value, 
             "scheme": "exact",
             "network": "eip155:42161",
             "amount": spec.amount_usdc_atomic,
-            "maxAmountRequired": spec.amount_usdc_atomic,
             "asset": ARBITRUM_USDC_ADDRESS,
             "payTo": pay_to,
             "maxTimeoutSeconds": 300,
@@ -147,7 +145,6 @@ pub fn build_x402_v2_challenge(base_url: &str, spec: &X402RouteSpec) -> (Value, 
             "scheme": "exact",
             "network": "eip155:137",
             "amount": spec.amount_usdc_atomic,
-            "maxAmountRequired": spec.amount_usdc_atomic,
             "asset": POLYGON_USDC_ADDRESS,
             "payTo": pay_to,
             "maxTimeoutSeconds": 300,
@@ -301,9 +298,12 @@ pub fn authorize_dual_402(
             .cloned()
             .unwrap_or_else(|| accepts[0].clone());
 
-        // For x402 v1 payloads, adapt network alias ("base") so v1 facilitators accept seamlessly
+        // For x402 v1 payloads, adapt network alias ("base") + maxAmountRequired
         if x402_version == 1 {
             if let Some(map) = req_obj.as_object_mut() {
+                if let Some(amt) = map.get("amount").cloned() {
+                    map.insert("maxAmountRequired".to_string(), amt);
+                }
                 let net_v1 = match map.get("network").and_then(|v| v.as_str()).unwrap_or("") {
                     "eip155:8453" => "base",
                     "eip155:42161" => "arbitrum",
