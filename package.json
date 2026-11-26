@@ -1,6 +1,6 @@
 {
   "name": "newsatoshi-mcp",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "description": "Zero-dependency MCP stdio bridge, zero-API-key crypto security/oracle CLI (EVM contract audit, Bitcoin mempool, BOLT-11, Base Uniswap V3), and post-quantum HTTP 402 PayWord SDK for Newsatoshi (LOVE).",
   "type": "module",
   "main": "./sdk/js/newsatoshi-402.mjs",

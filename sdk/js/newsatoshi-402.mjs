@@ -346,22 +346,62 @@ export async function verifyChannelMerkleProof(proof) {
   }
 }
 
+function hexToVariableBytes(hex, maxBytes = 8192) {
+  if (typeof hex !== "string") throw new Error("expected hex string");
+  const clean = hex.trim().toLowerCase().replace(/^0x/, "");
+  if (clean.length % 2 !== 0 || !/^[0-9a-f]*$/.test(clean)) {
+    throw new Error("expected even-length lowercase hex string");
+  }
+  const n = clean.length / 2;
+  if (n > maxBytes) throw new Error(`hex payload (${n} bytes) exceeds limit ${maxBytes}`);
+  const out = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
+
 /**
- * Encodes an exact 70-byte Newsatoshi L1 RFC-0022 unilateral `Action::ChannelClaim`
- * transaction (`Tx::Act(11)`) ready for `POST /api/tx` on any independent node.
+ * Computes the exact 32-byte domain-separated message signed by the seller's FIPS 205
+ * `SLH-DSA-SHA2-128s` key (`seller_vk`) to authorize an RFC-0022 `Action::ChannelClaim`:
+ * `SHA256("nsCHANCLAIM" || channel_id || ticks_u32_le || token)`.
  */
-export function encodeChannelClaimTx(channelIdHex, ticks, tokenHex) {
+export async function channelClaimMessageHex(channelIdHex, ticks, tokenHex) {
   if (!Number.isInteger(ticks) || ticks < 1 || ticks > MAX_PAYWORD_TICKS) {
     throw new Error(`ticks must be an integer in 1..=${MAX_PAYWORD_TICKS}`);
   }
   const chBytes = hexToBytes(channelIdHex);
   const tokBytes = hexToBytes(tokenHex);
-  const out = new Uint8Array(70);
+  const msg = new Uint8Array(11 + 32 + 4 + 32);
+  msg.set([0x6e, 0x73, 0x43, 0x48, 0x41, 0x4e, 0x43, 0x4c, 0x41, 0x49, 0x4d], 0); // "nsCHANCLAIM"
+  msg.set(chBytes, 11);
+  new DataView(msg.buffer).setUint32(43, ticks, true);
+  msg.set(tokBytes, 47);
+  return bytesToHex(await sha256(msg));
+}
+
+/**
+ * Encodes an exact seller-signed Newsatoshi L1 RFC-0022 unilateral `Action::ChannelClaim`
+ * transaction (`Tx::Act(11)`) ready for `POST /api/tx` on any independent node.
+ * Wire layout: `0x02 || 0x0b || channel[32] || ticks_u32_le[4] || token[32] || sig_len_u32_le[4] || sig`.
+ * With a standard 7,856-byte NIST FIPS 205 `SLH-DSA-SHA2-128s` signature, total size is 7,930 bytes.
+ */
+export function encodeChannelClaimTx(channelIdHex, ticks, tokenHex, sellerSigHex) {
+  if (!Number.isInteger(ticks) || ticks < 1 || ticks > MAX_PAYWORD_TICKS) {
+    throw new Error(`ticks must be an integer in 1..=${MAX_PAYWORD_TICKS}`);
+  }
+  const chBytes = hexToBytes(channelIdHex);
+  const tokBytes = hexToBytes(tokenHex);
+  const sigBytes = hexToVariableBytes(sellerSigHex ?? "", 7856);
+  const out = new Uint8Array(74 + sigBytes.length);
   out[0] = 2; // Tx::Act
   out[1] = 11; // Action::ChannelClaim
   out.set(chBytes, 2);
-  new DataView(out.buffer).setUint32(34, ticks, true);
+  const dv = new DataView(out.buffer);
+  dv.setUint32(34, ticks, true);
   out.set(tokBytes, 38);
+  dv.setUint32(70, sigBytes.length, true);
+  out.set(sigBytes, 74);
   return out;
 }
 
@@ -379,13 +419,14 @@ export function encodeChannelExpireTx(channelIdHex) {
 }
 
 /**
- * Broadcasts a 70-byte unilateral RFC-0022 `ChannelClaim` transaction directly to any
+ * Broadcasts a seller-signed unilateral RFC-0022 `ChannelClaim` transaction directly to any
  * Newsatoshi L1 node (`POST /api/tx`) with zero buyer cooperation or central gateway.
  */
 export async function submitL1ChannelClaim({
   channelIdHex,
   ticks,
   tokenHex,
+  sellerSigHex,
   network = "mainnet",
   seedBaseUrl = null,
   fetchImpl = fetch,
@@ -395,7 +436,7 @@ export async function submitL1ChannelClaim({
     seedBaseUrl ||
     (net === "testnet" ? DEFAULT_TESTNET_SEED_URL : DEFAULT_MAINNET_SEED_URL)
   ).replace(/\/$/, "");
-  const txBytes = encodeChannelClaimTx(channelIdHex, ticks, tokenHex);
+  const txBytes = encodeChannelClaimTx(channelIdHex, ticks, tokenHex, sellerSigHex);
   const resp = await fetchImpl(`${base}/api/tx`, {
     method: "POST",
     headers: { "Content-Type": "application/octet-stream" },
@@ -422,6 +463,7 @@ export async function verifyL1ChannelFunding({
   channelId = null,
   network = "mainnet",
   sellerAddress = null,
+  sellerVk = null,
   merchantAddress = null,
   requiredTicks = 1,
   unitPriceBaseUnits = 1,
@@ -481,15 +523,18 @@ export async function verifyL1ChannelFunding({
       const unitPrice = Number(ch.unit_price ?? 0);
       const timeout = Number(ch.timeout ?? 0);
       const seller = String(ch.seller ?? "").trim().toLowerCase();
+      const chVk = String(ch.seller_vk ?? "").trim().toLowerCase();
       const confirmedOk = !requireConfirmed || ch.confirmed === true;
       const addrOk =
         !expectedSeller ||
         expectedSeller.startsWith("<") ||
         seller === expectedSeller.trim().toLowerCase();
+      const vkOk =
+        !sellerVk || chVk === sellerVk.trim().toLowerCase().replace(/^0x/, "");
       const ticksOk = maxTicks >= requiredTicks;
       const priceOk = unitPrice >= unitPriceBaseUnits;
       const timeoutOk = chHeight === 0 || timeout >= chHeight + minBlocksRemaining;
-      return confirmedOk && addrOk && ticksOk && priceOk && timeoutOk;
+      return confirmedOk && addrOk && vkOk && ticksOk && priceOk && timeoutOk;
     });
 
     if (!matching) {
@@ -532,6 +577,7 @@ export async function verifyL1ChannelFunding({
       confirmations: Number(matching.confirmations || 0),
       confirmed: Boolean(matching.confirmed),
       sellerAddress: matching.seller || null,
+      sellerVk: matching.seller_vk || null,
       refundAddress: matching.refund || null,
       merkleProofVerified,
     };

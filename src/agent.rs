@@ -211,13 +211,16 @@ pub fn compute_network_metrics(seed: &SeedSnapshot, hashrate_ths: f64) -> Value 
     } else {
         1.2
     };
-    let max_supply_love = 21_000_000.0f64;
+    // Consensus schedule (`node/src/params.rs`): Bitcoin-style halvings to 20,917,968.75 LOVE by
+    // halving 8, then perpetual `SUBSIDY_FLOOR = 0.1953125 LOVE/block` tail emission (no hard cap).
+    let era8_supply_love = 20_917_968.75f64;
+    let tail_subsidy_love = 0.195_312_5f64;
     let block_reward_love = 50.0f64;
     let two_pow_32 = 4_294_967_296.0f64;
 
     let derive_chain = |st: &crate::seed::SeedStatus| -> Value {
         let issued_love = (st.issued as f64) / 100_000_000.0;
-        let supply_mined_pct = (issued_love / max_supply_love) * 100.0;
+        let era8_mined_pct = (issued_love / era8_supply_love) * 100.0;
         let recent_count = st.recent.len();
         let merge_mined_count = st.recent.iter().filter(|b| b.merge_mined).count();
         let merge_mined_pct = if recent_count > 0 {
@@ -258,8 +261,11 @@ pub fn compute_network_metrics(seed: &SeedSnapshot, hashrate_ths: f64) -> Value 
             "nullifiers": st.nullifiers,
             "mempool": st.mempool,
             "issued_love": issued_love,
-            "max_supply_love": max_supply_love,
-            "supply_mined_pct": supply_mined_pct,
+            "hard_cap": false,
+            "era8_supply_love": era8_supply_love,
+            "era8_mined_pct": era8_mined_pct,
+            "tail_subsidy_love_per_block": tail_subsidy_love,
+            "supply_schedule": "Bitcoin-like halvings to 20,917,968.75 LOVE by halving 8, then perpetual 0.1953125 LOVE/block tail emission (~10,266 LOVE/yr, <0.05%/yr and falling; no hard cap).",
             "block_reward_love": block_reward_love,
             "steady_state_daily_emission_love": steady_state_daily_emission_love,
             "recent_blocks_sampled": recent_count,
@@ -567,7 +573,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                      - **Zero Custody & Zero Server Keys:** Production runs in strict `--verify-only` mode with zero private signing keys on server hardware.\n\
                      - **Post-Quantum Cryptography End-to-End:** Uses NIST FIPS 205 SLH-DSA, stateful XMSS Merkle-Lamport trees, pure-SHA-256 PayWord hash-chains, and Winterfell 0.13 transparent STARK proofs with zero trusted setup.\n\
                      - **Honest Zero-Fake-Data Telemetry:** Every block height, difficulty, supply counter, lock verification, and treasury balance comes strictly from live cryptographic proofs and live L1 RPC/seed responses.\n\
-                     - **Open Source & Auditable:** Full source code, CI test suites, legal-cryptographic airlock templates, and RFC-0021 L1 soft-fork code are published openly on GitHub.\n"
+                     - **Open Source & Auditable:** Full source code, CI test suites, legal-cryptographic airlock templates, and height-gated RFC-0021/RFC-0022 L1 upgrade prototypes are published openly on GitHub.\n"
                 );
                 Some(("text/markdown; charset=utf-8", md))
             } else {
@@ -581,7 +587,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                      <h2>Zero-Custody, Verify-Only Architecture</h2>\n\
                      <p>The live public deployment at <code>commons.newsatoshi.org</code> runs in strict <code>--verify-only</code> mode and holds zero private signing keys on server disks or memory. All land deed attestations and physical energy telemetry packets are signed offline using NIST FIPS 205 SLH-DSA or stateful XMSS keys and verified cryptographically alongside Winterfell 0.13 transparent STARK proofs.</p>\n\
                      <h2>Verifiable Open Source</h2>\n\
-                     <p>All server code, smart contracts, Solana escrow codecs, AuxPoW Stratum merge-mining tools, and RFC-0021 L1 STARK soft-fork prototypes are published openly at <a href=\"https://github.com/theguysaccount/newsatoshi-commons\">github.com/theguysaccount/newsatoshi-commons</a> and <a href=\"https://github.com/theguysaccount/newsatoshi-rfc0021\">github.com/theguysaccount/newsatoshi-rfc0021</a>. Every counter starts at genuine zero and reflects real on-chain and cryptographic state only.</p>",
+                     <p>All server code, smart contracts, Solana escrow codecs, AuxPoW Stratum merge-mining tools, and height-gated RFC-0021/RFC-0022 L1 hard-fork upgrade prototypes are published openly at <a href=\"https://github.com/theguysaccount/newsatoshi-commons\">github.com/theguysaccount/newsatoshi-commons</a> and <a href=\"https://github.com/theguysaccount/newsatoshi-rfc0021\">github.com/theguysaccount/newsatoshi-rfc0021</a>. Every counter starts at genuine zero and reflects real on-chain and cryptographic state only.</p>",
                 );
                 Some(("text/html; charset=utf-8", html))
             }
@@ -592,7 +598,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                      Newsatoshi Commons is maintained openly on GitHub.\n\n\
                      ## Technical Support, Integrations & Bug Reports\n\
                      - GitHub Issues: https://github.com/theguysaccount/newsatoshi-commons/issues\n\
-                     - RFC-0021 L1 Soft-Fork Issues: https://github.com/theguysaccount/newsatoshi-rfc0021/issues\n\
+                     - RFC-0021 / RFC-0022 L1 Upgrade Issues: https://github.com/theguysaccount/newsatoshi-rfc0021/issues\n\
                      - Contact Email: commons@newsatoshi.org\n\n\
                      ## Security Disclosures\n\
                      If you discover a cryptographic, consensus, HTTP API, or bridge vulnerability, please open a private GitHub Security Advisory on `theguysaccount/newsatoshi-commons` or email `commons@newsatoshi.org` with reproduction steps and affected commit hashes so we can verify, patch, and add regression tests promptly.\n".to_string();
@@ -606,7 +612,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                     "<h1>Contact Newsatoshi Commons</h1>\n\
                      <p>Newsatoshi Commons is developed and operated in the open. Developers, AI agent builders, Bitcoin merge-miners, and liquidity makers can reach the maintainers directly through our public engineering channels or email.</p>\n\
                      <h2>Engineering &amp; Integration Support</h2>\n\
-                     <ul><li><strong>Commons, MCP &amp; Bridges Repository:</strong> <a href=\"https://github.com/theguysaccount/newsatoshi-commons/issues\">github.com/theguysaccount/newsatoshi-commons/issues</a></li><li><strong>RFC-0021 L1 STARK Soft-Fork Repository:</strong> <a href=\"https://github.com/theguysaccount/newsatoshi-rfc0021/issues\">github.com/theguysaccount/newsatoshi-rfc0021/issues</a></li><li><strong>Direct Contact Email:</strong> <a href=\"mailto:commons@newsatoshi.org\">commons@newsatoshi.org</a></li></ul>\n\
+                     <ul><li><strong>Commons, MCP &amp; Bridges Repository:</strong> <a href=\"https://github.com/theguysaccount/newsatoshi-commons/issues\">github.com/theguysaccount/newsatoshi-commons/issues</a></li><li><strong>RFC-0021 / RFC-0022 L1 Upgrade Repository:</strong> <a href=\"https://github.com/theguysaccount/newsatoshi-rfc0021/issues\">github.com/theguysaccount/newsatoshi-rfc0021/issues</a></li><li><strong>Direct Contact Email:</strong> <a href=\"mailto:commons@newsatoshi.org\">commons@newsatoshi.org</a></li></ul>\n\
                      <h2>Responsible Security Disclosure</h2>\n\
                      <p>We welcome independent cryptographic, smart-contract, Stratum, and HTTP API security reviews. Please report suspected vulnerabilities via a private GitHub Security Advisory on <code>theguysaccount/newsatoshi-commons</code> or by emailing <code>commons@newsatoshi.org</code> with affected file paths, commit hashes, and minimal reproduction steps.</p>",
                 );

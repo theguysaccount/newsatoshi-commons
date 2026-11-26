@@ -148,11 +148,13 @@ class Newsatoshi402PythonSdkTests(unittest.TestCase):
         )
 
         p237 = wallet.next_payment(237)
-        claim_tx = ns402.encode_channel_claim_tx(cid, 237, p237["token_hex"])
-        self.assertEqual(len(claim_tx), 70)
+        fake_sig_hex = "11" * 7856
+        claim_tx = ns402.encode_channel_claim_tx(cid, 237, p237["token_hex"], fake_sig_hex)
+        self.assertEqual(len(claim_tx), 7930)
         self.assertEqual(claim_tx[0], 2)
         self.assertEqual(claim_tx[1], 11)
         self.assertEqual(struct.unpack("<I", claim_tx[34:38])[0], 237)
+        self.assertEqual(struct.unpack("<I", claim_tx[70:74])[0], 7856)
         self.assertEqual(len(ns402.encode_channel_expire_tx(cid)), 34)
 
         received_tx = {}
@@ -226,9 +228,11 @@ class Newsatoshi402PythonSdkTests(unittest.TestCase):
             self.assertEqual(res["funding_status"], "verified_onchain_channel")
             self.assertEqual(res["channel_id"], cid)
 
-            sub = ns402.submit_l1_channel_claim(cid, 237, p237["token_hex"], seed_base_url=base)
+            sub = ns402.submit_l1_channel_claim(
+                cid, 237, p237["token_hex"], fake_sig_hex, seed_base_url=base
+            )
             self.assertTrue(sub["ok"])
-            self.assertEqual(sub["tx_bytes"], 70)
+            self.assertEqual(sub["tx_bytes"], 7930)
             self.assertEqual(received_tx["bytes"], claim_tx)
         finally:
             srv.shutdown()

@@ -204,13 +204,38 @@ def verify_channel_merkle_proof(proof: Optional[Dict[str, Any]]) -> bool:
         return False
 
 
-def encode_channel_claim_tx(channel_id_hex: str, ticks: int, token_hex: str) -> bytes:
-    """Encodes the exact 70-byte RFC-0022 unilateral Action::ChannelClaim L1 transaction."""
+def channel_claim_message(channel_id_hex: str, ticks: int, token_hex: str) -> str:
+    """Computes SHA256('nsCHANCLAIM' || channel_id || ticks_u32_le || token) signed by seller_vk."""
     if not isinstance(ticks, int) or not (1 <= ticks <= MAX_PAYWORD_TICKS):
         raise ValueError(f"ticks must be in 1..={MAX_PAYWORD_TICKS}")
     ch_bytes = _validate_hex32(channel_id_hex)
     tok_bytes = _validate_hex32(token_hex)
-    return bytes([2, 11]) + ch_bytes + struct.pack("<I", ticks) + tok_bytes
+    return hashlib.sha256(b"nsCHANCLAIM" + ch_bytes + struct.pack("<I", ticks) + tok_bytes).hexdigest()
+
+
+def encode_channel_claim_tx(
+    channel_id_hex: str,
+    ticks: int,
+    token_hex: str,
+    seller_sig_hex: str,
+) -> bytes:
+    """Encodes a seller-signed RFC-0022 unilateral Action::ChannelClaim L1 transaction (7,930 bytes with SLH-DSA-128s)."""
+    if not isinstance(ticks, int) or not (1 <= ticks <= MAX_PAYWORD_TICKS):
+        raise ValueError(f"ticks must be in 1..={MAX_PAYWORD_TICKS}")
+    ch_bytes = _validate_hex32(channel_id_hex)
+    tok_bytes = _validate_hex32(token_hex)
+    clean_sig = (seller_sig_hex or "").strip().lower().removeprefix("0x")
+    sig_bytes = bytes.fromhex(clean_sig) if clean_sig else b""
+    if len(sig_bytes) > 7856:
+        raise ValueError("seller signature exceeds 7,856 bytes")
+    return (
+        bytes([2, 11])
+        + ch_bytes
+        + struct.pack("<I", ticks)
+        + tok_bytes
+        + struct.pack("<I", len(sig_bytes))
+        + sig_bytes
+    )
 
 
 def encode_channel_expire_tx(channel_id_hex: str) -> bytes:
@@ -223,17 +248,18 @@ def submit_l1_channel_claim(
     channel_id_hex: str,
     ticks: int,
     token_hex: str,
+    seller_sig_hex: str,
     *,
     network: str = "mainnet",
     seed_base_url: Optional[str] = None,
     timeout: float = 10.0,
 ) -> Dict[str, Any]:
-    """Broadcasts a 70-byte unilateral RFC-0022 ChannelClaim tx to any Newsatoshi L1 node."""
+    """Broadcasts a seller-signed unilateral RFC-0022 ChannelClaim tx to any Newsatoshi L1 node."""
     net = "testnet" if network == "testnet" else "mainnet"
     base = (
         seed_base_url or (DEFAULT_TESTNET_SEED_URL if net == "testnet" else DEFAULT_MAINNET_SEED_URL)
     ).rstrip("/")
-    tx_bytes = encode_channel_claim_tx(channel_id_hex, ticks, token_hex)
+    tx_bytes = encode_channel_claim_tx(channel_id_hex, ticks, token_hex, seller_sig_hex)
     req = urllib.request.Request(
         f"{base}/api/tx",
         data=tx_bytes,
@@ -270,6 +296,7 @@ def verify_l1_channel_funding(
     channel_id: Optional[str] = None,
     network: str = "mainnet",
     seller_address: Optional[str] = None,
+    seller_vk: Optional[str] = None,
     merchant_address: Optional[str] = None,
     required_ticks: int = 1,
     unit_price_base_units: int = 1,
@@ -320,16 +347,18 @@ def verify_l1_channel_funding(
             unit_price = int(ch.get("unit_price", 0) or 0)
             ch_timeout = int(ch.get("timeout", 0) or 0)
             seller = str(ch.get("seller", "")).strip().lower()
+            ch_vk = str(ch.get("seller_vk", "")).strip().lower()
             confirmed_ok = (not require_confirmed) or (ch.get("confirmed") is True)
             addr_ok = (
                 not expected_seller
                 or expected_seller.startswith("<")
                 or seller == expected_seller.strip().lower()
             )
+            vk_ok = (not seller_vk) or (ch_vk == seller_vk.strip().lower().removeprefix("0x"))
             ticks_ok = max_ticks >= required_ticks
             price_ok = unit_price >= unit_price_base_units
             timeout_ok = ch_height == 0 or ch_timeout >= ch_height + min_blocks_remaining
-            if confirmed_ok and addr_ok and ticks_ok and price_ok and timeout_ok:
+            if confirmed_ok and addr_ok and vk_ok and ticks_ok and price_ok and timeout_ok:
                 merkle_verified = False
                 if ch.get("merkle_proof"):
                     merkle_verified = verify_channel_merkle_proof(ch["merkle_proof"])
@@ -358,6 +387,7 @@ def verify_l1_channel_funding(
                     "confirmations": int(ch.get("confirmations", 0) or 0),
                     "confirmed": bool(ch.get("confirmed")),
                     "seller_address": ch.get("seller"),
+                    "seller_vk": ch.get("seller_vk"),
                     "refund_address": ch.get("refund"),
                     "merkle_proof_verified": merkle_verified,
                 }

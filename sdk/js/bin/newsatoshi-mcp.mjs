@@ -44,7 +44,7 @@ function parseFlag(args, flag, fallback = undefined) {
 }
 
 function printHelp() {
-  console.log(`newsatoshi-mcp v0.15.0 — Zero-API-Key Crypto MCP Bridge & Post-Quantum 402 CLI
+  console.log(`newsatoshi-mcp v0.15.1 — Zero-API-Key Crypto MCP Bridge & Post-Quantum 402 CLI
 
 STDIO MCP BRIDGE (default when invoked with no subcommand):
   npx -y github:theguysaccount/newsatoshi-commons

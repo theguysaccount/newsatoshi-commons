@@ -326,21 +326,24 @@ test("RFC-0022 L1 channel funding check, Merkle proof verification, and 70-byte 
   assert.equal(gRes.fundingStatus, "verified_onchain_channel");
   assert.equal(gRes.channelId, channelId);
 
-  // Encode & submit exact 70-byte unilateral ChannelClaim
-  const rawClaim = encodeChannelClaimTx(channelId, 237, p237.tokenHex);
-  assert.equal(rawClaim.length, 70);
+  // Encode & submit exact seller-signed unilateral ChannelClaim (74 + 7856 = 7,930 bytes)
+  const fakeSigHex = "11".repeat(7856);
+  const rawClaim = encodeChannelClaimTx(channelId, 237, p237.tokenHex, fakeSigHex);
+  assert.equal(rawClaim.length, 7930);
   assert.equal(rawClaim[0], 2);
   assert.equal(rawClaim[1], 11);
   assert.equal(new DataView(rawClaim.buffer).getUint32(34, true), 237);
+  assert.equal(new DataView(rawClaim.buffer).getUint32(70, true), 7856);
   assert.equal(encodeChannelExpireTx(channelId).length, 34);
 
   const sub = await submitL1ChannelClaim({
     channelIdHex: channelId,
     ticks: 237,
     tokenHex: p237.tokenHex,
+    sellerSigHex: fakeSigHex,
     fetchImpl: mockNodeFetch,
   });
   assert.equal(sub.ok, true);
-  assert.equal(sub.txBytes, 70);
-  assert.equal(postedBody.length, 70);
+  assert.equal(sub.txBytes, 7930);
+  assert.equal(postedBody.length, 7930);
 });
