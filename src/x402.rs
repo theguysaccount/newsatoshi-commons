@@ -8,11 +8,13 @@
 //!   (default `https://facilitator.payai.network`, overrideable via `X402_FACILITATOR_URL`).
 //! - Zero-gas, post-quantum pure-SHA-256 `X-Newsatoshi-PayWord` fast path (`<1ms`, 0 gas).
 
-use crate::agent::verify_payword_token;
+use crate::agent::verify_payword_token_incremental;
 use crate::backing::{BackingProofSummary, CANONICAL_BACKING_VAULT};
 use crate::swap::CANONICAL_EVM_HTLC_CONTRACT;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
 pub const DEFAULT_X402_PAY_TO: &str = "0xdf18181bD7EBCF8Ac3e74B5e10708E5ceA67A04c";
@@ -193,10 +195,11 @@ pub fn build_x402_v2_challenge(base_url: &str, spec: &X402RouteSpec) -> (Value, 
         "resource": payment_required_obj["resource"],
         "payword_fast_path": {
             "protocol": "NEWSATOSHI-PAYWORD-SHA256/1.0",
+            "algorithm": "Rivest-Shamir (1996) incremental SHA-256 hash-chain (O(1) per sequential call, up to 1,000,000 ticks)",
             "header": "X-Newsatoshi-PayWord: tip=<64hex>,token=<64hex>,ticks=<n>",
             "gas_usd": 0,
-            "latency_ms": "<1",
-            "note": "Zero-gas post-quantum pure-SHA-256 alternative to on-chain x402 settlement"
+            "local_verify_latency_ms": "<1",
+            "note": "Zero-gas local voucher metering (demo mode on public verify-only sandbox; production merchants enforce funded on-chain L1/EVM lock verification)"
         },
         "backing_vault": CANONICAL_BACKING_VAULT
     });
@@ -207,7 +210,15 @@ pub fn build_x402_v2_challenge(base_url: &str, spec: &X402RouteSpec) -> (Value, 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SettlementReceipt {
     pub rail: String,
+    /// True ONLY when an on-chain payment/lock is cryptographically verified & settled
+    /// (e.g., x402 v2 USDC facilitator settlement or verified funded L1 lock).
+    /// Unfunded PayWord sandbox vouchers explicitly report `settled: false`.
     pub settled: bool,
+    pub funding_status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verification_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hashes_evaluated: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub network: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -220,15 +231,23 @@ pub struct SettlementReceipt {
     pub payment_response_b64: Option<String>,
 }
 
+static PAYWORD_WATERMARKS: OnceLock<Mutex<HashMap<String, (u64, String)>>> = OnceLock::new();
+
+fn payword_watermarks() -> &'static Mutex<HashMap<String, (u64, String)>> {
+    PAYWORD_WATERMARKS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
 /// Attempts to authorize a request via EITHER:
-/// 1. `X-Newsatoshi-PayWord: tip=...,token=...,ticks=...` (zero-gas pure SHA-256 local verification), OR
+/// 1. `X-Newsatoshi-PayWord: tip=...,token=...,ticks=...` (incremental O(1) pure SHA-256 verification
+///    with monotonic anti-replay watermark; explicitly tagged `unfunded_payword_demo`, `settled: false`
+///    on the public verify-only sandbox when no funded on-chain lock is attached), OR
 /// 2. `PAYMENT-SIGNATURE` / `X-PAYMENT` (x402 v2 / v1 Base/Arbitrum/Polygon USDC verified & settled live via facilitator).
 pub fn authorize_dual_402(
     payword_header: Option<&str>,
     x402_header: Option<&str>,
     challenge_obj: &Value,
 ) -> Result<Option<SettlementReceipt>, String> {
-    // Path 1: Zero-gas Newsatoshi PayWord fast path
+    // Path 1: Zero-gas incremental O(1) Newsatoshi PayWord metering path
     if let Some(hdr) = payword_header {
         let mut tip = None;
         let mut tok = None;
@@ -247,13 +266,39 @@ pub fn authorize_dual_402(
             (Some(a), Some(b), Some(c)) if c >= 1 => (a, b, c),
             _ => return Err("malformed X-Newsatoshi-PayWord header (expected tip=<hex>,token=<hex>,ticks=<n>)".to_string()),
         };
-        let res = verify_payword_token(&tip_h, &tok_h, n, 10_000)?;
+        let norm_tip = tip_h.trim().to_ascii_lowercase();
+        let prev = {
+            let map = payword_watermarks().lock().unwrap_or_else(|e| e.into_inner());
+            map.get(&norm_tip).cloned()
+        };
+        let (prev_ticks, prev_tok) = match prev {
+            Some((pt, ref ptok)) => {
+                if n <= pt {
+                    return Err(format!(
+                        "PayWord replay rejected: ticks ({n}) must exceed last accepted ({pt})"
+                    ));
+                }
+                (pt, Some(ptok.as_str()))
+            }
+            None => (0, None),
+        };
+        let res = verify_payword_token_incremental(&norm_tip, &tok_h, n, 10_000, prev_tok, prev_ticks)?;
         if !res.valid {
             return Err("invalid PayWord hash-chain proof".to_string());
         }
+        {
+            let mut map = payword_watermarks().lock().unwrap_or_else(|e| e.into_inner());
+            if map.len() >= 10_000 && !map.contains_key(&res.tip_hex) {
+                map.clear();
+            }
+            map.insert(res.tip_hex.clone(), (n, res.token_hex.clone()));
+        }
         return Ok(Some(SettlementReceipt {
             rail: "NEWSATOSHI-PAYWORD-SHA256/1.0".to_string(),
-            settled: true,
+            settled: false,
+            funding_status: "unfunded_payword_demo".to_string(),
+            verification_mode: Some(res.verification_mode),
+            hashes_evaluated: Some(res.hashes_evaluated),
             network: Some("newsatoshi:mainnet".to_string()),
             tx_hash: None,
             payer: Some(res.tip_hex),
@@ -404,6 +449,9 @@ pub fn authorize_dual_402(
         return Ok(Some(SettlementReceipt {
             rail: format!("x402-v{x402_version}-usdc"),
             settled: true,
+            funding_status: "verified_x402_onchain_usdc".to_string(),
+            verification_mode: Some("facilitator_onchain_settle".to_string()),
+            hashes_evaluated: None,
             network,
             tx_hash,
             payer,
