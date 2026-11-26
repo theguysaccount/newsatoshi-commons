@@ -32,11 +32,11 @@ function formatBlockTime(unix: number): string {
 const MIGRATION_PHASES = [
   {
     phase: 'Layer 1 (Narrow Waist)',
-    title: 'v1.0.0-core Minimalist SHA-2 Settlement Floor',
+    title: 'v1.1.0-hardened Minimalist SHA-2 Settlement Floor',
     status: 'IMPLEMENTED' as const,
     summary:
-      'Pure SHA-2 shielded cash (zero elliptic curves, zero novel ZK-hashes), Bitcoin AuxPoW (chainid 20051) + Day-1 ASERT ramp, BatchSpend K=2..16 compression (6.49x at K=8), work-proportional FlyClient MMR, 50% fee burn, PayWord channels, and minimal PriorLock. Alt-L1 bloat removed.',
-    specs: ['v1.0.0-core', '6.49x BatchSpend', '10 Lean + 249 Z3'],
+      'Pure SHA-2 shielded cash (256-bit Quartic Goldilocks FRI at 100–104 conservative QROM bits, zero elliptic curves, zero novel ZK-hashes), all 249 spend AIR constraints mechanized in Lean 4 (0 sorry), real pure-SHA-2 STARK-in-STARK IVC verifier, Bitcoin AuxPoW (chainid 20051) + Day-1 ASERT ramp, BatchSpend K=2..16 (6.45x at K=8), FlyClient MMR, 50% fee burn, PayWord channels, and minimal PriorLock.',
+    specs: ['v1.1.0-hardened', '100-104b QROM', '249 Lean AIR + IVC'],
   },
   {
     phase: 'Layer 2 (Above Waist)',

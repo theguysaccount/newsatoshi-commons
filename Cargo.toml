@@ -1,8 +1,8 @@
 [package]
 name = "newsatoshi-commons"
-version = "0.22.1"
+version = "0.23.0"
 edition = "2021"
-description = "Newsatoshi Commons Gateway (v1.0.0-core Priorism-FEP Pure SHA-2 L1 aligned): Native LOVE PayWord/PriorLock primary rails, x402 outer EVM bridge on-ramps, NIST FIPS 205 SLH-DSA, Winterfell 0.13 STARK verification, trustless multi-chain SHA-256 HTLC swaps, zkTLS verification, and honest Mainnet v2 cutover readiness telemetry."
+description = "Newsatoshi Commons Gateway (v1.1.0-hardened Priorism-FEP Pure SHA-2 L1 aligned: >=100-bit QROM Quartic FRI, full 249-constraint Lean 4 proof, real STARK-in-STARK IVC): Native LOVE PayWord/PriorLock primary rails, x402 outer EVM bridge on-ramps, NIST FIPS 205 SLH-DSA, Winterfell 0.13 STARK verification, trustless multi-chain SHA-256 HTLC swaps, zkTLS verification, and honest Mainnet v2 cutover readiness telemetry."
 
 [[bin]]
 name = "newsatoshi-commons"

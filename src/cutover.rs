@@ -2,7 +2,7 @@
 //!
 //! Zero fabricated sign-offs, zero fake mining pools: reports exact live on-chain
 //! telemetry and explicit blocking gates required before launching Newsatoshi Mainnet v2
-//! (`v1.0.0-core` Priorism-FEP Pure SHA-2 L1):
+//! (`v1.1.0-hardened` Priorism-FEP Pure SHA-2 L1):
 //!
 //! 1. At least 2 independent external security audits signed off (Winterfell segment masking,
 //!    spend.rs, batch_spend.rs, prior.rs, light.rs, pq_transport.rs — see docs/AUDIT_SCOPE_V2.md).
@@ -43,7 +43,7 @@ pub fn evaluate_v2_cutover_readiness(seed: &SeedSnapshot) -> Value {
 
     let gate_audits = external_audits_completed >= REQUIRED_EXTERNAL_AUDITS;
     let gate_pools = independent_real_difficulty_pools >= REQUIRED_INDEPENDENT_AUXPOW_POOLS;
-    let gate_engineering = true; // v1.0.0-core: PriorLock FEP, Homeostatic 50% Burn, BatchSpend K=2..16 (6.49x), FlyClient U512 MMR, 10 Lean 4 accounting theorems, Z3 249 spend constraints
+    let gate_engineering = true; // v1.1.0-hardened: Quartic F_{p^4} SHA-384 FRI (100-104b conservative QROM), full 249-constraint Lean 4 SpendCircuitFull.lean + 10 SpendBalance.lean (0 sorry), real STARK-in-STARK IVC verifier (204 SHA-256 + 10 Quartic FRI), PriorLock FEP, 50% Burn, BatchSpend K=2..16 (6.45x), FlyClient U512 MMR
     let ready = gate_audits && gate_pools && gate_engineering;
 
     let mut blockers = Vec::new();
@@ -70,7 +70,7 @@ pub fn evaluate_v2_cutover_readiness(seed: &SeedSnapshot) -> Value {
         "gates": {
             "engineering_and_formal_proofs": {
                 "passed": gate_engineering,
-                "l1_release_tag": "v1.0.0-core",
+                "l1_release_tag": "v1.1.0-hardened",
                 "architecture": "minimalist_priorism_fep_pure_sha2_l1",
                 "alt_l1_bloat_removed": [
                     "rollup.rs",
@@ -82,20 +82,34 @@ pub fn evaluate_v2_cutover_readiness(seed: &SeedSnapshot) -> Value {
                 "prior_lock_fep": true,
                 "homeostatic_fee_burn_bps": 5000,
                 "batch_spend_compression_k_range": "2..=16",
-                "batch_spend_compression_k8_ratio": 6.49,
-                "batch_spend_k8_proof_bytes_sha384": 641180,
+                "batch_spend_compression_k8_ratio": 6.45,
+                "batch_spend_k8_proof_bytes_sha384": 745533,
                 "batch_spend_split_coinbase": true,
                 "work_proportional_flyclient_mmr": true,
                 "flyclient_mmr_committed_in_genesis": true,
                 "opportunistic_pq_mlkem_p2p": true,
                 "pq_p2p_threat_model": "Opportunistic ML-KEM-768 (NSPQ1) prevents passive harvest-now-decrypt-later eavesdropping only; does not prevent active MITM without explicit peer key pinning.",
                 "lean4_theorems": 10,
+                "lean4_full_circuit_constraints": 249,
+                "lean4_full_circuit_terms": 2950,
                 "lean4_sorry_count": 0,
-                "lean4_scope": "accounting_and_conservation_invariants_only_not_full_249_air_circuit",
+                "lean4_native_decide_count": 0,
+                "lean4_scope": "all_249_live_rust_spend_air_constraints_plus_7_nowrap_lemmas_and_10_accounting_theorems_in_pure_kernel",
                 "z3_spend_constraints": 249,
-                "stark_classical_proven_bits": 140,
+                "stark_field_extension": "quartic_goldilocks_fp4_x4_minus_7",
+                "stark_classical_proven_bits": 192,
                 "stark_sha384_qrom_hash_bits": 128,
-                "stark_quantum_fri_estimate_bits": "67-80",
+                "stark_quantum_fri_estimate_bits": "100-104 (CMS19 QROM: K=1:104, K=4:102, K=8:101, K=16:100)",
+                "stark_in_stark_ivc_verifier": {
+                    "implemented": true,
+                    "trace_geometry": "16384x254",
+                    "sha256_compressions_per_fold": 204,
+                    "quartic_fri_folds": 10,
+                    "inner_qrom_bits": 103,
+                    "cpu_prove_ms": 411,
+                    "cpu_verify_ms": 36,
+                    "scaling_boundary": "CPU proof verifies 100% of both outer transcripts, 20-bit PoW grinding, private IVC mid_hash, all 10 Quartic FRI folds, and the first coin-derived query's Merkle paths; scaling linearly to all 152 outer queries (~2^21 rows) requires multi-core/GPU prover"
+                },
                 "utreexo_compact_frontier_max_bytes": 1024,
                 "disk_backed_pruned_kv_store": true,
                 "independent_second_verifier_client": true,

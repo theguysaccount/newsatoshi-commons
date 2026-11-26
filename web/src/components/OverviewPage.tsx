@@ -48,12 +48,13 @@ node web4-kit/agent-business.mjs`,
   },
   lean: {
     label: 'Lean 4 Checks',
-    caption: 'Re-verify the 9 L2 covenant model theorems locally (L1 SpendBalance.lean separately checks 10 accounting theorems; Z3 checks 249 AIR constraints)',
+    caption: 'Re-verify L2 covenant theorems + L1 full 249-constraint SHA-256 spend AIR proof (SpendCircuitFull.lean, 0 sorry, 0 native_decide)',
     code: `curl -fsSL https://commons.newsatoshi.org/formal/NewsatoshiCovenants.lean \\
   -o /tmp/NewsatoshiCovenants.lean
 
 lean /tmp/NewsatoshiCovenants.lean
-# Exit 0 — 9 covenant model theorems, 0 sorry`,
+# L1 repo also verifies ALL 249 live Rust spend constraints:
+# lean node/proof/SpendCircuitFull.lean  (0 sorry, pure kernel)`,
   },
   cli: {
     label: 'Install CLI',
@@ -132,7 +133,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
         <div className="lg:col-span-7">
           <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-white/[0.09] bg-white/[0.025] px-3 py-1 text-[11px] font-medium tracking-wide text-zinc-400">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            <span className="font-mono uppercase text-zinc-200">L1 v1.0.0-core</span>
+            <span className="font-mono uppercase text-zinc-200">L1 v1.1.0-hardened</span>
             <span className="text-zinc-600">·</span>
             <span>Hourglass Architecture · L2 Agent &amp; Bridge Gateway</span>
           </div>
@@ -170,12 +171,12 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
             </button>
 
             <a
-              href="https://github.com/theguysaccount/newsatoshi-rfc0021/releases/tag/v1.0.0-core"
+              href="https://github.com/theguysaccount/newsatoshi-rfc0021/releases/tag/v1.1.0-hardened"
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 px-3 py-2.5 text-[13px] font-medium text-zinc-400 transition hover:text-zinc-100"
             >
-              <span>L1 v1.0.0-core</span>
+              <span>L1 v1.1.0-hardened</span>
               <ArrowUpRight className="h-3.5 w-3.5" />
             </a>
           </div>
@@ -244,10 +245,10 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
               <ArrowUpRight className="h-3.5 w-3.5 text-zinc-600 transition group-hover:text-zinc-300" />
             </div>
             <div className="mt-2.5 font-mono text-2xl font-medium tracking-tight text-zinc-100">
-              10 Lean · 249 Z3
+              104b QROM · 249 Lean
             </div>
             <div className="mt-1.5 text-xs text-zinc-500">
-              Accounting theorems + Z3 spend AIR · 6.49× K=8 batch
+              Quartic FRI · 249 Lean AIR + IVC · 6.45× K=8 batch
             </div>
           </a>
 
@@ -298,7 +299,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] text-emerald-200 hover:bg-emerald-500/20"
               >
-                <span>newsatoshi-rfc0021 · v1.0.0-core</span>
+                <span>newsatoshi-rfc0021 · v1.1.0-hardened</span>
                 <ArrowUpRight className="h-3 w-3" />
               </a>
             </div>
@@ -330,10 +331,11 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
               <li className="flex items-start gap-2.5">
                 <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
                 <span>
-                  <strong className="text-zinc-100">Bitcoin AuxPoW + BatchSpend:</strong> borrows
+                  <strong className="text-zinc-100">Bitcoin AuxPoW + 100–104b QROM:</strong> borrows
                   Bitcoin SHA-256 ASIC security (<code className="font-mono text-xs">chainid 20051</code>),
-                  compresses K=8 spends <strong className="text-zinc-100">6.49×</strong> (641 KB),
-                  and verifies light clients via work-proportional FlyClient MMR.
+                  proves Quartic <code className="font-mono text-xs">F_p4</code> SHA-384 STARKs past 100
+                  conservative QROM bits, compresses K=8 spends <strong className="text-zinc-100">6.45×</strong> (745 KB in 1.43 s),
+                  mechanizes all 249 AIR constraints in Lean 4, and includes a real STARK-in-STARK IVC verifier.
                 </span>
               </li>
               <li className="flex items-start gap-2.5">
@@ -360,7 +362,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 rounded-full border border-white/[0.1] bg-white/[0.04] px-2.5 py-0.5 font-mono text-[10px] text-zinc-300 hover:text-white"
               >
-                <span>newsatoshi-commons · v0.22.1</span>
+                <span>newsatoshi-commons · v0.23.0</span>
                 <ArrowUpRight className="h-3 w-3" />
               </a>
             </div>
