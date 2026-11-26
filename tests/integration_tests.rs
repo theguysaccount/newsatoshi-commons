@@ -2038,7 +2038,19 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 14);
+    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 19);
+
+    let agent_card_v3: Value = serde_json::from_str(
+        &ureq::get(&format!("{base}/.well-known/agent-card.json"))
+            .call()
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert!(agent_card_v3["skills"].as_array().unwrap().len() >= 9);
+    assert_eq!(agent_card_v3["capabilities"]["evm_contract_security_audit"], true);
 
     let skills_idx: Value = serde_json::from_str(
         &ureq::get(&format!("{base}/.well-known/agent-skills/index.json"))
@@ -2164,7 +2176,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 14);
+    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 19);
 
     let install_sh = ureq::get(&format!("{base}/install.sh"))
         .call()
@@ -2692,7 +2704,7 @@ fn http_api_web4_charters_erc8004_services_bounties_and_paid_402_tool() {
     )
     .unwrap();
     assert_eq!(x402_idx["version"], 2);
-    assert_eq!(x402_idx["resources"].as_array().unwrap().len(), 3);
+    assert_eq!(x402_idx["resources"].as_array().unwrap().len(), 4);
 
     let r_x402_unpaid = agent
         .get(&format!("{base}/api/x402/bridge-quote"))

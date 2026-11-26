@@ -1,11 +1,15 @@
 {
   "name": "@newsatoshi/402",
-  "version": "0.8.0",
-  "description": "Zero-dependency post-quantum HTTP 402 PayWord micropayment middleware, autonomous agent client, and Streamable HTTP MCP client for Newsatoshi (LOVE).",
+  "version": "0.13.0",
+  "description": "Zero-dependency post-quantum HTTP 402 PayWord middleware, stdio MCP bridge, zero-API-key EVM/BTC/BOLT-11/Uniswap V3 tools, and Streamable HTTP MCP client for Newsatoshi (LOVE).",
   "type": "module",
   "main": "./newsatoshi-402.mjs",
   "exports": {
     ".": "./newsatoshi-402.mjs"
+  },
+  "bin": {
+    "newsatoshi-mcp": "./bin/newsatoshi-mcp.mjs",
+    "newsatoshi-402": "./bin/newsatoshi-mcp.mjs"
   },
   "scripts": {
     "test": "node --test test_newsatoshi_402.mjs"

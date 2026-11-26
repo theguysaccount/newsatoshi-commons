@@ -266,7 +266,9 @@ Sitemap: {base_url}/sitemap.xml
 # llms-full.txt: {base_url}/llms-full.txt
 # MCP Streamable HTTP: {base_url}/mcp
 # MCP Server Card: {base_url}/.well-known/mcp/server-card.json
-# A2A Agent Card: {base_url}/.well-known/agent.json
+# A2A Agent Card: {base_url}/.well-known/agent-card.json
+# A2A Legacy Agent Card: {base_url}/.well-known/agent.json
+# x402 Payment Discovery: {base_url}/.well-known/x402
 # RFC 9727 API Catalog: {base_url}/.well-known/api-catalog
 # Agent Skills Index: {base_url}/.well-known/agent-skills/index.json
 # OpenAPI 3.1: {base_url}/openapi.json
@@ -288,6 +290,8 @@ pub fn render_sitemap_xml(base_url: &str) -> String {
         ("/llms-full.txt", "0.9", "daily"),
         ("/openapi.json", "0.8", "daily"),
         ("/.well-known/agent.json", "0.8", "daily"),
+        ("/.well-known/agent-card.json", "0.85", "daily"),
+        ("/.well-known/x402", "0.9", "daily"),
         ("/.well-known/erc8004.json", "0.85", "daily"),
         ("/.well-known/mcp.json", "0.8", "daily"),
         ("/.well-known/mcp/server-card.json", "0.8", "daily"),
@@ -423,9 +427,12 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                      - All REST responses include `X-API-Version: 2026-11` and `RateLimit-Policy: 120;w=60`.\n\
                      - Breaking changes are introduced under a new versioned path or header with at least 90 days of advance notice via `Deprecation` and `Sunset` HTTP response headers.\n\n\
                      ## Core Endpoints\n\
-                     - `POST {base_url}/mcp` — Streamable HTTP MCP JSON-RPC 2.0 server (9 live tools).\n\
+                     - `POST {base_url}/mcp` — Streamable HTTP MCP JSON-RPC 2.0 server (**19 live tools**, including 5 zero-API-key EVM/BTC/BOLT-11/Uniswap V3 tools).\n\
+                     - `npx -y github:theguysaccount/newsatoshi-commons` — Zero-dependency stdio MCP bridge & CLI for Claude Desktop, Cursor, Codex, Cline & shell agents.\n\
+                     - `GET {base_url}/.well-known/x402` — 4 live `x402 v2` (`$0.001` Base/Arb/Polygon USDC) + zero-gas `<1ms` SHA-256 PayWord endpoints (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).\n\
                      - `GET {base_url}/api/health` — Node version, verify-only posture, and uptime.\n\
                      - `GET {base_url}/api/seed` — Live Newsatoshi Mainnet and Testnet block height, difficulty, issued LOVE, and peer count.\n\
+                     - `GET {base_url}/api/pool/status` — Live `0%`-fee Bitaxe / SHA-256 AuxPoW solo pool (`stratum+tcp://pool.newsatoshi.org:3333`).\n\
                      - `POST {base_url}/api/swaps/compile` — Compile zero-custody SHA-256 HTLC swaps for Bitcoin (`btc_onchain`), Lightning (`lightning_bolt11`), Solana (`solana_htlc`), and EVM (`evm_htlc`; **live Sourcify-verified contract across Base `8453`, Arbitrum One `42161`, Optimism `10`, and Polygon `137`:** `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987`).\n\
                      - `POST {base_url}/api/swaps/verify` — Live dual-chain verification across Newsatoshi L1 `/api/lock` and Bitcoin `mempool.space`.\n\
                      - `GET {base_url}/api/agent/402-challenge` & `POST {base_url}/api/agent/402-verify` — HTTP 402 PayWord hash-chain & L1 lock micropayments.\n\n\
@@ -722,11 +729,14 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 - Commons Treasury Balance: `{bal} LOVE` (`nonce={nonce}`, `parcels={parcels}`, `kwh={kwh}`, `starks={starks}`)
 
 ## Agent Interfaces (Zero Auth Required for All Reads, Compilers & Verifiers)
-- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with 14 live tools.
-- [MCP Server Card]({base_url}/.well-known/mcp/server-card.json) & [MCP Registry Manifest]({base_url}/server.json): Standard MCP discovery cards.
-- [A2A Agent Card]({base_url}/.well-known/agent.json): Machine-readable Agent-to-Agent capability manifest.
+- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **19 live tools** (including 5 everyday zero-API-key EVM security, Bitcoin mempool, BOLT-11 Lightning, Base Uniswap V3 & tx-receipt tools).
+- **Zero-Install Stdio MCP Bridge & CLI (Node 18+, Zero Dependencies):** `npx -y github:theguysaccount/newsatoshi-commons` (`inspect`, `btc-fees`, `decode-bolt11`, `quote-base`, `verify-tx`, `payword-demo`, or stdio MCP `serve`).
+- [x402 v2 & Zero-Gas PayWord Discovery]({base_url}/.well-known/x402): 4 live monetized endpoints accepting Base/Arbitrum/Polygon USDC (`x402 v2`, `$0.001`) OR unfreezeable `<1ms` zero-gas SHA-256 PayWords (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).
+- [MCP Server Card]({base_url}/.well-known/mcp/server-card.json) & [MCP Registry Manifest]({base_url}/server.json): Standard MCP discovery cards (`org.newsatoshi.commons/newsatoshi-commons`).
+- [A2A Agent Card]({base_url}/.well-known/agent-card.json) (and legacy `/.well-known/agent.json`): Machine-readable Agent-to-Agent capability manifest.
 - [RFC 9727 API Catalog]({base_url}/.well-known/api-catalog) & [OpenAPI 3.1 Schema]({base_url}/openapi.json): Complete REST API schema for multi-chain swaps, dual-chain lock verification, HTTP 402 PayWord verification, STARK verification, and offline signed telemetry/deeds.
 - [Agent Skills Index]({base_url}/.well-known/agent-skills/index.json): SHA-256 verified installable skill ([SKILL.md]({base_url}/skills/newsatoshi-agent-payments/SKILL.md)).
+- [Live 0%-Fee Bitaxe / AuxPoW Solo Pool](https://pool.newsatoshi.org/status): `stratum+tcp://pool.newsatoshi.org:3333` (direct solo coinbase payouts to any Mainnet `ns1…` address from `https://newsatoshi.org/wallet/`).
 - [Full Agent Transaction Guide]({base_url}/llms-full.txt): End-to-end 60-second setup recipes (wallet creation, free testnet faucet, BTC/Lightning/Solana/Base ↔ LOVE swaps, PayWord 402 streaming, L1 compute jobs, AuxPoW mining).
 - [XML Sitemap]({base_url}/sitemap.xml)
 
@@ -783,16 +793,38 @@ Add to Claude Desktop, Cursor, Codex, Antigravity, or any Streamable HTTP MCP ho
   }}
 }}
 ```
-Available MCP tools:
+Available MCP tools (19 live tools — zero API keys required):
+- `crypto_inspect_evm_contract` — Live multi-chain EVM smart contract security audit (bytecode, EIP-1967 proxy/admin slots, `owner()` admin risk, ERC-20 metadata, Sourcify v2 exact-match verification across Ethereum, Base, Arbitrum, Optimism & Polygon)
+- `crypto_bitcoin_mempool_oracle` — Live Bitcoin chain tip, recommended sat/vB fee tiers (`fastest`, `30m`, `60m`, `economy`), and mempool backlog
+- `crypto_decode_bolt11_invoice` — Pure-Rust BOLT-11 Lightning invoice decoder (network, sats/msats, payment hash, expiry, description)
+- `crypto_quote_base_uniswap_v3` — Live Base Mainnet Uniswap V3 `QuoterV2` quote across fee tiers (`ETH`, `WETH`, `USDC`, `wLOVE`, or any ERC-20)
+- `crypto_verify_tx_receipt` — Live EVM transaction receipt & confirmation verifier across Ethereum, Base, Arbitrum, Optimism & Polygon
 - `newsatoshi_get_network_status` — Live Mainnet & Testnet chain status
 - `newsatoshi_get_commons_state` — Live Commons treasury, covenant rule hash, public roots, STARKs & anchors
-- `newsatoshi_compile_btc_love_swap` — Compile canonical BIP-199 Bitcoin P2WSH HTLC (`bc1q…`), decode Lightning BOLT-11, Solana PDA escrow, or live Base Mainnet `NewsatoshiHtlc.sol` (`0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987`)
+- `newsatoshi_compile_btc_love_swap` — Compile canonical BIP-199 Bitcoin P2WSH HTLC (`bc1q…`), decode Lightning BOLT-11, Solana PDA escrow, or live 4-chain `NewsatoshiHtlc.sol` (`0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987`)
 - `newsatoshi_verify_onchain_lock` — Verify a SHA-256 lock live on Newsatoshi Mainnet/Testnet + Bitcoin `mempool.space`
 - `newsatoshi_verify_payword_402` — Verify a pure-SHA-256 PayWord HTTP 402 micropayment token (`SHA256^ticks(token) == tip`)
 - `newsatoshi_verify_stark_proof` — Cryptographically re-verify a Winterfell STARK covenant transition proof
 - `newsatoshi_agent_quickstart` — Structured onboarding commands for autonomous agents
-- `newsatoshi_create_402_challenge` — Generate a standard `NEWSATOSHI-402/1.0` Payment Required challenge
-- `newsatoshi_get_mining_economics` — Live AuxPoW merge-mining yield & network hashrate economics
+- `newsatoshi_create_402_challenge` — Generate a standard `NEWSATOSHI-402/1.0` + `x402 v2` Payment Required challenge
+- `newsatoshi_get_mining_economics` — Live AuxPoW merge-mining yield & public `0%`-fee solo pool (`stratum+tcp://pool.newsatoshi.org:3333`) stats
+- `newsatoshi_get_backing_proof` — Live 4-chain `NewsatoshiBackingVault.sol` (`0x37Ed94525DBE408fA72cDd156409875666679265`) Proof-of-Backing reserves
+- `newsatoshi_spawn_charter` — Compile a deterministic Web4 Sovereign Business Charter with Lean 4 Theorem 8 monotonic child bounds
+- `newsatoshi_list_charters` — List registered Web4 charters and parent-child covenant lineage
+- `newsatoshi_discover_services` — Discover live HTTP 402 PayWord & `x402 v2` monetized endpoints
+- `newsatoshi_list_bounties` — List zero-custody HTLC & Freivalds matrix compute bounties
+
+Stdio MCP Bridge (for stdio-only hosts such as Claude Desktop, Cursor, Cline, or shell scripts):
+```json
+{{
+  \"mcpServers\": {{
+    \"newsatoshi\": {{
+      \"command\": \"npx\",
+      \"args\": [\"-y\", \"github:theguysaccount/newsatoshi-commons\"]
+    }}
+  }}
+}}
+```
 
 ### Recipe 2: Zero-Human Wallet Setup & Shielded Agent Payments
 Newsatoshi supports non-interactive shielded delivery addresses (`nsd1…`): any sender can pay your agent on-chain privately without out-of-band note passing.
@@ -863,22 +895,31 @@ Humans can fund a Commons/Covenant UTXO with immutable caps (`max_bounty_payout`
 pub fn render_agent_card_json(base_url: &str, state: &ApiStateView) -> Value {
     json!({
         "schema_version": "1.0",
-        "name": "Newsatoshi Commons & Agent Transaction Interface",
-        "description": "Post-quantum, zero-KYC machine-to-machine payment, BTC-LOVE HTLC atomic swap, HTTP 402 PayWord micropayment, and Winterfell STARK covenant verification interface for Newsatoshi L1 (LOVE).",
+        "name": "Newsatoshi Commons & Multi-Chain Crypto Agent Gateway",
+        "description": "Zero-API-key multi-chain EVM security audits, Bitcoin mempool fees, Lightning BOLT-11 decoding, Base Uniswap V3 quotes, dual x402 v2 + zero-gas post-quantum SHA-256 PayWord micropayments, and trustless Newsatoshi (LOVE) HTLC atomic swaps.",
         "url": base_url,
         "version": env!("CARGO_PKG_VERSION"),
         "protocol_version": state.protocol_version,
         "documentation_url": format!("{base_url}/llms.txt"),
         "openapi_url": format!("{base_url}/openapi.json"),
         "mcp_endpoint": format!("{base_url}/mcp"),
+        "x402_discovery_url": format!("{base_url}/.well-known/x402"),
+        "defaultInputModes": ["application/json", "text/plain"],
+        "defaultOutputModes": ["application/json", "text/markdown"],
         "authentication": {
             "read_and_verify": "none",
+            "x402_paid_routes": "x402_v2_usdc_or_sha256_payword",
             "operator_write": "bearer_token",
             "hardware_and_deed_attestation": "offline_nist_fips205_slh_dsa_or_xmss"
         },
         "capabilities": {
             "mcp_streamable_http": true,
+            "mcp_stdio_bridge_npx": "npx -y github:theguysaccount/newsatoshi-commons",
+            "x402_v2_usdc_multichain": true,
             "http_402_payword_micropayments": true,
+            "evm_contract_security_audit": true,
+            "bitcoin_mempool_oracle": true,
+            "base_uniswap_v3_quoter": true,
             "btc_love_htlc_atomic_swaps": true,
             "bolt11_lightning_decoding": true,
             "dual_chain_l1_verification": true,
@@ -887,14 +928,39 @@ pub fn render_agent_card_json(base_url: &str, state: &ApiStateView) -> Value {
         },
         "skills": [
             {
+                "id": "crypto_inspect_evm_contract",
+                "name": "Multi-Chain EVM Smart Contract Security Audit",
+                "description": "Zero-API-key live audit of any contract on Ethereum, Base, Arbitrum, Optimism, or Polygon: bytecode size, EIP-1967 proxy/admin slots, active owner() risk, ERC-20 metadata/supply, and Sourcify v2 exact-match verification."
+            },
+            {
+                "id": "crypto_bitcoin_mempool_oracle",
+                "name": "Bitcoin Mempool & Fee Oracle",
+                "description": "Live Bitcoin tip height, hash, sat/vB fee tiers (fastest, 30m, 60m, economy), and mempool backlog with zero API keys."
+            },
+            {
+                "id": "crypto_decode_bolt11_invoice",
+                "name": "Lightning BOLT-11 Invoice Decoder",
+                "description": "Pure-Rust BOLT-11 invoice parser returning network, sats/msats, SHA-256 payment hash, expiry, and description."
+            },
+            {
+                "id": "crypto_quote_base_uniswap_v3",
+                "name": "Base Mainnet Uniswap V3 Live Quoter",
+                "description": "Live on-chain Base Uniswap V3 QuoterV2 quote across fee tiers for ETH, WETH, USDC, wLOVE, or arbitrary ERC-20 tokens."
+            },
+            {
+                "id": "crypto_verify_tx_receipt",
+                "name": "Multi-Chain EVM Transaction Receipt Verifier",
+                "description": "Live receipt status, block confirmations, gas used, and log count across Ethereum, Base, Arbitrum, Optimism, and Polygon."
+            },
+            {
                 "id": "newsatoshi_get_network_status",
                 "name": "Live Newsatoshi Mainnet & Testnet Status",
                 "description": "Returns live heights, difficulty, issued LOVE, locks, peers, and AuxPoW chainid (20051) for both Mainnet and Testnet."
             },
             {
                 "id": "newsatoshi_compile_btc_love_swap",
-                "name": "Trustless BTC <-> LOVE Atomic Swap Compiler",
-                "description": "Compiles canonical BIP-199 Bitcoin P2WSH HTLC scripts/addresses (bc1q...) or decodes Lightning BOLT-11 invoices into Newsatoshi L1 hash-locks."
+                "name": "Trustless BTC / Lightning / Solana / Base <-> LOVE Atomic Swap Compiler",
+                "description": "Compiles canonical BIP-199 Bitcoin P2WSH HTLC scripts/addresses (bc1q...), Lightning BOLT-11, Solana PDA escrow, or 4-chain EVM HTLCs into Newsatoshi L1 hash-locks."
             },
             {
                 "id": "newsatoshi_verify_onchain_lock",
@@ -904,7 +970,7 @@ pub fn render_agent_card_json(base_url: &str, state: &ApiStateView) -> Value {
             {
                 "id": "newsatoshi_verify_payword_402",
                 "name": "HTTP 402 PayWord Micropayment Verifier",
-                "description": "Verifies pure-SHA-256 post-quantum PayWord hash-chain payment tokens (SHA256^ticks(token) == tip) for sub-millisecond agent API billing."
+                "description": "Verifies pure-SHA-256 post-quantum PayWord hash-chain payment tokens (SHA256^ticks(token) == tip) for sub-millisecond zero-gas agent billing."
             }
         ],
         "covenant_rule_hash": state.covenant_rule_hash,

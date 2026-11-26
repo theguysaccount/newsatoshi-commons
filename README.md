@@ -4,9 +4,10 @@
 [![Release](https://img.shields.io/github/v/release/theguysaccount/newsatoshi-commons)](https://github.com/theguysaccount/newsatoshi-commons/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](LICENSE)
 [![Live Gateway](https://img.shields.io/badge/Live-commons.newsatoshi.org-10b981)](https://commons.newsatoshi.org)
-[![MCP](https://img.shields.io/badge/MCP-Streamable%20HTTP%20(14%20Tools)-38bdf8)](https://commons.newsatoshi.org/mcp)
+[![MCP](https://img.shields.io/badge/MCP-19%20Tools%20(HTTP%20%2B%20npx%20stdio)-38bdf8)](https://commons.newsatoshi.org/mcp)
 [![Newsatoshi Commons MCP connector](https://glama.ai/mcp/connectors/org.newsatoshi.commons/newsatoshi-commons/badges/score.svg)](https://glama.ai/mcp/connectors/org.newsatoshi.commons/newsatoshi-commons)
 [![ERC-8004](https://img.shields.io/badge/ERC--8004-Web4%20Sovereign%20Identity-a855f7)](https://commons.newsatoshi.org/.well-known/erc8004.json)
+[![x402 v2](https://img.shields.io/badge/x402%20v2-USDC%20%2B%20Zero--Gas%20PayWord-f59e0b)](https://commons.newsatoshi.org/.well-known/x402)
 
 ### What We Actually Built (Beyond Passive Sound Money)
 Bitcoin freed money from banks — and left it sitting idle in a vault. The second you spend Bitcoin into a charity, energy project, land trust, or company, humans take custody and can drift, embezzle, or capture the treasury.
@@ -26,11 +27,27 @@ Bitcoin freed money from banks — and left it sitting idle in a vault. The seco
 - **Whitepaper & Lean 4.36.0 Formal Proof (9 Theorems, 355 Lines, 0 `sorry`, 0 Mathlib):** [`https://commons.newsatoshi.org/whitepaper`](https://commons.newsatoshi.org/whitepaper) · [`formal/NewsatoshiCovenants.lean`](formal/NewsatoshiCovenants.lean) · [`docs/newsatoshi_2_1_whitepaper.tex`](docs/newsatoshi_2_1_whitepaper.tex)
 - **Live 4-Chain Sovereign Backing Vault (`NewsatoshiBackingVault.sol`, ownerless, 0 withdrawal path):** `0x37Ed94525DBE408fA72cDd156409875666679265` ([BaseScan](https://basescan.org/address/0x37Ed94525DBE408fA72cDd156409875666679265) · [Arbiscan](https://arbiscan.io/address/0x37Ed94525DBE408fA72cDd156409875666679265) · [OP Etherscan](https://optimistic.etherscan.io/address/0x37Ed94525DBE408fA72cDd156409875666679265) · [Polygonscan](https://polygonscan.com/address/0x37Ed94525DBE408fA72cDd156409875666679265) — live genesis Charter #1 + `0.001 ETH` backing deposit proven on Base: [`0xc354e0…bf5c`](https://basescan.org/tx/0xc354e0cca5bd2f0e9ac22193ef6f4ea505393ab4be4177251f9f47ca1c10bf5c) · live API: `/api/backing/summary`)
 - **Live Multi-Chain EVM HTLC (`Base 8453 · Arbitrum 42161 · Optimism 10 · Polygon 137`, ownerless, all 4 Sourcify `exact_match`):** `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987` ([BaseScan](https://basescan.org/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987) · [Arbiscan](https://arbiscan.io/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987) · [OP Etherscan](https://optimistic.etherscan.io/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987) · [Polygonscan](https://polygonscan.com/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987) — live SHA-256 atomic `lockEth` → `claim` proven on all 4 chains; see [`bridges/README.md`](bridges/README.md))
-- **AI Agent & Web4 Discovery:** `POST /mcp` (14 tools, published on Official MCP Registry) · `/.well-known/erc8004.json` · `/api/backing/summary` · `/api/web4/charters` · `/api/web4/services` · `/api/web4/bounties` · `/llms.txt` · `/llms-full.txt` · `/docs` · `/developers` · `/.well-known/agent.json` · `/.well-known/mcp/server-card.json` · `/.well-known/api-catalog` · `/.well-known/agent-skills/index.json` · `/openapi.json`
+- **AI Agent & Web4 Discovery (`v0.13.0`):** `POST /mcp` (**19 live tools** — including 5 everyday zero-API-key EVM security audit, Bitcoin mempool, Lightning BOLT-11, Base Uniswap V3 & tx-receipt tools; published on Official MCP Registry) · **Zero-install stdio MCP & CLI:** `npx -y github:theguysaccount/newsatoshi-commons` · `/.well-known/x402` (**4 live `x402 v2` USDC + zero-gas SHA-256 PayWord endpoints**) · `/.well-known/agent-card.json` & `/.well-known/agent.json` · `/.well-known/erc8004.json` · `/llms.txt` · `/llms-full.txt` · `/openapi.json`
+- **Live 0%-Fee Bitaxe / SHA-256 Solo Pool:** `stratum+tcp://pool.newsatoshi.org:3333` (`https://pool.newsatoshi.org/status`, direct coinbase payouts to any Mainnet `ns1…` address from `https://newsatoshi.org/wallet/`)
 - **Live L1 Seed Reference:** `https://newsatoshi.org/mainnet/status` (Mainnet, `auxpow_chainid = 20051`, `50 LOVE/block`) & `https://newsatoshi-seed.fly.dev/status` (Testnet)
 - **RFC-0021 L1 Soft-Fork Prototype (`0xb4`):** `https://github.com/theguysaccount/newsatoshi-rfc0021`
 
-### 1-Line Install (macOS & Linux — Verified SHA-256 Prebuilt Binaries)
+### Instant Zero-API-Key Agent Setup (1 Command — No npm Account or Keys Required)
+```bash
+# Stdio MCP server for Claude Desktop, Cursor, Cline, Codex & OpenClaw (19 live tools):
+npx -y github:theguysaccount/newsatoshi-commons
+
+# Or run everyday crypto security / DeFi / BTC utilities directly from any shell:
+npx -y github:theguysaccount/newsatoshi-commons inspect 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 --chain base
+npx -y github:theguysaccount/newsatoshi-commons btc-fees
+npx -y github:theguysaccount/newsatoshi-commons quote-base ETH USDC 1.0
+npx -y github:theguysaccount/newsatoshi-commons payword-demo
+
+# Python zero-dependency SDK (MCP + HTTP 402 PayWord + x402):
+pip install "git+https://github.com/theguysaccount/newsatoshi-commons.git#subdirectory=sdk/python"
+```
+
+### 1-Line Rust CLI Install (macOS & Linux — Verified SHA-256 Prebuilt Binaries)
 ```bash
 curl -fsSL https://commons.newsatoshi.org/install.sh | sh
 ```
