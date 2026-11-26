@@ -1581,3 +1581,140 @@ export function createClearinghouseClient({
     },
   };
 }
+
+// =============================================================================
+// RFC-0027: Decentralized Agent Swarm Launchpads & Bonding-Curve Fee Routing
+// =============================================================================
+
+function isqrtBigInt(n) {
+  if (n < 2n) return n;
+  let x = 1n << BigInt(Math.ceil(n.toString(2).length / 2));
+  while (true) {
+    const y = (x + n / x) >> 1n;
+    if (y >= x) return x;
+    x = y;
+  }
+}
+
+/**
+ * Exact integer bonding-curve buy quote matching L1 `node/src/mission.rs` 1:1.
+ * Routes `curveFeeBps` (0..=1000) directly into `bountyPool` (0% founder cut).
+ */
+export function quoteMissionCurveBuy({ curveReserve = 0, totalShares = 0, curveFeeBps = 500, amount }) {
+  const amt = BigInt(amount);
+  const feeBps = BigInt(curveFeeBps);
+  if (amt <= 0n) throw new Error("amount must be > 0");
+  if (feeBps > 1000n) throw new Error("curveFeeBps exceeds 1000 (10%)");
+  const feeToBountyPool = (amt * feeBps) / 10000n;
+  const netToCurve = amt - feeToBountyPool;
+  const newCurveReserve = BigInt(curveReserve) + netToCurve;
+  const targetShares = isqrtBigInt(newCurveReserve * 1000n);
+  const curShares = BigInt(totalShares);
+  const minted = targetShares > curShares ? targetShares - curShares : 1n;
+  return {
+    amount: Number(amt),
+    feeToBountyPool: Number(feeToBountyPool),
+    founderCut: 0,
+    netToCurve: Number(netToCurve),
+    sharesMinted: Number(minted),
+    newCurveReserve: Number(newCurveReserve),
+    newTotalShares: Number(curShares + minted),
+  };
+}
+
+/**
+ * Exact integer bonding-curve share redemption quote matching L1 `node/src/mission.rs` 1:1.
+ * Exit fees ALSO route 100% into `bountyPool` to fund verified agent work.
+ */
+export function quoteMissionCurveRedeem({
+  curveReserve,
+  totalShares,
+  curveFeeBps = 500,
+  shares,
+  minerFee = 0,
+}) {
+  const sh = BigInt(shares);
+  const tot = BigInt(totalShares);
+  const res = BigInt(curveReserve);
+  const feeBps = BigInt(curveFeeBps);
+  const mfee = BigInt(minerFee);
+  if (sh <= 0n || tot <= 0n || sh > tot) throw new Error("shares must be in 1..=totalShares");
+  const gross = (res * sh) / tot;
+  const feeToBountyPool = (gross * feeBps) / 10000n;
+  const afterBounty = gross - feeToBountyPool;
+  if (mfee > afterBounty) throw new Error("minerFee exceeds payout");
+  const userPayout = afterBounty - mfee;
+  return {
+    sharesBurned: Number(sh),
+    grossExit: Number(gross),
+    feeToBountyPool: Number(feeToBountyPool),
+    founderCut: 0,
+    minerFee: Number(mfee),
+    userPayout: Number(userPayout),
+    newCurveReserve: Number(res - gross),
+    newTotalShares: Number(tot - sh),
+  };
+}
+
+/**
+ * Query a live RFC-0027 Mission Launchpad & Agent Swarm Pool (`GET /api/mission?id=...`).
+ */
+export async function fetchL1Mission({
+  missionIdHex,
+  network = "mainnet",
+  seedBaseUrl = null,
+  expectedMissionsRootHex = null,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const id = String(missionIdHex || "").trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(id)) throw new Error("missionIdHex must be 64 hex characters");
+  const base = resolveSeedUrl(network, seedBaseUrl);
+  const resp = await fetchImpl(`${base}/api/mission?id=${id}`);
+  if (!resp.ok) return { found: false, reason: `HTTP ${resp.status} from ${base}/api/mission` };
+  const data = await resp.json();
+  if (!data || !data.found) return { found: false, height: data?.height ?? null, reason: "mission not found on L1" };
+  let merkleVerified = false;
+  if (data.merkle_proof) {
+    merkleVerified = await verifyMerkleMapProof(data.merkle_proof, expectedMissionsRootHex);
+  }
+  return { ...data, merkleVerified };
+}
+
+/** Compute exact L1 RFC-0027 `post_task_message` SHA-256 digest (`nsMISSTASK`). */
+export async function missionPostTaskMessageHex(missionIdHex, taskId, specHashHex, reward) {
+  const mid = hexToBytes(missionIdHex);
+  const spec = hexToBytes(specHashHex);
+  const buf = new Uint8Array(10 + 32 + 4 + 32 + 8);
+  buf.set(new TextEncoder().encode("nsMISSTASK"), 0);
+  buf.set(mid, 10);
+  const dv = new DataView(buf.buffer);
+  dv.setUint32(42, Number(taskId), true);
+  buf.set(spec, 46);
+  dv.setBigUint64(78, BigInt(reward), true);
+  return bytesToHex(await sha256(buf));
+}
+
+/** Compute exact L1 RFC-0027 `claim_task_message` SHA-256 digest (`nsMISSCLAIM`). */
+export async function missionClaimTaskMessageHex(
+  missionIdHex,
+  taskId,
+  specHashHex,
+  proofHashHex,
+  contributorApkHex,
+  minerFee
+) {
+  const mid = hexToBytes(missionIdHex);
+  const spec = hexToBytes(specHashHex);
+  const proof = hexToBytes(proofHashHex);
+  const apk = hexToBytes(contributorApkHex);
+  const buf = new Uint8Array(11 + 32 + 4 + 32 + 32 + 32 + 8);
+  buf.set(new TextEncoder().encode("nsMISSCLAIM"), 0);
+  buf.set(mid, 11);
+  const dv = new DataView(buf.buffer);
+  dv.setUint32(43, Number(taskId), true);
+  buf.set(spec, 47);
+  buf.set(proof, 79);
+  buf.set(apk, 111);
+  dv.setBigUint64(143, BigInt(minerFee), true);
+  return bytesToHex(await sha256(buf));
+}

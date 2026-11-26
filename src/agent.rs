@@ -710,7 +710,15 @@ pub fn render_mcp_server_card_json(base_url: &str) -> Value {
             "crypto_bitcoin_mempool_oracle",
             "crypto_decode_bolt11_invoice",
             "crypto_quote_base_uniswap_v3",
-            "crypto_verify_tx_receipt"
+            "crypto_verify_tx_receipt",
+            "newsatoshi_inspect_trust_bond",
+            "newsatoshi_inspect_rollup_vault",
+            "newsatoshi_get_protocol_signaling",
+            "newsatoshi_create_scoped_session_policy",
+            "newsatoshi_launch_agent_mission",
+            "newsatoshi_quote_launchpad_curve",
+            "newsatoshi_inspect_mission_launchpad",
+            "newsatoshi_format_swarm_task_claim"
         ],
         "resources": [
             "newsatoshi://llms.txt",
@@ -790,7 +798,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 - Commons Treasury Balance: `{bal} LOVE` (`nonce={nonce}`, `parcels={parcels}`, `kwh={kwh}`, `starks={starks}`)
 
 ## Agent Interfaces (Zero Auth Required for All Reads, Compilers & Verifiers)
-- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **19 live tools** (including 5 everyday zero-API-key EVM security, Bitcoin mempool, BOLT-11 Lightning, Base Uniswap V3 & tx-receipt tools).
+- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **27 live tools** (including 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, RFC-0023/0024/0025/0026 clearinghouse substrate tools, and 4 RFC-0027 Mission Launchpad & AI Agent Swarm tools).
 - **Zero-Install Stdio MCP Bridge & CLI (Node 18+, Zero Dependencies):** `npx -y github:theguysaccount/newsatoshi-commons` (`inspect`, `btc-fees`, `decode-bolt11`, `quote-base`, `verify-tx`, `payword-demo`, or stdio MCP `serve`).
 - [x402 v2 & Zero-Gas PayWord Discovery]({base_url}/.well-known/x402): 4 live monetized endpoints accepting Base/Arbitrum/Polygon USDC (`x402 v2`, `$0.001`) OR unfreezeable `<1ms` zero-gas SHA-256 PayWords (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).
 - [MCP Server Card]({base_url}/.well-known/mcp/server-card.json) & [MCP Registry Manifest]({base_url}/server.json): Standard MCP discovery cards (`org.newsatoshi.commons/newsatoshi-commons`).
@@ -854,7 +862,7 @@ Add to Claude Desktop, Cursor, Codex, Antigravity, or any Streamable HTTP MCP ho
   }}
 }}
 ```
-Available MCP tools (19 live tools — zero API keys required):
+Available MCP tools (27 live tools — zero API keys required):
 - `crypto_inspect_evm_contract` — Live multi-chain EVM smart contract security audit (bytecode, EIP-1967 proxy/admin slots, `owner()` admin risk, ERC-20 metadata, Sourcify v2 exact-match verification across Ethereum, Base, Arbitrum, Optimism & Polygon)
 - `crypto_bitcoin_mempool_oracle` — Live Bitcoin chain tip, recommended sat/vB fee tiers (`fastest`, `30m`, `60m`, `economy`), and mempool backlog
 - `crypto_decode_bolt11_invoice` — Pure-Rust BOLT-11 Lightning invoice decoder (network, sats/msats, payment hash, expiry, description)
@@ -874,6 +882,14 @@ Available MCP tools (19 live tools — zero API keys required):
 - `newsatoshi_list_charters` — List registered Web4 charters and parent-child covenant lineage
 - `newsatoshi_discover_services` — Discover live HTTP 402 PayWord & `x402 v2` monetized endpoints
 - `newsatoshi_list_bounties` — List zero-custody HTLC & Freivalds matrix compute bounties
+- `newsatoshi_inspect_trust_bond` — Inspect an RFC-0024 L1 Universal Trust Bond (active LOVE stake, settled volume, slash history, Merkle proof)
+- `newsatoshi_inspect_rollup_vault` — Inspect an RFC-0023 Sovereign L2 Rollup Vault (vk_hash, state_root, TVL, withdraw_roots, Merkle proof)
+- `newsatoshi_get_protocol_signaling` — Query RFC-0026 live BIP-9 AuxPoW-safe signaling & ossification telemetry
+- `newsatoshi_create_scoped_session_policy` — Compile a deterministic RFC-0025 scoped AI agent spending session policy
+- `newsatoshi_launch_agent_mission` — Compile an RFC-0027 Native Mission Launchpad & Decentralized AI Agent Swarm (`pequalnp.money`-style zero-rugpull bonding-curve bounty pool, 0% founder take, automatic 80/20 split, MCP agent onboarding)
+- `newsatoshi_quote_launchpad_curve` — Compute exact integer RFC-0027 bonding-curve buy/redeem quotes matching L1 & Lean 4 Theorem 9
+- `newsatoshi_inspect_mission_launchpad` — Query an RFC-0027 L1 Mission Launchpad (`/api/mission?id=...`) with Merkle proof
+- `newsatoshi_format_swarm_task_claim` — Compute deterministic RFC-0027 `nsMISSTASK` & `nsMISSCLAIM` signing digests
 
 Stdio MCP Bridge (for stdio-only hosts such as Claude Desktop, Cursor, Cline, or shell scripts):
 ```json
@@ -1424,6 +1440,38 @@ pub fn render_openapi_json(base_url: &str) -> Value {
                         "400": err_ref.clone()
                     }
                 }
+            },
+            "/api/launchpad/compile": {
+                "post": {
+                    "operationId": "compileMissionLaunchpad",
+                    "summary": "Compile an RFC-0027 Native Mission Launchpad & Decentralized AI Agent Swarm charter",
+                    "description": "Deterministically compiles a zero-rugpull RFC-0027 mission launchpad (0% founder cut, automatic contributor/public-goods split, bonding-curve fees routed 100% into bounty_pool, optional RFC-0024 Trust Bond anti-Sybil gate, and 1-line external agent MCP join snippet).",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Compiled RFC-0027 Mission Launchpad charter", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
+            },
+            "/api/launchpad/quote": {
+                "post": {
+                    "operationId": "quoteLaunchpadCurve",
+                    "summary": "Exact integer RFC-0027 Mission Launchpad bonding-curve buy/redeem quote",
+                    "description": "Computes exact integer square-root bonding-curve buy or redemption quotes matching Newsatoshi L1 (node/src/mission.rs) and Lean 4 Theorem 9 conservation 1:1.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Exact bonding-curve buy/redeem quote", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
             }
         }
     })
@@ -1714,6 +1762,75 @@ pub fn mcp_tools_list() -> Value {
                         "max_counterparty_slashes": { "type": "integer", "description": "Maximum tolerated slash count on counterparties (default 0)" },
                         "profit_sweep_address": { "type": "string", "description": "Shielded ns1.../nsd1... address for automated profit sweeps" },
                         "ttl_seconds": { "type": "integer", "description": "Session validity duration in seconds (default 86400)" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_launch_agent_mission",
+                "description": "Compile a deterministic RFC-0027 Native Mission Launchpad & Decentralized AI Agent Swarm charter (pequalnp.money-style): dual zero-rugpull bounty_pool + bonding curve_reserve, 0% founder take, automatic contributor/public-goods split (e.g. 80/20), optional RFC-0024 anti-Sybil Trust Bond gate, and 1-line external agent MCP join snippet.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["name", "ticker", "mission_brief"],
+                    "properties": {
+                        "name": { "type": "string", "description": "Mission name (2..=80 chars, e.g. 'Open P vs NP Lean 4 Swarm')" },
+                        "ticker": { "type": "string", "description": "Mission ticker (1..=12 alphanumeric chars, e.g. 'PVNP')" },
+                        "mission_brief": { "type": "string", "description": "Objective, verification rule, and deliverables (8..=1200 chars)" },
+                        "verifier_kind": { "type": "string", "default": "lean4_zero_sorry", "description": "Verification rule (lean4_zero_sorry, unit_tests, stark_proof, zktls_receipt, quorum_review)" },
+                        "contributor_bps": { "type": "integer", "default": 8000, "description": "Contributor payout share in basis points (must sum with public_goods_bps to 10000; 0% founder take)" },
+                        "public_goods_bps": { "type": "integer", "default": 2000, "description": "Public-goods treasury share in basis points (e.g. 2000 = 20% to Lean FRO)" },
+                        "public_goods_label": { "type": "string", "default": "Public Goods / Formal Verification Treasury" },
+                        "public_goods_address": { "type": "string", "description": "Shielded ns1... or nsd1... public-goods beneficiary address" },
+                        "curve_fee_bps": { "type": "integer", "default": 500, "maximum": 1000, "description": "Bonding-curve buy/sell fee routed 100% into bounty_pool (max 1000 = 10%)" },
+                        "initial_funding_base_units": { "type": "integer", "default": 100000000, "description": "Initial bounty pool funding in base units (1 LOVE = 100,000,000)" },
+                        "min_worker_bond_base_units": { "type": "integer", "default": 0, "description": "Optional RFC-0024 Trust Bond minimum stake required to claim tasks (anti-Sybil)" },
+                        "repo_url": { "type": "string", "description": "Optional open-source repository URL for agent pull requests / proofs" },
+                        "swarm_roles": { "type": "array", "items": { "type": "string" }, "description": "Swarm role topology (defaults to orchestrator, prover, red_team, checker_desk)" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_quote_launchpad_curve",
+                "description": "Compute an exact integer RFC-0027 Mission Launchpad bonding-curve buy or redeem quote matching Newsatoshi L1 (node/src/mission.rs) and Lean 4 Theorem 9 conservation 1:1 (100% of curve_fee_bps routes straight into bounty_pool, 0% founder extraction).",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["side", "curve_reserve", "total_shares", "curve_fee_bps"],
+                    "properties": {
+                        "side": { "type": "string", "enum": ["buy", "redeem"], "description": "Quote direction: buy shares into curve or redeem shares from curve" },
+                        "curve_reserve": { "type": "integer", "minimum": 0, "description": "Current curve_reserve in base units" },
+                        "total_shares": { "type": "integer", "minimum": 0, "description": "Current total_shares outstanding" },
+                        "curve_fee_bps": { "type": "integer", "default": 500, "maximum": 1000, "description": "Fee in bps routed into bounty_pool on every trade (max 1000)" },
+                        "amount": { "type": "integer", "minimum": 1, "description": "Input LOVE base units (required when side='buy')" },
+                        "shares": { "type": "integer", "minimum": 1, "description": "Shares to burn (required when side='redeem')" },
+                        "miner_fee": { "type": "integer", "default": 0, "description": "Optional L1 miner fee in base units (for side='redeem')" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_inspect_mission_launchpad",
+                "description": "Query an RFC-0027 Native Mission Launchpad on an L1 node (/api/mission?id=...): returns live bounty_pool, curve_reserve, total_shares, contributor/public-goods split, open/claimed tasks, min_worker_bond, and canonical Merkle proof.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["mission_id_hex"],
+                    "properties": {
+                        "mission_id_hex": { "type": "string", "description": "64-hex RFC-0027 Mission Launchpad ID" },
+                        "seed_url": { "type": "string", "description": "Optional L1 node base URL (defaults to live Mainnet seed)" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_format_swarm_task_claim",
+                "description": "Compute deterministic L1 RFC-0027 post_task_message (nsMISSTASK) and claim_task_message (nsMISSCLAIM) SHA-256 signing digests for FIPS 205 checker-desk quorum task posting and verified bounty payouts.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["mission_id_hex", "task_id", "spec_hash_hex", "reward"],
+                    "properties": {
+                        "mission_id_hex": { "type": "string", "description": "64-hex RFC-0027 Mission Launchpad ID" },
+                        "task_id": { "type": "integer", "minimum": 0, "description": "Monotonic u32 task/lemma identifier" },
+                        "spec_hash_hex": { "type": "string", "description": "64-hex SHA-256 hash of the task specification / theorem statement" },
+                        "reward": { "type": "integer", "minimum": 1, "description": "Gross task bounty in base units (split automatically by contributor_bps/public_goods_bps)" },
+                        "proof_hash_hex": { "type": "string", "description": "Optional 64-hex SHA-256 hash of verified proof artifact (required to compute claim_task_message_hex)" },
+                        "contributor_apk_hex": { "type": "string", "description": "Optional 64-hex shielded contributor apk (required to compute claim_task_message_hex)" },
+                        "miner_fee": { "type": "integer", "default": 0, "description": "L1 miner fee deducted from gross reward on claim" }
                     }
                 }
             }
@@ -2175,6 +2292,122 @@ pub fn handle_mcp_jsonrpc(
                         }))
                     }
                 }
+                "newsatoshi_launch_agent_mission" => {
+                    serde_json::from_value::<crate::launchpad::LaunchMissionRequest>(args)
+                        .map_err(|e| format!("invalid mission launchpad arguments: {e}"))
+                        .and_then(|req| crate::launchpad::compile_mission_launchpad(&req, base_url))
+                        .map(|mission| {
+                            json!({
+                                "ok": true,
+                                "persisted": false,
+                                "mission": mission
+                            })
+                        })
+                }
+                "newsatoshi_quote_launchpad_curve" => (|| -> Result<Value, String> {
+                    let side = args
+                        .get("side")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("buy")
+                        .trim()
+                        .to_ascii_lowercase();
+                    let curve_reserve = args
+                        .get("curve_reserve")
+                        .and_then(|v| v.as_u64())
+                        .ok_or_else(|| "missing required integer 'curve_reserve'".to_string())?;
+                    let total_shares = args
+                        .get("total_shares")
+                        .and_then(|v| v.as_u64())
+                        .ok_or_else(|| "missing required integer 'total_shares'".to_string())?;
+                    let curve_fee_bps = args
+                        .get("curve_fee_bps")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(500);
+                    let fee_u16 = u16::try_from(curve_fee_bps)
+                        .map_err(|_| "curve_fee_bps out of range".to_string())?;
+                    match side.as_str() {
+                        "buy" => {
+                            let amount = args
+                                .get("amount")
+                                .and_then(|v| v.as_u64())
+                                .ok_or_else(|| "missing required integer 'amount' for buy quote".to_string())?;
+                            crate::launchpad::quote_curve_buy(curve_reserve, total_shares, fee_u16, amount)
+                        }
+                        "redeem" => {
+                            let shares = args
+                                .get("shares")
+                                .and_then(|v| v.as_u64())
+                                .ok_or_else(|| "missing required integer 'shares' for redeem quote".to_string())?;
+                            let miner_fee = args
+                                .get("miner_fee")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0);
+                            crate::launchpad::quote_curve_redeem(curve_reserve, total_shares, fee_u16, shares, miner_fee)
+                        }
+                        other => Err(format!("invalid curve side '{other}' (expected 'buy' or 'redeem')")),
+                    }
+                })(),
+                "newsatoshi_inspect_mission_launchpad" => {
+                    let mid = args
+                        .get("mission_id_hex")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .trim()
+                        .to_ascii_lowercase();
+                    if mid.len() != 64 || !mid.chars().all(|c| c.is_ascii_hexdigit()) {
+                        Err("mission_id_hex must be 64 hex characters".into())
+                    } else {
+                        let base = args
+                            .get("seed_url")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.trim_end_matches('/').to_string())
+                            .unwrap_or_else(|| "https://newsatoshi.org/mainnet".to_string());
+                        let url = format!("{base}/api/mission?id={mid}");
+                        match ureq::get(&url).call() {
+                            Ok(mut resp) => {
+                                let txt = resp.body_mut().read_to_string().unwrap_or_default();
+                                let val: Value = serde_json::from_str(&txt).unwrap_or_else(|_| json!({ "raw": txt }));
+                                Ok(json!({ "ok": true, "endpoint": url, "rfc": "RFC-0027", "mission": val }))
+                            }
+                            Err(e) => Ok(json!({
+                                "ok": true,
+                                "endpoint": url,
+                                "rfc": "RFC-0027",
+                                "live_node_supports_rfc0027": false,
+                                "note": format!("Target node did not return /api/mission ({e}); RFC-0027 Native Mission Launchpads are height-gated in v0.5.0-launchpad (active on regtest/dry/v2)."),
+                                "mission_id_hex": mid
+                            })),
+                        }
+                    }
+                }
+                "newsatoshi_format_swarm_task_claim" => {
+                    let mid = args
+                        .get("mission_id_hex")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| "missing required 'mission_id_hex'".to_string());
+                    let task_id = args
+                        .get("task_id")
+                        .and_then(|v| v.as_u64())
+                        .and_then(|v| u32::try_from(v).ok())
+                        .ok_or_else(|| "missing required u32 'task_id'".to_string());
+                    let spec = args
+                        .get("spec_hash_hex")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| "missing required 'spec_hash_hex'".to_string());
+                    let reward = args
+                        .get("reward")
+                        .and_then(|v| v.as_u64())
+                        .ok_or_else(|| "missing required integer 'reward'".to_string());
+                    let proof = args.get("proof_hash_hex").and_then(|v| v.as_str());
+                    let apk = args.get("contributor_apk_hex").and_then(|v| v.as_str());
+                    let miner_fee = args.get("miner_fee").and_then(|v| v.as_u64()).unwrap_or(0);
+                    match (mid, task_id, spec, reward) {
+                        (Ok(m), Ok(t), Ok(s), Ok(r)) => {
+                            crate::launchpad::format_task_digests(m, t, s, r, proof, apk, miner_fee)
+                        }
+                        (Err(e), _, _, _) | (_, Err(e), _, _) | (_, _, Err(e), _) | (_, _, _, Err(e)) => Err(e),
+                    }
+                }
                 other => Err(format!("unknown MCP tool '{other}'")),
             };
 
@@ -2280,6 +2513,6 @@ mod tests {
             &client,
             None,
         );
-        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 23);
+        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 27);
     }
 }

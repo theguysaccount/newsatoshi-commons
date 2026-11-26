@@ -22,6 +22,11 @@ import {
   detectOptimisticEquivocation,
   encodeRollupWithdrawTx,
   createClearinghouseClient,
+  quoteMissionCurveBuy,
+  quoteMissionCurveRedeem,
+  fetchL1Mission,
+  missionPostTaskMessageHex,
+  missionClaimTaskMessageHex,
 } from "./newsatoshi-402.mjs";
 import { forwardJsonRpcLine } from "./bin/newsatoshi-mcp.mjs";
 
@@ -456,4 +461,46 @@ test("Clearinghouse SDK: Scoped Agent Session, Tier-1 zkTLS, Tier-2 Equivocation
   assert.equal(wtx[0], 2);
   assert.equal(wtx[1], 19);
   assert.equal(wtx.length, 2 + 32 + 8 + 32 + 32 + 8 + 8 + 32 + 32 + 2 + 32);
+});
+
+test("RFC-0027 Mission Launchpad bonding-curve quotes, exact conservation, task/claim digests & fetchL1Mission", async () => {
+  const buy = quoteMissionCurveBuy({ curveReserve: 0, totalShares: 0, curveFeeBps: 500, amount: 2_000_000_000 });
+  assert.equal(buy.feeToBountyPool, 100_000_000);
+  assert.equal(buy.netToCurve, 1_900_000_000);
+  assert.equal(buy.founderCut, 0);
+  assert.equal(buy.feeToBountyPool + buy.netToCurve, buy.amount);
+  assert.equal(buy.sharesMinted, 1_378_404);
+
+  const redeem = quoteMissionCurveRedeem({
+    curveReserve: buy.newCurveReserve,
+    totalShares: buy.newTotalShares,
+    curveFeeBps: 500,
+    shares: Math.floor(buy.sharesMinted / 2),
+    minerFee: 5_000,
+  });
+  assert.equal(redeem.founderCut, 0);
+  assert.equal(redeem.feeToBountyPool + redeem.userPayout + redeem.minerFee, redeem.grossExit);
+  assert.ok(redeem.feeToBountyPool > 0);
+
+  const mid = "11".repeat(32);
+  const spec = "22".repeat(32);
+  const proof = "33".repeat(32);
+  const apk = "44".repeat(32);
+  const postHex = await missionPostTaskMessageHex(mid, 1, spec, 200_010_000);
+  const claimHex = await missionClaimTaskMessageHex(mid, 1, spec, proof, apk, 10_000);
+  assert.equal(postHex.length, 64);
+  assert.equal(claimHex.length, 64);
+  assert.notEqual(postHex, claimHex);
+
+  const fetched = await fetchL1Mission({
+    missionIdHex: mid,
+    seedBaseUrl: "http://127.0.0.1:9999",
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ found: true, id: mid, bounty_pool: 300_000_000, curve_reserve: 1_900_000_000 }),
+    }),
+  });
+  assert.equal(fetched.found, true);
+  assert.equal(fetched.bounty_pool, 300_000_000);
 });

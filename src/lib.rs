@@ -5,6 +5,7 @@ pub mod backing;
 pub mod crypto;
 pub mod crypto_tools;
 pub mod hardware;
+pub mod launchpad;
 pub mod rpc;
 pub mod seed;
 pub mod server;

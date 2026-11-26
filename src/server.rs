@@ -1294,6 +1294,96 @@ fn handle_request(mut req: Request, state: &AppState) {
                 Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
             }
         }
+        (Method::Post, "/api/launchpad/compile") => {
+            let base_url = infer_base_url(&req);
+            let body = match read_body_string(&mut req) {
+                Ok(b) => b,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": e }));
+                    return;
+                }
+            };
+            let parsed: crate::launchpad::LaunchMissionRequest = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": format!("invalid JSON: {e}") }));
+                    return;
+                }
+            };
+            match crate::launchpad::compile_mission_launchpad(&parsed, &base_url) {
+                Ok(mission) => respond_json(
+                    req,
+                    200,
+                    &json!({
+                        "ok": true,
+                        "persisted": false,
+                        "mission": mission
+                    }),
+                ),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/launchpad/quote") => {
+            let body = match read_body_string(&mut req) {
+                Ok(b) => b,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": e }));
+                    return;
+                }
+            };
+            let parsed: Value = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(e) => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": format!("invalid JSON: {e}") }));
+                    return;
+                }
+            };
+            let side = parsed
+                .get("side")
+                .and_then(|v| v.as_str())
+                .unwrap_or("buy")
+                .trim()
+                .to_ascii_lowercase();
+            let curve_reserve = match parsed.get("curve_reserve").and_then(|v| v.as_u64()) {
+                Some(v) => v,
+                None => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": "missing required integer 'curve_reserve'" }));
+                    return;
+                }
+            };
+            let total_shares = match parsed.get("total_shares").and_then(|v| v.as_u64()) {
+                Some(v) => v,
+                None => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": "missing required integer 'total_shares'" }));
+                    return;
+                }
+            };
+            let curve_fee_bps = match parsed.get("curve_fee_bps").and_then(|v| v.as_u64()).unwrap_or(500) {
+                v if v <= u16::MAX as u64 => v as u16,
+                _ => {
+                    respond_json(req, 400, &json!({ "ok": false, "error": "curve_fee_bps out of range" }));
+                    return;
+                }
+            };
+            let quoted = match side.as_str() {
+                "buy" => match parsed.get("amount").and_then(|v| v.as_u64()) {
+                    Some(amount) => crate::launchpad::quote_curve_buy(curve_reserve, total_shares, curve_fee_bps, amount),
+                    None => Err("missing required integer 'amount' for buy quote".into()),
+                },
+                "redeem" => match parsed.get("shares").and_then(|v| v.as_u64()) {
+                    Some(shares) => {
+                        let miner_fee = parsed.get("miner_fee").and_then(|v| v.as_u64()).unwrap_or(0);
+                        crate::launchpad::quote_curve_redeem(curve_reserve, total_shares, curve_fee_bps, shares, miner_fee)
+                    }
+                    None => Err("missing required integer 'shares' for redeem quote".into()),
+                },
+                other => Err(format!("invalid curve side '{other}' (expected 'buy' or 'redeem')")),
+            };
+            match quoted {
+                Ok(q) => respond_json(req, 200, &q),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
         (Method::Post, "/api/web4/charters") => {
             if !is_authorized_operator(&req, state) {
                 respond_unauthorized(req);
