@@ -1,0 +1,45 @@
+{
+  "name": "newsatoshi-mcp",
+  "version": "0.13.0",
+  "description": "Zero-dependency MCP stdio bridge, zero-API-key crypto security/oracle CLI (EVM contract audit, Bitcoin mempool, BOLT-11, Base Uniswap V3), and post-quantum HTTP 402 PayWord SDK for Newsatoshi (LOVE).",
+  "type": "module",
+  "main": "./sdk/js/newsatoshi-402.mjs",
+  "exports": {
+    ".": "./sdk/js/newsatoshi-402.mjs"
+  },
+  "bin": {
+    "newsatoshi-mcp": "./sdk/js/bin/newsatoshi-mcp.mjs",
+    "newsatoshi-402": "./sdk/js/bin/newsatoshi-mcp.mjs"
+  },
+  "files": [
+    "sdk/js/**",
+    "skills/**",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test sdk/js/test_newsatoshi_402.mjs"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "x402",
+    "http-402",
+    "payword",
+    "evm-security",
+    "bitcoin",
+    "lightning",
+    "uniswap",
+    "post-quantum",
+    "newsatoshi",
+    "ai-agents"
+  ],
+  "license": "MIT",
+  "homepage": "https://commons.newsatoshi.org/developers",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/theguysaccount/newsatoshi-commons.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -39,6 +39,54 @@ class Newsatoshi402PythonSdkTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             ns402.NewsatoshiMcpClient("file:///etc/passwd")
 
+    def test_fetch_with_newsatoshi_402_auto_retries_with_payword(self) -> None:
+        import http.server
+        import json
+        import threading
+
+        gate = ns402.PayWordGate(min_ticks_increment=1, unit_price_base_units=1_000)
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_POST(self) -> None:
+                length = int(self.headers.get("Content-Length", "0"))
+                _ = self.rfile.read(length)
+                hdr = self.headers.get("X-Newsatoshi-PayWord")
+                res = gate.verify_header(hdr)
+                if not res["paid"]:
+                    self.send_response(402)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"error": "payment required"}).encode("utf-8"))
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": True, "ticks": res["ticks"]}).encode("utf-8"))
+
+            def log_message(self, format: str, *args: object) -> None:
+                return
+
+        srv = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+        port = srv.server_address[1]
+        t = threading.Thread(target=srv.serve_forever, daemon=True)
+        t.start()
+        try:
+            wallet = ns402.generate_payword_chain(10, 1_000)
+            status, body, _ = ns402.fetch_with_newsatoshi_402(
+                f"http://127.0.0.1:{port}/scan",
+                wallet,
+                method="POST",
+                body=b'{"chain":"base"}',
+                headers={"Content-Type": "application/json"},
+            )
+            self.assertEqual(status, 200)
+            parsed = json.loads(body.decode("utf-8"))
+            self.assertTrue(parsed["ok"])
+            self.assertEqual(parsed["ticks"], 1)
+        finally:
+            srv.shutdown()
+            srv.server_close()
+
 
 if __name__ == "__main__":
     unittest.main()

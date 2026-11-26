@@ -7,6 +7,7 @@ import {
   createPayWordGate,
   fetchWithNewsatoshi402,
 } from "./newsatoshi-402.mjs";
+import { forwardJsonRpcLine } from "./bin/newsatoshi-mcp.mjs";
 
 test("PayWord chain generation, verification, forgery rejection, and replay guard", async () => {
   const wallet = await generatePayWordChain(20, 2_500);
@@ -70,4 +71,36 @@ test("PayWord chain generation, verification, forgery rejection, and replay guar
   } finally {
     server.close();
   }
+});
+
+test("stdio MCP bridge forwards JSON-RPC requests, drops notifications, and catches malformed JSON", async () => {
+  const seen = [];
+  const fakeFetch = async (url, init) => {
+    seen.push({ url, body: JSON.parse(init.body) });
+    return {
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({ jsonrpc: "2.0", id: JSON.parse(init.body).id ?? null, result: { ok: true } }),
+    };
+  };
+
+  const reply = await forwardJsonRpcLine(
+    JSON.stringify({ jsonrpc: "2.0", id: 7, method: "tools/list", params: {} }),
+    "https://commons.newsatoshi.org/mcp",
+    fakeFetch
+  );
+  assert.equal(JSON.parse(reply).id, 7);
+  assert.equal(JSON.parse(reply).result.ok, true);
+  assert.equal(seen.length, 1);
+
+  const notif = await forwardJsonRpcLine(
+    JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+    "https://commons.newsatoshi.org/mcp",
+    fakeFetch
+  );
+  assert.equal(notif, null);
+
+  const bad = await forwardJsonRpcLine("{not-json", "https://commons.newsatoshi.org/mcp", fakeFetch);
+  assert.equal(JSON.parse(bad).error.code, -32700);
 });

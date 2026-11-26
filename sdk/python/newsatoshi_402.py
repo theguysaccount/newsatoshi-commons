@@ -172,7 +172,7 @@ class NewsatoshiMcpClient:
             headers={
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-                "User-Agent": "newsatoshi-402-py/0.8.0",
+                "User-Agent": "newsatoshi-402-py/0.13.0",
             },
         )
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
@@ -186,6 +186,53 @@ class NewsatoshiMcpClient:
 
     def call_tool(self, name: str, arguments: Optional[Dict[str, Any]] = None) -> Any:
         return self.rpc("tools/call", {"name": name, "arguments": arguments or {}})
+
+    def inspect_evm_contract(self, address: str, chain: str = "base") -> Any:
+        return self.call_tool("crypto_inspect_evm_contract", {"address": address, "chain": chain})
+
+    def bitcoin_mempool_oracle(self) -> Any:
+        return self.call_tool("crypto_bitcoin_mempool_oracle", {})
+
+    def decode_bolt11(self, invoice: str) -> Any:
+        return self.call_tool("crypto_decode_bolt11_invoice", {"invoice": invoice})
+
+    def quote_base_uniswap_v3(self, token_in: str, token_out: str, amount: str) -> Any:
+        return self.call_tool(
+            "crypto_quote_base_uniswap_v3",
+            {"token_in": token_in, "token_out": token_out, "amount": str(amount)},
+        )
+
+    def verify_tx_receipt(self, tx_hash: str, chain: str = "base") -> Any:
+        return self.call_tool("crypto_verify_tx_receipt", {"tx_hash": tx_hash, "chain": chain})
+
+
+def fetch_with_newsatoshi_402(
+    url: str,
+    wallet: PayWordWallet,
+    *,
+    method: str = "GET",
+    body: Optional[bytes] = None,
+    headers: Optional[Dict[str, str]] = None,
+    ticks_per_call: int = 1,
+    timeout: float = 15.0,
+) -> Tuple[int, bytes, Dict[str, str]]:
+    """Autonomous Python HTTP client: automatically retries HTTP 402 with the next PayWord token."""
+    if not url.startswith(("https://", "http://")):
+        raise ValueError("URL must use https:// or http://")
+    req_headers = dict(headers or {})
+    req = urllib.request.Request(url, data=body, headers=req_headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status, resp.read(2_097_152), dict(resp.headers.items())
+    except urllib.error.HTTPError as err:
+        if err.code != 402:
+            raise
+        payment = wallet.next_payment(ticks_per_call)
+        retry_headers = dict(req_headers)
+        retry_headers["X-Newsatoshi-PayWord"] = payment["header_value"]
+        retry_req = urllib.request.Request(url, data=body, headers=retry_headers, method=method)
+        with urllib.request.urlopen(retry_req, timeout=timeout) as resp:
+            return resp.status, resp.read(2_097_152), dict(resp.headers.items())
 
 
 CANONICAL_EVM_HTLC = "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987"

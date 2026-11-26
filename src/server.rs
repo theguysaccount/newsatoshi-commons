@@ -498,7 +498,8 @@ fn discovery_link_header() -> Header {
             "</llms.txt>; rel=\"alternate\"; type=\"text/markdown\", ",
             "</openapi.json>; rel=\"service-desc\"; type=\"application/openapi+json\", ",
             "</.well-known/api-catalog>; rel=\"api-catalog\"; type=\"application/linkset+json\", ",
-            "</.well-known/agent.json>; rel=\"describedby\"; type=\"application/json\", ",
+            "</.well-known/agent-card.json>; rel=\"describedby\"; type=\"application/json\", ",
+            "</.well-known/x402>; rel=\"payment\"; type=\"application/json\", ",
             "</.well-known/mcp/server-card.json>; rel=\"https://modelcontextprotocol.io/rel/server-card\"; type=\"application/json\""
         ),
     )
@@ -670,6 +671,7 @@ fn handle_request(mut req: Request, state: &AppState) {
             }
             "/.well-known/api-catalog" => Some("application/linkset+json; charset=utf-8"),
             "/.well-known/agent.json"
+            | "/.well-known/agent-card.json"
             | "/.well-known/erc8004.json"
             | "/.well-known/x402.json"
             | "/.well-known/x402"
@@ -809,7 +811,7 @@ fn handle_request(mut req: Request, state: &AppState) {
                 "v=MCPv1; k=ed25519; p=n0LJ+zLwShIlENsy4iOKZLHW3eeAfRyO1ItUzxWm0n4=\n".to_string(),
             );
         }
-        (Method::Get, "/.well-known/agent.json") => {
+        (Method::Get, "/.well-known/agent.json") | (Method::Get, "/.well-known/agent-card.json") => {
             let base_url = infer_base_url(&req);
             let api_state = state.engine.lock().unwrap_or_else(|e| e.into_inner()).to_api_state();
             respond_json(req, 200, &render_agent_card_json(&base_url, &api_state));

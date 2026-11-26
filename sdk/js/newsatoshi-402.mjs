@@ -332,6 +332,30 @@ export class NewsatoshiMcpClient {
   callTool(name, args = {}) {
     return this.rpc("tools/call", { name, arguments: args });
   }
+
+  inspectEvmContract(address, chain = "base") {
+    return this.callTool("crypto_inspect_evm_contract", { address, chain });
+  }
+
+  bitcoinMempoolOracle() {
+    return this.callTool("crypto_bitcoin_mempool_oracle", {});
+  }
+
+  decodeBolt11(invoice) {
+    return this.callTool("crypto_decode_bolt11_invoice", { invoice });
+  }
+
+  quoteBaseUniswapV3(tokenIn, tokenOut, amount) {
+    return this.callTool("crypto_quote_base_uniswap_v3", {
+      token_in: tokenIn,
+      token_out: tokenOut,
+      amount: String(amount),
+    });
+  }
+
+  verifyTxReceipt(txHash, chain = "base") {
+    return this.callTool("crypto_verify_tx_receipt", { tx_hash: txHash, chain });
+  }
 }
 
 export const CANONICAL_EVM_HTLC = "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987";
