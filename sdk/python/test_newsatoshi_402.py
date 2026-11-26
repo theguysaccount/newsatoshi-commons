@@ -303,6 +303,34 @@ class Newsatoshi402PythonSdkTests(unittest.TestCase):
         self.assertEqual(len(wtx), 2 + 32 + 8 + 32 + 32 + 8 + 8 + 32 + 32 + 2 + 32)
         self.assertEqual(len(ns402.bond_commit_message_hex("11" * 32, 7, "aa" * 32)), 64)
 
+    def test_rfc0027_mission_launchpad_curve_and_digests(self):
+        buy = ns402.quote_mission_curve_buy(0, 0, 500, 2_000_000_000)
+        self.assertEqual(buy["fee_to_bounty_pool"], 100_000_000)
+        self.assertEqual(buy["net_to_curve"], 1_900_000_000)
+        self.assertEqual(buy["founder_cut"], 0)
+        self.assertEqual(buy["shares_minted"], 1_378_404)
+        self.assertEqual(buy["fee_to_bounty_pool"] + buy["net_to_curve"], buy["amount"])
+
+        redeem = ns402.quote_mission_curve_redeem(
+            buy["new_curve_reserve"],
+            buy["new_total_shares"],
+            500,
+            buy["shares_minted"] // 2,
+            5_000,
+        )
+        self.assertEqual(redeem["founder_cut"], 0)
+        self.assertEqual(
+            redeem["fee_to_bounty_pool"] + redeem["user_payout"] + redeem["miner_fee"],
+            redeem["gross_exit"],
+        )
+        self.assertGreater(redeem["fee_to_bounty_pool"], 0)
+
+        post_hex = ns402.mission_post_task_message_hex("11" * 32, 1, "22" * 32, 200_010_000)
+        claim_hex = ns402.mission_claim_task_message_hex("11" * 32, 1, "22" * 32, "33" * 32, "44" * 32, 10_000)
+        self.assertEqual(len(post_hex), 64)
+        self.assertEqual(len(claim_hex), 64)
+        self.assertNotEqual(post_hex, claim_hex)
+
 
 if __name__ == "__main__":
     unittest.main()

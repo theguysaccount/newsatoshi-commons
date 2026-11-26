@@ -2038,7 +2038,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 19);
+    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 27);
 
     let agent_card_v3: Value = serde_json::from_str(
         &ureq::get(&format!("{base}/.well-known/agent-card.json"))
@@ -2176,7 +2176,51 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 23);
+    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 27);
+
+    // RFC-0027 Native Mission Launchpad compile + bonding-curve quote over HTTP & MCP
+    let compiled_mission: Value = serde_json::from_str(
+        &ureq::post(&format!("{base}/api/launchpad/compile"))
+            .header("Content-Type", "application/json")
+            .send(r#"{"name":"Open P vs NP Lean 4 Swarm","ticker":"PVNP","mission_brief":"Decentralized AI-agent swarm verifying complexity-theoretic lemmas in Lean 4 with 0 sorry.","verifier_kind":"lean4_zero_sorry","contributor_bps":8000,"public_goods_bps":2000,"public_goods_label":"Lean FRO","curve_fee_bps":500,"initial_funding_base_units":200000000,"min_worker_bond_base_units":100000000}"#)
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(compiled_mission["ok"], true);
+    assert_eq!(compiled_mission["mission"]["rfc"], "RFC-0027");
+    assert_eq!(compiled_mission["mission"]["founder_fee_bps"], 0);
+    assert_eq!(compiled_mission["mission"]["contributor_bps"], 8000);
+
+    let buy_quote: Value = serde_json::from_str(
+        &ureq::post(&format!("{base}/api/launchpad/quote"))
+            .header("Content-Type", "application/json")
+            .send(r#"{"side":"buy","curve_reserve":0,"total_shares":0,"curve_fee_bps":500,"amount":10000000}"#)
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(buy_quote["ok"], true);
+    assert_eq!(buy_quote["fee_to_bounty_pool_base_units"], 500_000);
+    assert_eq!(buy_quote["founder_extraction_base_units"], 0);
+    assert_eq!(buy_quote["conservation_check"], true);
+
+    let mcp_mission: Value = serde_json::from_str(
+        &ureq::post(&format!("{base}/mcp"))
+            .header("Content-Type", "application/json")
+            .send(r#"{"jsonrpc":"2.0","id":27,"method":"tools/call","params":{"name":"newsatoshi_launch_agent_mission","arguments":{"name":"Swarm Test","ticker":"SWRM","mission_brief":"Verify lemmas in Lean 4 with 0 sorry."}}}"#)
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(mcp_mission["result"]["isError"], false);
+    assert_eq!(mcp_mission["result"]["structuredContent"]["mission"]["rfc"], "RFC-0027");
 
     let install_sh = ureq::get(&format!("{base}/install.sh"))
         .call()

@@ -1088,3 +1088,84 @@ def verify_zktls_attestation(
         f"nsZKTLS1|{domain}|{status_val}|{ts}|{body_hash}|{proof_digest}".encode("utf-8")
     ).hexdigest()
     return {"valid": True, "domain": domain, "timestamp_unix": ts, "body_hash_hex": body_hash, "receipt_hash_hex": receipt_hash}
+
+
+# =============================================================================
+# RFC-0027: Decentralized Agent Swarm Launchpads & Bonding-Curve Fee Routing
+# =============================================================================
+
+
+def quote_mission_curve_buy(
+    curve_reserve: int, total_shares: int, curve_fee_bps: int, amount: int
+) -> Dict[str, Any]:
+    """Exact integer bonding-curve buy quote matching L1 `node/src/mission.rs` 1:1 (0% founder cut)."""
+    import math
+    if amount <= 0 or curve_fee_bps > 1000:
+        raise ValueError("amount must be > 0 and curve_fee_bps <= 1000")
+    fee_to_bounty = (amount * curve_fee_bps) // 10_000
+    net_to_curve = amount - fee_to_bounty
+    new_reserve = curve_reserve + net_to_curve
+    target_shares = math.isqrt(new_reserve * 1_000)
+    minted = max(1, target_shares - total_shares)
+    return {
+        "amount": amount,
+        "fee_to_bounty_pool": fee_to_bounty,
+        "founder_cut": 0,
+        "net_to_curve": net_to_curve,
+        "shares_minted": minted,
+        "new_curve_reserve": new_reserve,
+        "new_total_shares": total_shares + minted,
+    }
+
+
+def quote_mission_curve_redeem(
+    curve_reserve: int, total_shares: int, curve_fee_bps: int, shares: int, miner_fee: int = 0
+) -> Dict[str, Any]:
+    """Exact integer bonding-curve share redemption quote matching L1 `node/src/mission.rs` 1:1."""
+    if shares <= 0 or total_shares <= 0 or shares > total_shares:
+        raise ValueError("shares must be in 1..=total_shares")
+    gross = (curve_reserve * shares) // total_shares
+    fee_to_bounty = (gross * curve_fee_bps) // 10_000
+    after_bounty = gross - fee_to_bounty
+    if miner_fee > after_bounty:
+        raise ValueError("miner_fee exceeds payout")
+    user_payout = after_bounty - miner_fee
+    return {
+        "shares_burned": shares,
+        "gross_exit": gross,
+        "fee_to_bounty_pool": fee_to_bounty,
+        "founder_cut": 0,
+        "miner_fee": miner_fee,
+        "user_payout": user_payout,
+        "new_curve_reserve": curve_reserve - gross,
+        "new_total_shares": total_shares - shares,
+    }
+
+
+def mission_post_task_message_hex(mission_id_hex: str, task_id: int, spec_hash_hex: str, reward: int) -> str:
+    """Compute exact L1 RFC-0027 `post_task_message` SHA-256 digest (`nsMISSTASK`)."""
+    mid = bytes.fromhex(mission_id_hex)
+    spec = bytes.fromhex(spec_hash_hex)
+    return hashlib.sha256(
+        b"nsMISSTASK" + mid + int(task_id).to_bytes(4, "little") + spec + int(reward).to_bytes(8, "little")
+    ).hexdigest()
+
+
+def mission_claim_task_message_hex(
+    mission_id_hex: str,
+    task_id: int,
+    spec_hash_hex: str,
+    proof_hash_hex: str,
+    contributor_apk_hex: str,
+    miner_fee: int,
+) -> str:
+    """Compute exact L1 RFC-0027 `claim_task_message` SHA-256 digest (`nsMISSCLAIM`)."""
+    return hashlib.sha256(
+        b"nsMISSCLAIM"
+        + bytes.fromhex(mission_id_hex)
+        + int(task_id).to_bytes(4, "little")
+        + bytes.fromhex(spec_hash_hex)
+        + bytes.fromhex(proof_hash_hex)
+        + bytes.fromhex(contributor_apk_hex)
+        + int(miner_fee).to_bytes(8, "little")
+    ).hexdigest()
