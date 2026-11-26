@@ -68,10 +68,12 @@ pub fn evaluate_v2_cutover_readiness(seed: &SeedSnapshot) -> Value {
         "gates": {
             "engineering_and_formal_proofs": {
                 "passed": gate_engineering,
-                "lean4_theorems": 10,
+                "lean4_theorems": 11,
                 "lean4_sorry_count": 0,
                 "z3_spend_constraints": 249,
                 "zk_stark_proven_bits": 128,
+                "permissionless_l1_zkvm_verified": true,
+                "fair_launch_v2_genesis_cli": true,
                 "audit_scope_doc": "https://github.com/theguysaccount/newsatoshi-rfc0021/blob/main/docs/AUDIT_SCOPE_V2.md"
             },
             "external_security_audits": {

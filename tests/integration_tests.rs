@@ -2191,7 +2191,8 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
     assert_eq!(cutover["ok"], true);
     assert_eq!(cutover["ready_for_v2_activation"], false);
     assert_eq!(cutover["gates"]["external_security_audits"]["completed"], 0);
-    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["lean4_theorems"], 10);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["lean4_theorems"], 11);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["permissionless_l1_zkvm_verified"], true);
 
     let p2p_list: Value = serde_json::from_str(
         &ureq::get(&format!("{base}/api/p2p/offers"))
