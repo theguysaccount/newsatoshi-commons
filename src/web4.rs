@@ -354,16 +354,26 @@ pub fn render_gateway_erc8004(base_url: &str, covenant_rule_hash: &str) -> Value
         "active": true,
         "x402Support": true,
         "paywordSupport": true,
+        "registrations": [
+            { "agentId": 1229992, "agentRegistry": "eip155:8453:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432" },
+            { "agentId": 1692, "agentRegistry": "eip155:42161:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432" },
+            { "agentId": 42519, "agentRegistry": "eip155:10:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432" },
+            { "agentId": 715, "agentRegistry": "eip155:137:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432" }
+        ],
         "services": [
             { "name": "MCP", "endpoint": format!("{base_url}/mcp"), "version": "2025-03-26" },
             { "name": "A2A", "endpoint": format!("{base_url}/.well-known/agent.json"), "version": "1.0" },
+            { "name": "MainTerminal", "endpoint": "https://newsatoshi.org/", "version": "NEWSATOSHI/2.0" },
             { "name": "Whitepaper", "endpoint": format!("{base_url}/whitepaper"), "version": "NEWSATOSHI/2.1" },
             { "name": "Lean4Kernel", "endpoint": format!("{base_url}/formal/NewsatoshiCovenants.lean"), "version": "4.36.0" }
         ],
         "contracts": {
             "universal_evm_chains": [8453, 42161, 10, 137],
             "htlc_bridge": CANONICAL_EVM_HTLC_CONTRACT,
-            "backing_vault": CANONICAL_BACKING_VAULT
+            "backing_vault": CANONICAL_BACKING_VAULT,
+            "base_wlove_mirror": "0x0A3ccFb3fF981a22A264Aa05CD8b77d06C2732A3",
+            "base_uniswap_v3_pool": "0x08ddc8C3fc09ACdab6802a13B26631f47ABcB888",
+            "base_uniswap_lp_token_id_burned": 6689936
         },
         "covenant_rule_hash": covenant_rule_hash
     })

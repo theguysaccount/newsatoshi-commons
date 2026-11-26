@@ -85,6 +85,32 @@ const CANONICAL_CONTRACTS = [
     ],
     sourcify: 'https://repo.sourcify.dev/8453/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987',
   },
+  {
+    name: 'NewsatoshiBaseMirror (wLOVE)',
+    role: 'Zero-owner, zero-tax Base ERC-20 mirror · 100% supply in Uniswap V3 WETH pool · LP NFT #6689936 burned to 0x…dEaD',
+    address: '0x0A3ccFb3fF981a22A264Aa05CD8b77d06C2732A3',
+    badge: 'Base Uniswap V3 · LP Burned',
+    explorers: [
+      { label: 'Uniswap', url: 'https://app.uniswap.org/swap?chain=base&outputCurrency=0x0A3ccFb3fF981a22A264Aa05CD8b77d06C2732A3' },
+      { label: 'DEXScreener', url: 'https://dexscreener.com/base/0x08ddc8C3fc09ACdab6802a13B26631f47ABcB888' },
+      { label: 'GeckoTerminal', url: 'https://www.geckoterminal.com/base/pools/0x08ddc8c3fc09acdab6802a13b26631f47abcb888' },
+      { label: 'BaseScan', url: 'https://basescan.org/address/0x0A3ccFb3fF981a22A264Aa05CD8b77d06C2732A3' },
+    ],
+    sourcify: 'https://repo.sourcify.dev/8453/0x0A3ccFb3fF981a22A264Aa05CD8b77d06C2732A3',
+  },
+  {
+    name: 'ERC-8004 On-Chain Agent Identity',
+    role: 'Registered across 4 mainnets: Base #1229992 · Arbitrum #1692 · Optimism #42519 · Polygon #715',
+    address: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
+    badge: '4 Chains Indexed',
+    explorers: [
+      { label: 'Base #1229992', url: 'https://basescan.org/tx/0x0eda4629e7976d29edeccaef5bae3453e8fe434a66c77e6443b8047257468bbe' },
+      { label: 'Arb #1692', url: 'https://arbiscan.io/tx/0x5f915f240194e285c97f874ab25c569a87fa0279a6f59f7c0c3cf1634ad351e2' },
+      { label: 'OP #42519', url: 'https://optimistic.etherscan.io/tx/0x0a469889afe20774a1210c4fd93f27924c0c7043884b1177e51d22506bc27ac6' },
+      { label: 'Pol #715', url: 'https://polygonscan.com/tx/0x2d097bf8a65e48a283c75c1f6771d0401cc501921f841fc14463227c6d5cfe9a' },
+    ],
+    sourcify: 'https://commons.newsatoshi.org/.well-known/erc8004.json',
+  },
 ] as const;
 
 export function OverviewPage({ seed, backing, onNavigate }: OverviewPageProps) {

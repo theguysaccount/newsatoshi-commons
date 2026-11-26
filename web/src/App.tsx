@@ -69,8 +69,18 @@ const PROTOCOL_TABS: { id: ProtocolSubTab; label: string }[] = [
   { id: 'legal', label: 'Legal Airlock' },
 ];
 
+function readInitialView(): PrimaryView {
+  try {
+    const p = new URLSearchParams(window.location.search).get('view');
+    if (p === 'build' || p === 'bridge' || p === 'protocol' || p === 'overview') return p;
+  } catch {
+    // ignore
+  }
+  return 'overview';
+}
+
 export default function App() {
-  const [view, setView] = useState<PrimaryView>('overview');
+  const [view, setView] = useState<PrimaryView>(readInitialView);
   const [protocolTab, setProtocolTab] = useState<ProtocolSubTab>('explorer');
   const [loading, setLoading] = useState<boolean>(true);
   const [connected, setConnected] = useState<boolean>(false);
@@ -90,6 +100,14 @@ export default function App() {
   const navigate = useCallback((nextView: PrimaryView, subTab?: ProtocolSubTab) => {
     setView(nextView);
     if (subTab) setProtocolTab(subTab);
+    try {
+      const url = new URL(window.location.href);
+      if (nextView === 'overview') url.searchParams.delete('view');
+      else url.searchParams.set('view', nextView);
+      window.history.replaceState({}, '', url.toString());
+    } catch {
+      // ignore
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
@@ -679,6 +697,9 @@ export default function App() {
           </div>
 
           <div className="flex flex-wrap items-center gap-5">
+            <a href="https://newsatoshi.org/" className="transition hover:text-zinc-200">
+              newsatoshi.org
+            </a>
             <a href="/whitepaper" className="transition hover:text-zinc-200">
               Whitepaper
             </a>
