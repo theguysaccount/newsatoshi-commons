@@ -826,11 +826,11 @@ fn handle_request(mut req: Request, state: &AppState) {
             respond_json(req, 200, &render_well_known_x402(&base_url));
         }
         (Method::Get, "/.well-known/402index-verify.txt") => {
-            respond_text_with_ct(
+            respond_text(
                 req,
                 200,
                 "text/plain; charset=utf-8",
-                "fda5f8f68094de6dcf826e7ce1971d61584372847d876452ceac2e27e6c9f0a6\n",
+                "fda5f8f68094de6dcf826e7ce1971d61584372847d876452ceac2e27e6c9f0a6\n".to_string(),
             );
         }
         (Method::Get, "/api/x402/bridge-quote") => {
