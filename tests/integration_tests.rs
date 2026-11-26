@@ -2191,11 +2191,13 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
     assert_eq!(cutover["ok"], true);
     assert_eq!(cutover["ready_for_v2_activation"], false);
     assert_eq!(cutover["gates"]["external_security_audits"]["completed"], 0);
-    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["lean4_theorems"], 13);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["lean4_theorems"], 14);
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["zk_stark_proven_bits"], 192);
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["zkvm_logup_rom_rap"], true);
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["pq_mlkem_p2p_transport"], true);
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["flyclient_mmr_light_client"], true);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["independent_second_verifier_client"], true);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["utreexo_compact_frontier_max_bytes"], 1024);
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["permissionless_l1_zkvm_verified"], true);
 
     let p2p_list: Value = serde_json::from_str(

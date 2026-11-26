@@ -68,8 +68,8 @@ pub fn evaluate_v2_cutover_readiness(seed: &SeedSnapshot) -> Value {
         "gates": {
             "engineering_and_formal_proofs": {
                 "passed": gate_engineering,
-                "l1_release_tag": "v0.8.0-apex",
-                "lean4_theorems": 13,
+                "l1_release_tag": "v0.9.0-frontier",
+                "lean4_theorems": 14,
                 "lean4_sorry_count": 0,
                 "z3_spend_constraints": 249,
                 "zk_stark_proven_bits": 192,
@@ -78,11 +78,20 @@ pub fn evaluate_v2_cutover_readiness(seed: &SeedSnapshot) -> Value {
                 "permissionless_l1_zkvm_verified": true,
                 "zkvm_logup_rom_rap": true,
                 "pq_mlkem_p2p_transport": true,
+                "pq_p2p_enforced_on_mainnet_v2": true,
                 "eclipse_netgroup_defense": true,
                 "compact_block_relay": true,
                 "flyclient_mmr_light_client": true,
+                "flyclient_mmr_committed_in_genesis": true,
+                "utreexo_compact_frontier_max_bytes": 1024,
+                "disk_backed_pruned_kv_store": true,
+                "stark_sha256d_header_chain_and_fri_recursion": true,
+                "independent_second_verifier_client": true,
+                "differential_mutation_fuzzer_ci": true,
                 "fair_launch_v2_genesis_cli": true,
-                "audit_scope_doc": "https://github.com/theguysaccount/newsatoshi-rfc0021/blob/main/docs/AUDIT_SCOPE_V2.md"
+                "audit_scope_doc": "https://github.com/theguysaccount/newsatoshi-rfc0021/blob/main/docs/AUDIT_SCOPE_V2.md",
+                "external_audit_rfp_doc": "https://github.com/theguysaccount/newsatoshi-rfc0021/blob/main/docs/EXTERNAL_AUDIT_RFP.md",
+                "commercial_wedge_playbook": "https://github.com/theguysaccount/newsatoshi-commons/blob/main/docs/COMMERCIAL_WEDGE_PLAYBOOK.md"
             },
             "external_security_audits": {
                 "passed": gate_audits,
