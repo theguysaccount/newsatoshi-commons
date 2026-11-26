@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for the zero-dependency Newsatoshi HTTP 402 PayWord Python SDK (v0.14.0)."""
+"""Unit tests for the zero-dependency Newsatoshi HTTP 402 PayWord Python SDK (v0.15.0)."""
 
 import os
 import tempfile
@@ -124,6 +124,112 @@ class Newsatoshi402PythonSdkTests(unittest.TestCase):
             parsed = json.loads(body.decode("utf-8"))
             self.assertTrue(parsed["ok"])
             self.assertEqual(parsed["ticks"], 1)
+        finally:
+            srv.shutdown()
+            srv.server_close()
+
+    def test_rfc0022_channel_merkle_proof_and_70_byte_claim_encoding(self) -> None:
+        import hashlib
+        import http.server
+        import json
+        import struct
+        import threading
+
+        wallet = ns402.generate_payword_chain(1_000, 10_000)
+        seller = "ns1seller00000000000000000000000000000000000000000000000000000000"
+        cid = "ab" * 32
+        vhash = "cd" * 32
+        root = hashlib.sha256(b"nsMKL" + bytes.fromhex(cid) + bytes.fromhex(vhash)).hexdigest()
+        self.assertTrue(
+            ns402.verify_channel_merkle_proof({"root": root, "key": cid, "value_hash": vhash, "siblings": []})
+        )
+        self.assertFalse(
+            ns402.verify_channel_merkle_proof({"root": root, "key": cid, "value_hash": "00" * 32, "siblings": []})
+        )
+
+        p237 = wallet.next_payment(237)
+        claim_tx = ns402.encode_channel_claim_tx(cid, 237, p237["token_hex"])
+        self.assertEqual(len(claim_tx), 70)
+        self.assertEqual(claim_tx[0], 2)
+        self.assertEqual(claim_tx[1], 11)
+        self.assertEqual(struct.unpack("<I", claim_tx[34:38])[0], 237)
+        self.assertEqual(len(ns402.encode_channel_expire_tx(cid)), 34)
+
+        received_tx = {}
+
+        class MockNode(http.server.BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                if self.path.startswith("/api/channel?tip="):
+                    payload = {
+                        "height": 5000,
+                        "channels": [
+                            {
+                                "found": True,
+                                "id": cid,
+                                "state": "open",
+                                "confirmed": True,
+                                "tip": wallet.tip_hex,
+                                "max_ticks": 1_000,
+                                "unit_price": 10_000,
+                                "claim_fee": 5_000,
+                                "budget": 10_000_000,
+                                "total_deposit": 10_005_000,
+                                "timeout": 5100,
+                                "seller": seller,
+                                "refund": "ns1buyer000000000000000000000000000000000000000000000000000000000",
+                                "confirmations": 2,
+                                "height": 5000,
+                                "merkle_proof": {"root": root, "key": cid, "value_hash": vhash, "siblings": []},
+                            }
+                        ],
+                    }
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(payload).encode("utf-8"))
+                    return
+                self.send_response(404)
+                self.end_headers()
+
+            def do_POST(self) -> None:
+                if self.path == "/api/tx":
+                    n = int(self.headers.get("Content-Length", "0"))
+                    received_tx["bytes"] = self.rfile.read(n)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"ok": True, "txid": "ef" * 32}).encode("utf-8"))
+                    return
+                self.send_response(404)
+                self.end_headers()
+
+            def log_message(self, format: str, *args: object) -> None:
+                return
+
+        srv = http.server.HTTPServer(("127.0.0.1", 0), MockNode)
+        port = srv.server_address[1]
+        t = threading.Thread(target=srv.serve_forever, daemon=True)
+        t.start()
+        try:
+            base = f"http://127.0.0.1:{port}"
+            gate = ns402.PayWordGate(
+                unit_price_base_units=10_000,
+                merchant_address=seller,
+                require_funding=True,
+                funding_rail="channel",
+                seed_base_url=base,
+            )
+            res = gate.verify_header(p237["header_value"])
+            self.assertTrue(res["paid"])
+            self.assertTrue(res["collectible_on_chain"])
+            self.assertTrue(res["unilateral_claim_ready"])
+            self.assertEqual(res["funding_status"], "verified_onchain_channel")
+            self.assertEqual(res["channel_id"], cid)
+
+            sub = ns402.submit_l1_channel_claim(cid, 237, p237["token_hex"], seed_base_url=base)
+            self.assertTrue(sub["ok"])
+            self.assertEqual(sub["tx_bytes"], 70)
+            self.assertEqual(received_tx["bytes"], claim_tx)
         finally:
             srv.shutdown()
             srv.server_close()

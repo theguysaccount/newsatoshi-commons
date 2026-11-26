@@ -11,6 +11,11 @@ import {
   createPayWordGate,
   createFilePayWordStore,
   verifyL1LockFunding,
+  verifyL1ChannelFunding,
+  verifyChannelMerkleProof,
+  encodeChannelClaimTx,
+  encodeChannelExpireTx,
+  submitL1ChannelClaim,
   fetchWithNewsatoshi402,
 } from "./newsatoshi-402.mjs";
 import { forwardJsonRpcLine } from "./bin/newsatoshi-mcp.mjs";
@@ -230,4 +235,112 @@ test("stdio MCP bridge forwards JSON-RPC requests, drops notifications, and catc
 
   const bad = await forwardJsonRpcLine("{not-json", "https://commons.newsatoshi.org/mcp", fakeFetch);
   assert.equal(JSON.parse(bad).error.code, -32700);
+});
+
+test("RFC-0022 L1 channel funding check, Merkle proof verification, and 70-byte unilateral ChannelClaim tx encoding", async () => {
+  const crypto = await import("node:crypto");
+  const wallet = await generatePayWordChain(1_000, 10_000);
+  const seller = "ns1seller00000000000000000000000000000000000000000000000000000000";
+  const channelId = "ab".repeat(32);
+  const valueHash = "cd".repeat(32);
+  const root = crypto
+    .createHash("sha256")
+    .update(Buffer.concat([Buffer.from("nsMKL"), Buffer.from(channelId, "hex"), Buffer.from(valueHash, "hex")]))
+    .digest("hex");
+
+  assert.equal(
+    await verifyChannelMerkleProof({ root, key: channelId, value_hash: valueHash, siblings: [] }),
+    true
+  );
+  assert.equal(
+    await verifyChannelMerkleProof({ root, key: channelId, value_hash: "00".repeat(32), siblings: [] }),
+    false
+  );
+
+  let postedBody = null;
+  const mockNodeFetch = async (url, init = {}) => {
+    if (url.includes("/api/channel?tip=")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          height: 5000,
+          channels: [
+            {
+              found: true,
+              id: channelId,
+              state: "open",
+              confirmed: true,
+              tip: wallet.tipHex,
+              max_ticks: 1_000,
+              unit_price: 10_000,
+              claim_fee: 5_000,
+              budget: 10_000_000,
+              total_deposit: 10_005_000,
+              timeout: 5100,
+              seller,
+              refund: "ns1buyer000000000000000000000000000000000000000000000000000000000",
+              confirmations: 3,
+              height: 5000,
+              merkle_proof: { root, key: channelId, value_hash: valueHash, siblings: [] },
+            },
+          ],
+        }),
+      };
+    }
+    if (url.includes("/api/tx") && init.method === "POST") {
+      postedBody = new Uint8Array(init.body);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, txid: "ef".repeat(32) }),
+      };
+    }
+    return { ok: false, status: 404, json: async () => ({ ok: false }) };
+  };
+
+  const chCheck = await verifyL1ChannelFunding({
+    tipHex: wallet.tipHex,
+    sellerAddress: seller,
+    requiredTicks: 237,
+    unitPriceBaseUnits: 10_000,
+    fetchImpl: mockNodeFetch,
+  });
+  assert.equal(chCheck.funded, true);
+  assert.equal(chCheck.rail, "rfc0022_payword_channel");
+  assert.equal(chCheck.channelId, channelId);
+  assert.equal(chCheck.merkleProofVerified, true);
+
+  const gate = createPayWordGate({
+    recipient: seller,
+    unitPriceBaseUnits: 10_000,
+    requireFunding: true,
+    fundingRail: "channel",
+    fetchImpl: mockNodeFetch,
+  });
+  const p237 = wallet.nextPayment(237);
+  const gRes = await gate.verifyRequest(p237.headerValue);
+  assert.equal(gRes.paid, true);
+  assert.equal(gRes.collectibleOnChain, true);
+  assert.equal(gRes.unilateralClaimReady, true);
+  assert.equal(gRes.fundingStatus, "verified_onchain_channel");
+  assert.equal(gRes.channelId, channelId);
+
+  // Encode & submit exact 70-byte unilateral ChannelClaim
+  const rawClaim = encodeChannelClaimTx(channelId, 237, p237.tokenHex);
+  assert.equal(rawClaim.length, 70);
+  assert.equal(rawClaim[0], 2);
+  assert.equal(rawClaim[1], 11);
+  assert.equal(new DataView(rawClaim.buffer).getUint32(34, true), 237);
+  assert.equal(encodeChannelExpireTx(channelId).length, 34);
+
+  const sub = await submitL1ChannelClaim({
+    channelIdHex: channelId,
+    ticks: 237,
+    tokenHex: p237.tokenHex,
+    fetchImpl: mockNodeFetch,
+  });
+  assert.equal(sub.ok, true);
+  assert.equal(sub.txBytes, 70);
+  assert.equal(postedBody.length, 70);
 });
