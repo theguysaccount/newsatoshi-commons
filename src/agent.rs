@@ -8,6 +8,10 @@
 
 use crate::backing::{fetch_live_backing_summary, BackingProofSummary, CANONICAL_BACKING_VAULT};
 use crate::crypto::{hash32_from_hex, sha256};
+use crate::crypto_tools::{
+    decode_bolt11_tool, fetch_bitcoin_mempool_oracle, inspect_evm_contract, quote_base_uniswap_v3,
+    verify_tx_receipt,
+};
 use crate::seed::{SeedSnapshot, SeedStatusClient, AUXPOW_CHAIN_ID, MAINNET_GENESIS_HASH, TESTNET_GENESIS_HASH};
 use crate::stark::verify_covenant_stark;
 use crate::storage::{ApiStateView, CommonsEngine};
@@ -633,7 +637,12 @@ pub fn render_mcp_server_card_json(base_url: &str) -> Value {
             "newsatoshi_spawn_charter",
             "newsatoshi_list_charters",
             "newsatoshi_discover_services",
-            "newsatoshi_list_bounties"
+            "newsatoshi_list_bounties",
+            "crypto_inspect_evm_contract",
+            "crypto_bitcoin_mempool_oracle",
+            "crypto_decode_bolt11_invoice",
+            "crypto_quote_base_uniswap_v3",
+            "crypto_verify_tx_receipt"
         ],
         "resources": [
             "newsatoshi://llms.txt",
@@ -1470,6 +1479,64 @@ pub fn mcp_tools_list() -> Value {
                 "name": "newsatoshi_list_bounties",
                 "description": "List open zero-custody work & compute bounties backed by Newsatoshi L1 Freivalds jobs or multi-chain SHA-256 HTLC locks.",
                 "inputSchema": { "type": "object", "properties": {} }
+            },
+            {
+                "name": "crypto_inspect_evm_contract",
+                "description": "Zero-API-key live EVM smart-contract security audit across Ethereum, Base, Arbitrum, Optimism & Polygon: inspects bytecode size, EIP-1967 upgradeable proxy slots, active owner() privilege, ERC-20 metadata, native balance, and live Sourcify source verification.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["chain", "address"],
+                    "properties": {
+                        "chain": { "type": "string", "enum": ["ethereum", "base", "arbitrum", "optimism", "polygon"], "description": "Target EVM mainnet" },
+                        "address": { "type": "string", "description": "0x-prefixed 20-byte EVM contract or EOA address" }
+                    }
+                }
+            },
+            {
+                "name": "crypto_bitcoin_mempool_oracle",
+                "description": "Zero-API-key live Bitcoin Mainnet fee rate oracle (sat/vB for fastest/30m/1h/economy), current tip block height, mempool backlog size, and optional Bitcoin address confirmed/unconfirmed balance lookup via mempool.space.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "address": { "type": "string", "description": "Optional Bitcoin address (bc1q..., bc1p..., 1..., 3...) for live balance & tx count lookup" }
+                    }
+                }
+            },
+            {
+                "name": "crypto_decode_bolt11_invoice",
+                "description": "Instant sub-millisecond pure-Rust Lightning Network BOLT-11 invoice decoder: extracts network, SHA-256 payment_hash, exact satoshi & millisatoshi amount, expiry, timestamp, and description.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["invoice"],
+                    "properties": {
+                        "invoice": { "type": "string", "description": "Lightning BOLT-11 invoice string (lnbc..., lntb..., lnbcrt...)" }
+                    }
+                }
+            },
+            {
+                "name": "crypto_quote_base_uniswap_v3",
+                "description": "Fetch a live on-chain Base Mainnet Uniswap V3 QuoterV2 swap quote and live pool reserves for ETH <-> wLOVE or USDC <-> wLOVE (including 2-hop USDC -> WETH -> wLOVE).",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["from_asset", "to_asset", "amount"],
+                    "properties": {
+                        "from_asset": { "type": "string", "enum": ["ETH", "USDC", "wLOVE"], "description": "Input asset symbol" },
+                        "to_asset": { "type": "string", "enum": ["ETH", "USDC", "wLOVE"], "description": "Output asset symbol" },
+                        "amount": { "type": "string", "description": "Human-readable decimal amount (e.g. '0.001' ETH or '1' USDC)" }
+                    }
+                }
+            },
+            {
+                "name": "crypto_verify_tx_receipt",
+                "description": "Zero-API-key cross-chain transaction finality & confirmation checker across Ethereum, Base, Arbitrum, Optimism, Polygon, and Bitcoin Mainnet.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["chain", "tx_hash"],
+                    "properties": {
+                        "chain": { "type": "string", "enum": ["ethereum", "base", "arbitrum", "optimism", "polygon", "bitcoin"], "description": "Target blockchain network" },
+                        "tx_hash": { "type": "string", "description": "Transaction hash (0x... for EVM or 64-hex txid for Bitcoin)" }
+                    }
+                }
             }
         ]
     })
@@ -1791,6 +1858,30 @@ pub fn handle_mcp_jsonrpc(
                     "count": engine.web4_bounties.len(),
                     "bounties": engine.web4_bounties
                 })),
+                "crypto_inspect_evm_contract" => {
+                    let chain = args.get("chain").and_then(|v| v.as_str()).unwrap_or("base");
+                    let address = args.get("address").and_then(|v| v.as_str()).unwrap_or("");
+                    inspect_evm_contract(chain, address)
+                }
+                "crypto_bitcoin_mempool_oracle" => {
+                    let address = args.get("address").and_then(|v| v.as_str());
+                    fetch_bitcoin_mempool_oracle(address)
+                }
+                "crypto_decode_bolt11_invoice" => {
+                    let invoice = args.get("invoice").and_then(|v| v.as_str()).unwrap_or("");
+                    decode_bolt11_tool(invoice)
+                }
+                "crypto_quote_base_uniswap_v3" => {
+                    let from_asset = args.get("from_asset").and_then(|v| v.as_str()).unwrap_or("ETH");
+                    let to_asset = args.get("to_asset").and_then(|v| v.as_str()).unwrap_or("wLOVE");
+                    let amount = args.get("amount").and_then(|v| v.as_str()).unwrap_or("0.001");
+                    quote_base_uniswap_v3(from_asset, to_asset, amount)
+                }
+                "crypto_verify_tx_receipt" => {
+                    let chain = args.get("chain").and_then(|v| v.as_str()).unwrap_or("base");
+                    let tx_hash = args.get("tx_hash").and_then(|v| v.as_str()).unwrap_or("");
+                    verify_tx_receipt(chain, tx_hash)
+                }
                 other => Err(format!("unknown MCP tool '{other}'")),
             };
 
@@ -1887,6 +1978,6 @@ mod tests {
             &client,
             None,
         );
-        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 14);
+        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 19);
     }
 }

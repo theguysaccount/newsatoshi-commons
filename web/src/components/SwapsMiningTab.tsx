@@ -158,7 +158,44 @@ export function SwapsMiningTab({
 
   // Easy Setup & Mining state
   const [minerThs, setMinerThs] = useState<string>('1.2');
+  const [poolStatus, setPoolStatus] = useState<{
+    ok?: boolean;
+    online?: boolean;
+    stratum_url?: string;
+    pool_fee_pct?: number;
+    connected_workers?: number;
+    estimated_pool_hashrate_ghs?: number;
+    shares_accepted?: number;
+    aux_blocks_accepted?: number;
+    current_template?: {
+      aux_height?: number;
+      worker_difficulty?: number;
+      network_difficulty?: number;
+    } | null;
+  } | null>(null);
   const [mcpTestBusy, setMcpTestBusy] = useState(false);
+
+  useEffect(() => {
+    if (section !== 'setup') return;
+    let alive = true;
+    const pollPool = async () => {
+      try {
+        const res = await fetch('/api/pool/status');
+        if (res.ok && alive) {
+          const data = await res.json();
+          setPoolStatus(data);
+        }
+      } catch {
+        // silent
+      }
+    };
+    void pollPool();
+    const id = window.setInterval(() => void pollPool(), 15000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, [section]);
   const [mcpTestResult, setMcpTestResult] = useState<{
     ok: boolean;
     toolCount?: number;
@@ -1649,17 +1686,21 @@ docker compose up -d`;
             <div className="surface-card rounded-2xl p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-400">
-                  Zero API Keys · Official MCP Registry
+                  Zero API Keys · Official MCP &amp; Glama
                 </span>
                 <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] text-emerald-300">
-                  14 Live Tools
+                  19 Live Tools
                 </span>
               </div>
               <h3 className="font-display text-2xl text-zinc-100">
                 Connect Claude, Cursor, or any AI agent.
               </h3>
               <p className="text-xs leading-relaxed text-zinc-400">
-                Drop this snippet into your MCP config to give any agent live mainnet telemetry, swap compilation, x402/PayWord verification, and STARK covenant checks.
+                Drop this snippet into your MCP config for instant zero-API-key{' '}
+                <strong className="text-zinc-200">EVM contract security audits</strong>,{' '}
+                <strong className="text-zinc-200">Bitcoin mempool fees</strong>,{' '}
+                <strong className="text-zinc-200">Lightning BOLT-11 decoding</strong>,{' '}
+                <strong className="text-zinc-200">Base Uniswap V3 quotes</strong>, tx finality checks, and Newsatoshi LOVE rails.
               </p>
 
               <div className="rounded-xl border border-white/[0.08] bg-[#0a0a0d] p-3.5">
@@ -1700,6 +1741,107 @@ docker compose up -d`;
                       : `Error: ${mcpTestResult.error}`}
                   </span>
                 )}
+              </div>
+            </div>
+          </div>
+
+          {/* Public Bitaxe / ASIC Solo-Mining Pool (0% Fee · Direct Coinbase Payout) */}
+          <div className="surface-card rounded-2xl p-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      poolStatus?.online ? 'bg-emerald-400' : 'bg-amber-400'
+                    }`}
+                  />
+                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-amber-300">
+                    Live Public Bitaxe / ASIC Solo Pool · 0% Fee · Direct L1 Payout
+                  </span>
+                </div>
+                <h3 className="font-display mt-1.5 text-2xl text-zinc-100 sm:text-3xl">
+                  Point your Bitaxe or NerdQAxe in 10 seconds — no Docker required.
+                </h3>
+                <p className="mt-1 max-w-2xl text-xs text-zinc-400">
+                  Paste our public Stratum v1 URL into AxeOS or any SHA-256 miner and put your own{' '}
+                  <code className="font-mono text-zinc-200">ns1…</code> address as the Username. Winning blocks pay{' '}
+                  <strong className="text-zinc-200">100% of the 50 LOVE reward directly to your address</strong> on-chain.
+                </p>
+              </div>
+              <a
+                href="https://pool.newsatoshi.org/status"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded-full border border-white/[0.1] bg-white/[0.03] px-3 py-1.5 font-mono text-[11px] text-zinc-300 hover:border-white/[0.22] hover:text-white"
+              >
+                <span>Live Pool JSON</span>
+                <ArrowUpRight className="h-3 w-3" />
+              </a>
+            </div>
+
+            {/* 4 Live Pool Metrics (Strict Zero-Fake-Data) */}
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+              <div className="rounded-xl border border-white/[0.07] bg-[#0a0a0d] p-3">
+                <div className="text-[10px] uppercase tracking-wider text-zinc-500">Pool Status</div>
+                <div className="mt-1 font-mono text-sm font-semibold text-emerald-300">
+                  {poolStatus?.online
+                    ? poolStatus.current_template?.aux_height
+                      ? `Online · #${poolStatus.current_template.aux_height.toLocaleString()}`
+                      : 'Online · Syncing'
+                    : 'Connecting…'}
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/[0.07] bg-[#0a0a0d] p-3">
+                <div className="text-[10px] uppercase tracking-wider text-zinc-500">Connected Miners</div>
+                <div className="mt-1 font-mono text-sm font-semibold text-zinc-100 tabular-nums">
+                  {poolStatus?.online ? (poolStatus.connected_workers ?? 0) : '—'}
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/[0.07] bg-[#0a0a0d] p-3">
+                <div className="text-[10px] uppercase tracking-wider text-zinc-500">Accepted Shares</div>
+                <div className="mt-1 font-mono text-sm font-semibold text-zinc-100 tabular-nums">
+                  {poolStatus?.online ? (poolStatus.shares_accepted ?? 0).toLocaleString() : '—'}
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/[0.07] bg-[#0a0a0d] p-3">
+                <div className="text-[10px] uppercase tracking-wider text-zinc-500">Pool Blocks / Fee</div>
+                <div className="mt-1 font-mono text-sm font-semibold text-amber-300 tabular-nums">
+                  {poolStatus?.online ? `${poolStatus.aux_blocks_accepted ?? 0} blk · 0% fee` : '0% fee'}
+                </div>
+              </div>
+            </div>
+
+            {/* 3-Field AxeOS / Bitaxe Paste Box */}
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+              <div className="rounded-xl border border-white/[0.08] bg-[#0a0a0d] p-3">
+                <div className="flex items-center justify-between text-[10px] uppercase text-zinc-500">
+                  <span>Stratum Host</span>
+                  <CopyButton value="pool.newsatoshi.org" label="Copy" />
+                </div>
+                <div className="mt-1 font-mono text-xs font-medium text-emerald-300">
+                  pool.newsatoshi.org
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/[0.08] bg-[#0a0a0d] p-3">
+                <div className="flex items-center justify-between text-[10px] uppercase text-zinc-500">
+                  <span>Stratum Port</span>
+                  <CopyButton value="3333" label="Copy" />
+                </div>
+                <div className="mt-1 font-mono text-xs font-medium text-zinc-100">
+                  3333 <span className="text-zinc-500">(BIP-320 supported)</span>
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/[0.08] bg-[#0a0a0d] p-3">
+                <div className="flex items-center justify-between text-[10px] uppercase text-zinc-500">
+                  <span>Stratum User (Payout)</span>
+                  <CopyButton
+                    value={loveAddress ? `${loveAddress}.bitaxe` : 'YOUR_NS1_ADDRESS.bitaxe'}
+                    label="Copy"
+                  />
+                </div>
+                <div className="mt-1 truncate font-mono text-xs font-medium text-amber-200">
+                  {loveAddress ? `${truncateHash(loveAddress, 8, 5)}.bitaxe` : 'YOUR_NS1_ADDRESS.bitaxe'}
+                </div>
               </div>
             </div>
           </div>

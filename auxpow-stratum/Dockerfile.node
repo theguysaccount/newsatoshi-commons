@@ -1,5 +1,5 @@
 # Verified upstream Newsatoshi v0.1.0 L1 full node (SHA-256 pinned)
-FROM rust:1.85-slim-bookworm AS builder
+FROM rust:bookworm AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl unzip ca-certificates \
     && rm -rf /var/lib/apt/lists/*

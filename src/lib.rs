@@ -1,6 +1,9 @@
+#![recursion_limit = "256"]
+
 pub mod agent;
 pub mod backing;
 pub mod crypto;
+pub mod crypto_tools;
 pub mod hardware;
 pub mod rpc;
 pub mod seed;

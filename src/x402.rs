@@ -491,12 +491,42 @@ pub fn route_spec_verify_payword() -> X402RouteSpec {
     }
 }
 
+pub fn route_spec_evm_security_scan() -> X402RouteSpec {
+    X402RouteSpec {
+        path: "/api/x402/evm-security-scan",
+        method: "POST",
+        name: "Multi-Chain EVM Smart Contract Security Scan (ETH/Base/Arb/OP/Polygon)",
+        description: "Live on-chain security & rug-risk audit for any EVM contract: bytecode size, EIP-1967 proxy implementation/admin slots, active owner() privileges, ERC-20 supply/metadata, and Sourcify source verification. Accepts x402 USDC ($0.001) or zero-gas SHA-256 PayWord.",
+        amount_usdc_atomic: "1000",
+        tags: &["crypto", "security", "evm", "audit", "base", "ethereum", "x402"],
+        input_info: json!({
+            "type": "http",
+            "method": "POST",
+            "bodyType": "json",
+            "bodyFields": {
+                "chain": "ethereum | base | arbitrum | optimism | polygon",
+                "address": "0x-prefixed 20-byte contract address"
+            }
+        }),
+        output_example: json!({
+            "ok": true,
+            "chain": "base",
+            "is_contract": true,
+            "is_eip1967_proxy": false,
+            "is_ownerless": true,
+            "sourcify_status": "perfect",
+            "risk_flags": ["IMMUTABLE_OWNERLESS_VERIFIED"]
+        }),
+    }
+}
+
 /// Renders `/.well-known/x402.json` discovery manifest for x402 indexers & crawlers.
 pub fn render_well_known_x402(base_url: &str) -> Value {
     let specs = [
         route_spec_bridge_quote(),
         route_spec_compile_htlc(),
         route_spec_verify_payword(),
+        route_spec_evm_security_scan(),
     ];
     let resources: Vec<Value> = specs
         .iter()
