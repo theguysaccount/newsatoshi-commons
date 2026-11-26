@@ -1,32 +1,61 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowLeftRight,
+  ArrowUpRight,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Cpu,
+  Download,
   KeyRound,
+  Loader2,
   Pickaxe,
+  Plus,
   Radio,
   SearchCheck,
   ShieldCheck,
+  Sparkles,
   Terminal,
+  Wallet,
   Zap,
 } from 'lucide-react';
 import { actionCompileSwap, actionPublishSwap, actionVerifySwap } from '../api/client';
 import type {
   AtomicSwapContract,
+  BackingProofSummary,
   CommonsState,
   CompileSwapPayload,
   DualChainSwapVerification,
   SeedStatusResponse,
 } from '../types';
-import { CopyButton, HashPill } from './ui/CopyButton';
+import {
+  BASE_WLOVE_ADDRESS,
+  BASE_WLOVE_POOL,
+  CANONICAL_HTLC,
+  EVM_CHAINS,
+  encodeApprove,
+  encodeHtlcLockErc20,
+  encodeHtlcLockEth,
+  parseUnits,
+  readErc20Allowance,
+  type EvmChainKey,
+} from '../wallet/evm';
+import { useWallet } from '../wallet/WalletContext';
+import { InstantSwapCard } from './InstantSwapCard';
+import { QuickBackCard } from './QuickBackCard';
+import { CopyButton, HashPill, truncateHash } from './ui/CopyButton';
 import { Panel } from './ui/Panel';
+
+export type SwapHubSection = 'swap' | 'back' | 'bridge' | 'setup';
 
 interface SwapsMiningTabProps {
   state: CommonsState | null;
   seed: SeedStatusResponse | null;
+  backing: BackingProofSummary | null;
   hasOperatorToken: boolean;
+  initialSection?: SwapHubSection;
+  onRefreshBacking: (force?: boolean) => void;
   onStateUpdated: (next: CommonsState) => void;
   onNotice: (kind: 'success' | 'error', message: string) => void;
 }
@@ -37,26 +66,70 @@ function bytesToHex(bytes: Uint8Array): string {
     .join('');
 }
 
+const MCP_SNIPPET = `{
+  "mcpServers": {
+    "newsatoshi": {
+      "url": "https://commons.newsatoshi.org/mcp"
+    }
+  }
+}`;
+
 export function SwapsMiningTab({
   state,
   seed,
+  backing,
   hasOperatorToken,
+  initialSection = 'swap',
+  onRefreshBacking,
   onStateUpdated,
   onNotice,
 }: SwapsMiningTabProps) {
-  const [section, setSection] = useState<'swaps' | 'mining'>('swaps');
+  const {
+    evmAddress,
+    evmChainId,
+    openModal,
+    switchEvmChain,
+    sendEvmTx,
+    waitForEvmReceipt,
+    addWloveToWallet,
+    solanaAddress,
+    connectSolana,
+    btcAddress,
+    btcPubkeyHex,
+    connectBtc,
+    loveAddress,
+    setLoveAddress,
+  } = useWallet();
 
-  // Multi-chain Atomic Swap Compiler form state (strictly blank inputs — zero fake keys or orders)
-  const [rail, setRail] = useState<'btc_onchain' | 'lightning_bolt11' | 'solana_htlc' | 'evm_htlc'>('btc_onchain');
+  const [section, setSection] = useState<SwapHubSection>(initialSection);
+
+  useEffect(() => {
+    setSection(initialSection);
+  }, [initialSection]);
+
+  // ── Guided 1-Click EVM HTLC Bridge State ───────────────────────────────────
+  const [guidedChain, setGuidedChain] = useState<EvmChainKey>('base');
+  const [guidedAsset, setGuidedAsset] = useState<'NATIVE' | 'USDC' | 'WLOVE'>('NATIVE');
+  const [guidedAmount, setGuidedAmount] = useState<string>('0.002');
+  const [guidedCounterparty, setGuidedCounterparty] = useState<string>('');
+  const [guidedTimeoutHours, setGuidedTimeoutHours] = useState<number>(6);
+  const [localPreimage, setLocalPreimage] = useState<string>('');
+  const [paymentHash, setPaymentHash] = useState<string>('');
+  const [lockingHtlc, setLockingHtlc] = useState<string | null>(null);
+  const [htlcLockTx, setHtlcLockTx] = useState<string | null>(null);
+
+  // ── Collapsible Advanced Power-User HTLC Compiler & Verifier ───────────────
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  const [rail, setRail] = useState<'btc_onchain' | 'lightning_bolt11' | 'solana_htlc' | 'evm_htlc'>(
+    'evm_htlc'
+  );
   const [direction, setDirection] = useState<'btc_to_love' | 'love_to_btc'>('btc_to_love');
   const [loveNet, setLoveNet] = useState<'mainnet' | 'testnet'>('mainnet');
   const [btcNet, setBtcNet] = useState<'mainnet' | 'testnet' | 'signet' | 'regtest'>('mainnet');
-  const [localPreimage, setLocalPreimage] = useState<string>('');
-  const [paymentHash, setPaymentHash] = useState<string>('');
   const [bolt11Invoice, setBolt11Invoice] = useState<string>('');
   const [amountLove, setAmountLove] = useState<string>('');
   const [amountBtcSats, setAmountBtcSats] = useState<string>('');
-  const [loveClaimAddr, setLoveClaimAddr] = useState<string>('');
+  const [loveClaimAddr, setLoveClaimAddr] = useState<string>(loveAddress);
   const [loveTimeoutBlocks, setLoveTimeoutBlocks] = useState<string>('144');
   const [btcClaimPk, setBtcClaimPk] = useState<string>('');
   const [btcRefundPk, setBtcRefundPk] = useState<string>('');
@@ -69,7 +142,6 @@ export function SwapsMiningTab({
   const [evmChain, setEvmChain] = useState<string>('base');
   const [evmRecipient, setEvmRecipient] = useState<string>('');
   const [makerLabel, setMakerLabel] = useState<string>('');
-
   const [compiling, setCompiling] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [compiled, setCompiled] = useState<AtomicSwapContract | null>(null);
@@ -84,10 +156,32 @@ export function SwapsMiningTab({
   const [verifyResult, setVerifyResult] = useState<DualChainSwapVerification | null>(null);
   const [verifyError, setVerifyError] = useState<string | null>(null);
 
-  // Live AuxPoW Merge-Mining Yield Calculator state (100% live Mainnet difficulty math, zero fake USD prices)
+  // Easy Setup & Mining state
   const [minerThs, setMinerThs] = useState<string>('1.2');
+  const [mcpTestBusy, setMcpTestBusy] = useState(false);
+  const [mcpTestResult, setMcpTestResult] = useState<{
+    ok: boolean;
+    toolCount?: number;
+    latencyMs?: number;
+    error?: string;
+  } | null>(null);
+  const [loveDraft, setLoveDraft] = useState(loveAddress);
 
-  const handleGenerateLocalSecret = async () => {
+  // Auto-sync connected wallet addresses into advanced bridge fields so users never copy/paste
+  useEffect(() => {
+    if (loveAddress && !loveClaimAddr) setLoveClaimAddr(loveAddress);
+    if (loveAddress && !loveDraft) setLoveDraft(loveAddress);
+  }, [loveAddress, loveClaimAddr, loveDraft]);
+
+  useEffect(() => {
+    if (solanaAddress && !solSender) setSolSender(solanaAddress);
+  }, [solanaAddress, solSender]);
+
+  useEffect(() => {
+    if (btcPubkeyHex && !btcRefundPk) setBtcRefundPk(btcPubkeyHex);
+  }, [btcPubkeyHex, btcRefundPk]);
+
+  const handleGenerateLocalSecret = async (): Promise<{ preimage: string; hash: string } | null> => {
     try {
       const preimage = new Uint8Array(32);
       window.crypto.getRandomValues(preimage);
@@ -97,12 +191,143 @@ export function SwapsMiningTab({
       setLocalPreimage(pHex);
       setPaymentHash(hHex);
       setVerifyHash(hHex);
-      onNotice('success', 'Generated 32-byte CSPRNG secret locally (never sent to server)');
+      onNotice('success', 'Generated 32-byte SHA-256 secret locally (never leaves your browser)');
+      return { preimage: pHex, hash: hHex };
     } catch {
       onNotice('error', 'Web Crypto CSPRNG unavailable in this browser context');
+      return null;
     }
   };
 
+  const handleDownloadSecretReceipt = () => {
+    if (!localPreimage || !paymentHash) return;
+    const payload = {
+      protocol: 'NEWSATOSHI/2.1 SHA-256 HTLC Secret Receipt',
+      created_at: new Date().toISOString(),
+      keep_private_preimage_hex: localPreimage,
+      public_payment_hash_hex: paymentHash,
+      evm_htlc_contract: CANONICAL_HTLC,
+      chain: guidedChain,
+      asset: guidedAsset,
+      amount: guidedAmount,
+      counterparty: guidedCounterparty || null,
+      love_claim_address: loveAddress || null,
+      tx_hash: htlcLockTx || null,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `newsatoshi-htlc-secret-${paymentHash.slice(0, 8)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const guidedCfg = EVM_CHAINS[guidedChain];
+  const guidedDecimals =
+    guidedAsset === 'USDC' ? 6 : guidedAsset === 'WLOVE' ? 18 : guidedCfg.nativeDecimals;
+  const guidedSymbol =
+    guidedAsset === 'NATIVE'
+      ? guidedCfg.nativeSymbol
+      : guidedAsset === 'USDC'
+        ? 'USDC'
+        : 'wLOVE';
+  const guidedAmountRaw = useMemo(
+    () => parseUnits(guidedAmount, guidedDecimals),
+    [guidedAmount, guidedDecimals]
+  );
+
+  const handleLockEvmHtlcDirect = async () => {
+    if (!evmAddress) {
+      openModal();
+      return;
+    }
+    if (evmChainId !== guidedCfg.chainId) {
+      setLockingHtlc(`Switching wallet to ${guidedCfg.name}…`);
+      try {
+        await switchEvmChain(guidedChain);
+      } finally {
+        setLockingHtlc(null);
+      }
+      return;
+    }
+    if (!/^0x[0-9a-fA-F]{40}$/.test(guidedCounterparty.trim())) {
+      onNotice('error', 'Enter a valid 0x… counterparty maker address');
+      return;
+    }
+    if (guidedCounterparty.trim().toLowerCase() === evmAddress.toLowerCase()) {
+      onNotice('error', 'Counterparty must be a different address from your own wallet');
+      return;
+    }
+    if (!guidedAmountRaw || guidedAmountRaw <= 0n) {
+      onNotice('error', 'Enter an amount greater than 0');
+      return;
+    }
+
+    let hashHex = paymentHash.trim();
+    if (!/^[0-9a-fA-F]{64}$/.test(hashHex)) {
+      const gen = await handleGenerateLocalSecret();
+      if (!gen) return;
+      hashHex = gen.hash;
+    }
+
+    const timelockUnix = Math.floor(Date.now() / 1000) + guidedTimeoutHours * 3600;
+    setHtlcLockTx(null);
+
+    try {
+      if (guidedAsset === 'NATIVE') {
+        setLockingHtlc(`Locking ${guidedAmount} ${guidedSymbol} in HTLC…`);
+        const txHash = await sendEvmTx({
+          to: CANONICAL_HTLC,
+          data: encodeHtlcLockEth(guidedCounterparty.trim(), `0x${hashHex}`, timelockUnix),
+          value: `0x${guidedAmountRaw.toString(16)}`,
+        });
+        setHtlcLockTx(txHash);
+        onNotice('success', `HTLC lock submitted on ${guidedCfg.name}! Save your secret receipt.`);
+        await waitForEvmReceipt(guidedChain, txHash);
+      } else {
+        const tokenAddr =
+          guidedAsset === 'WLOVE' ? BASE_WLOVE_ADDRESS : guidedCfg.usdcAddress;
+        setLockingHtlc(`Checking ${guidedSymbol} allowance…`);
+        const allowance = await readErc20Allowance(
+          guidedChain,
+          tokenAddr,
+          evmAddress,
+          CANONICAL_HTLC
+        );
+        if (allowance < guidedAmountRaw) {
+          setLockingHtlc(`Approving ${guidedSymbol} for HTLC…`);
+          const appTx = await sendEvmTx({
+            to: tokenAddr,
+            data: encodeApprove(CANONICAL_HTLC, guidedAmountRaw),
+            value: '0x0',
+          });
+          await waitForEvmReceipt(guidedChain, appTx);
+        }
+        setLockingHtlc(`Locking ${guidedAmount} ${guidedSymbol} in HTLC…`);
+        const txHash = await sendEvmTx({
+          to: CANONICAL_HTLC,
+          data: encodeHtlcLockErc20(
+            guidedCounterparty.trim(),
+            tokenAddr,
+            guidedAmountRaw,
+            `0x${hashHex}`,
+            timelockUnix
+          ),
+          value: '0x0',
+        });
+        setHtlcLockTx(txHash);
+        onNotice('success', `${guidedSymbol} HTLC lock submitted on ${guidedCfg.name}!`);
+        await waitForEvmReceipt(guidedChain, txHash);
+      }
+    } catch (err) {
+      onNotice('error', err instanceof Error ? err.message : 'HTLC lock cancelled');
+    } finally {
+      setLockingHtlc(null);
+    }
+  };
+
+  // Advanced compiler handlers
   const buildPayload = (): CompileSwapPayload => {
     const satsNum = amountBtcSats.trim() ? Number(amountBtcSats.trim()) : undefined;
     const lockNum = btcLocktime.trim() ? Number(btcLocktime.trim()) : undefined;
@@ -194,7 +419,7 @@ export function SwapsMiningTab({
           'success',
           res.verification.love_confirmed
             ? `Confirmed on Newsatoshi ${res.verification.love_network} L1`
-            : `Checked Newsatoshi ${res.verification.love_network} L1${res.verification.btc_address ? ' + mempool.space' : ''}`
+            : `Checked Newsatoshi ${res.verification.love_network} L1`
         );
       } else {
         setVerifyResult(null);
@@ -208,15 +433,40 @@ export function SwapsMiningTab({
     }
   };
 
+  const handleTestLiveMcp = async () => {
+    setMcpTestBusy(true);
+    setMcpTestResult(null);
+    const t0 = performance.now();
+    try {
+      const res = await fetch('/mcp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
+      });
+      const data = (await res.json()) as { result?: { tools?: unknown[] }; error?: { message?: string } };
+      const latencyMs = Math.round(performance.now() - t0);
+      if (res.ok && Array.isArray(data.result?.tools)) {
+        setMcpTestResult({ ok: true, toolCount: data.result.tools.length, latencyMs });
+        onNotice('success', `MCP live: ${data.result.tools.length} tools responded in ${latencyMs}ms`);
+      } else {
+        setMcpTestResult({ ok: false, error: data.error?.message || `HTTP ${res.status}` });
+      }
+    } catch (err) {
+      setMcpTestResult({ ok: false, error: err instanceof Error ? err.message : 'MCP request failed' });
+    } finally {
+      setMcpTestBusy(false);
+    }
+  };
+
   const mainnet = seed?.mainnet_status;
   const swapOffers = state?.swap_offers ?? [];
 
   const dockerQuickstart = `git clone https://github.com/theguysaccount/newsatoshi-commons.git
 cd newsatoshi-commons/auxpow-stratum
 export NS_RPC_AUTH="auxpow:$(openssl rand -hex 16)"
-# Optional: set your shielded payout address (ns1... or nsd1...)
-# export NS_PAYOUT_ADDRESS="ns1..."
 docker compose up -d`;
+
+  const cliInstallCmd = `curl -fsSL https://commons.newsatoshi.org/install.sh | sh`;
 
   const meterDaemonCmd = `agent-vault env-run \\
   --map COMMONS_HARDWARE_XMSS_SEED=newsatoshi/hardware-tee-xmss-seed \\
@@ -227,987 +477,1345 @@ docker compose up -d`;
     --soil 92 --love-per-kwh 10 --scheme slh_dsa \\
     --endpoint https://commons.newsatoshi.org/api/telemetry`;
 
+  const TABS: { id: SwapHubSection; label: string }[] = [
+    { id: 'swap', label: 'Instant Swap' },
+    { id: 'back', label: '1-Click Back' },
+    { id: 'bridge', label: 'Bridge to L1' },
+    { id: 'setup', label: 'Easy Setup & Mine' },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Focused 2-Mode Switcher + Compact Rail Status Strip */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/[0.08] bg-[#0f0f12] px-4 py-3">
-        <div className="inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-[#0a0a0d] p-1">
-          <button
-            type="button"
-            onClick={() => setSection('swaps')}
-            className={`rounded-full px-4 py-1.5 text-xs font-medium transition cursor-pointer ${
-              section === 'swaps'
-                ? 'bg-zinc-100 text-zinc-950'
-                : 'text-zinc-400 hover:text-zinc-100'
-            }`}
-          >
-            Atomic Swaps &amp; Verifier
-          </button>
-          <button
-            type="button"
-            onClick={() => setSection('mining')}
-            className={`rounded-full px-4 py-1.5 text-xs font-medium transition cursor-pointer ${
-              section === 'mining'
-                ? 'bg-zinc-100 text-zinc-950'
-                : 'text-zinc-400 hover:text-zinc-100'
-            }`}
-          >
-            AuxPoW Mining &amp; Hardware
-          </button>
+      {/* Crisp 4-Mode Switcher + Connected Wallet Status */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-[#0f0f12] px-4 py-3">
+        <div className="flex flex-wrap items-center gap-1 rounded-full border border-white/[0.08] bg-[#0a0a0d] p-1">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setSection(t.id)}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition cursor-pointer ${
+                section === t.id
+                  ? 'bg-zinc-100 text-zinc-950'
+                  : 'text-zinc-400 hover:text-zinc-100'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-zinc-400">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            <span>4 EVM Mainnets Live</span>
+        <button
+          type="button"
+          onClick={openModal}
+          className="inline-flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.03] px-3.5 py-1.5 text-xs font-medium text-zinc-200 transition hover:border-white/[0.25] hover:bg-white/[0.07] cursor-pointer"
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${evmAddress ? 'bg-emerald-400' : 'bg-zinc-500'}`}
+          />
+          <Wallet className="h-3.5 w-3.5 text-zinc-400" />
+          <span className="font-mono text-[11px]">
+            {evmAddress ? truncateHash(evmAddress, 6, 4) : 'Connect Wallet'}
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            <span>BTC P2WSH Live</span>
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            <span>AuxPoW 20051 Live</span>
-          </span>
-          <span className="font-mono text-zinc-500">Lightning &amp; Solana Ready</span>
-        </div>
+        </button>
       </div>
 
-      {/* Section A: Trustless BTC <-> LOVE Atomic Swap Compiler & Verifier */}
-      {section === 'swaps' && (
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-        <div className="xl:col-span-7">
-          <Panel
-            title="Multi-Chain Trustless Buy Roads (BTC · Lightning · Solana · Base/EVM ↔ LOVE)"
-            subtitle="All 4 rails share the identical SHA-256 HTLC preimage invariant verified by Newsatoshi L1 — zero custodians, zero wrapped tokens"
-            icon={<ArrowLeftRight className="h-4 w-4" />}
-            accent="emerald"
-            badge={
-              <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-emerald-300">
-                4 TRUSTLESS RAILS · 0 CUSTODY
-              </span>
-            }
-          >
-            <form onSubmit={handleCompile} className="space-y-4">
-              <div className="space-y-3">
-                <div>
-                  <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                    Source Buy / Bridge Rail
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-                    <button
-                      type="button"
-                      onClick={() => setRail('btc_onchain')}
-                      className={`rounded-lg border px-2.5 py-2 text-xs font-medium transition cursor-pointer ${
-                        rail === 'btc_onchain'
-                          ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-200'
-                          : 'border-slate-800 bg-slate-950/70 text-slate-400 hover:text-slate-200'
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* TAB 1 (DEFAULT): INSTANT 1-CLICK SWAP (ZERO FORM FILLING)              */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {section === 'swap' && (
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+          <div className="lg:col-span-6 xl:col-span-5">
+            <InstantSwapCard
+              onNotice={onNotice}
+              onOpenBridge={() => setSection('bridge')}
+            />
+          </div>
+
+          <div className="space-y-4 lg:col-span-6 xl:col-span-7">
+            {/* 30-Second Guided Checklist */}
+            <div className="surface-card rounded-2xl p-6">
+              <div className="flex items-center gap-2 text-xs font-medium text-zinc-400">
+                <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
+                <span>3 Steps · Zero Forms</span>
+              </div>
+              <h2 className="font-display mt-2 text-3xl tracking-tight text-zinc-100">
+                Swap in from any Base wallet in seconds.
+              </h2>
+              <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+                Connect MetaMask, Coinbase Wallet, Rabby, or Phantom — pick ETH or USDC, and swap directly through the ownerless, LP-burned Uniswap V3 pool on Base Mainnet.
+              </p>
+
+              <div className="mt-5 space-y-2.5">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-[#0a0a0d] px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-mono text-[11px] font-semibold ${
+                        evmAddress
+                          ? 'bg-emerald-500/20 text-emerald-300'
+                          : 'bg-white/[0.08] text-zinc-300'
                       }`}
                     >
-                      BTC P2WSH
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRail('lightning_bolt11')}
-                      className={`inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-2 text-xs font-medium transition cursor-pointer ${
-                        rail === 'lightning_bolt11'
-                          ? 'border-amber-500/60 bg-amber-500/15 text-amber-200'
-                          : 'border-slate-800 bg-slate-950/70 text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      <Zap className="h-3.5 w-3.5" />
-                      Lightning
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRail('solana_htlc')}
-                      className={`rounded-lg border px-2.5 py-2 text-xs font-medium transition cursor-pointer ${
-                        rail === 'solana_htlc'
-                          ? 'border-purple-500/60 bg-purple-500/15 text-purple-200'
-                          : 'border-slate-800 bg-slate-950/70 text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      Solana (SOL/USDC)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRail('evm_htlc')}
-                      className={`rounded-lg border px-2.5 py-2 text-xs font-medium transition cursor-pointer ${
-                        rail === 'evm_htlc'
-                          ? 'border-sky-500/60 bg-sky-500/15 text-sky-200'
-                          : 'border-slate-800 bg-slate-950/70 text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      Base / EVM
-                    </button>
+                      {evmAddress ? '✓' : '1'}
+                    </span>
+                    <div>
+                      <div className="text-xs font-medium text-zinc-100">Connect your wallet</div>
+                      <div className="text-[11px] text-zinc-500">
+                        {evmAddress
+                          ? `Connected: ${truncateHash(evmAddress, 6, 4)}`
+                          : 'Auto-detects MetaMask, Coinbase Wallet, Rabby & Phantom'}
+                      </div>
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={openModal}
+                    className="shrink-0 rounded-lg border border-white/[0.12] px-3 py-1.5 text-[11px] font-medium text-zinc-200 hover:bg-white/[0.06] cursor-pointer"
+                  >
+                    {evmAddress ? 'Switch' : 'Connect'}
+                  </button>
                 </div>
 
-                <div>
-                  <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                    Swap Direction &amp; Networks
-                  </label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <select
-                      value={direction}
-                      onChange={(e) => setDirection(e.target.value as 'btc_to_love' | 'love_to_btc')}
-                      className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-2 font-mono text-[11px] text-slate-200"
-                    >
-                      <option value="btc_to_love">Bridge In → LOVE</option>
-                      <option value="love_to_btc">LOVE → Bridge Out</option>
-                    </select>
-                    <select
-                      value={loveNet}
-                      onChange={(e) => setLoveNet(e.target.value as 'mainnet' | 'testnet')}
-                      className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-2 font-mono text-[11px] text-slate-200"
-                    >
-                      <option value="mainnet">LOVE Mainnet</option>
-                      <option value="testnet">LOVE Testnet</option>
-                    </select>
-                    {rail === 'solana_htlc' ? (
-                      <select
-                        value={solCluster}
-                        onChange={(e) => setSolCluster(e.target.value)}
-                        className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-2 font-mono text-[11px] text-slate-200"
-                      >
-                        <option value="mainnet-beta">Solana Mainnet</option>
-                        <option value="devnet">Solana Devnet</option>
-                      </select>
-                    ) : rail === 'evm_htlc' ? (
-                      <select
-                        value={evmChain}
-                        onChange={(e) => setEvmChain(e.target.value)}
-                        className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-2 font-mono text-[11px] text-slate-200"
-                      >
-                        <option value="base">Base (8453)</option>
-                        <option value="arbitrum">Arbitrum (42161)</option>
-                        <option value="ethereum">Ethereum (1)</option>
-                        <option value="optimism">Optimism (10)</option>
-                        <option value="polygon">Polygon (137)</option>
-                      </select>
-                    ) : (
-                      <select
-                        value={btcNet}
-                        onChange={(e) =>
-                          setBtcNet(e.target.value as 'mainnet' | 'testnet' | 'signet' | 'regtest')
-                        }
-                        className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-2 font-mono text-[11px] text-slate-200"
-                      >
-                        <option value="mainnet">BTC Mainnet</option>
-                        <option value="testnet">BTC Testnet</option>
-                        <option value="signet">BTC Signet</option>
-                        <option value="regtest">BTC Regtest</option>
-                      </select>
-                    )}
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-[#0a0a0d] px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.08] font-mono text-[11px] font-semibold text-zinc-300">
+                      2
+                    </span>
+                    <div>
+                      <div className="text-xs font-medium text-zinc-100">
+                        Swap ETH or USDC → wLOVE
+                      </div>
+                      <div className="text-[11px] text-zinc-500">
+                        0% buy/sell tax · 0 team allocation · LP NFT #6689936 burned forever
+                      </div>
+                    </div>
                   </div>
+                  {evmAddress && (
+                    <button
+                      type="button"
+                      onClick={() => void addWloveToWallet()}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-medium text-emerald-300 hover:bg-emerald-500/20 cursor-pointer"
+                    >
+                      <Plus className="h-3 w-3" />
+                      <span>Add Token</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-[#0a0a0d] px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-mono text-[11px] font-semibold ${
+                        loveAddress
+                          ? 'bg-emerald-500/20 text-emerald-300'
+                          : 'bg-white/[0.08] text-zinc-300'
+                      }`}
+                    >
+                      {loveAddress ? '✓' : '3'}
+                    </span>
+                    <div>
+                      <div className="text-xs font-medium text-zinc-100">
+                        Want native shielded L1 LOVE?
+                      </div>
+                      <div className="text-[11px] text-zinc-500">
+                        Open the zero-install browser wallet on newsatoshi.org, or use the 1-click Bridge tab.
+                      </div>
+                    </div>
+                  </div>
+                  <a
+                    href="https://newsatoshi.org/wallet/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-white/[0.12] px-2.5 py-1.5 text-[11px] font-medium text-zinc-200 hover:bg-white/[0.06]"
+                  >
+                    <span>L1 Wallet</span>
+                    <ArrowUpRight className="h-3 w-3" />
+                  </a>
                 </div>
               </div>
+            </div>
 
-              {rail !== 'lightning_bolt11' ? (
-                <div className="space-y-3">
-                  <div>
-                    <div className="mb-1 flex items-center justify-between">
-                      <label className="font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                        SHA-256 Payment Hash (64 hex chars)
-                      </label>
+            {/* Verified Token & Pool Proof Card */}
+            <div className="surface-card rounded-2xl p-5 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-mono text-[11px] uppercase tracking-wider text-zinc-400">
+                  Verified Base wLOVE Contract
+                </span>
+                <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] text-emerald-300">
+                  Sourcify Exact Match · 0 Owner
+                </span>
+              </div>
+              <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/[0.07] bg-[#0a0a0d] px-3.5 py-2.5 font-mono text-[11px] text-zinc-200">
+                <span className="break-all">{BASE_WLOVE_ADDRESS}</span>
+                <CopyButton value={BASE_WLOVE_ADDRESS} label="Copy" />
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <a
+                  href={`https://app.uniswap.org/swap?chain=base&outputCurrency=${BASE_WLOVE_ADDRESS}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-[#0a0a0d] px-3 py-1.5 text-[11px] font-medium text-zinc-300 hover:border-white/[0.2] hover:text-white"
+                >
+                  <span>Trade on Uniswap</span>
+                  <ArrowUpRight className="h-3 w-3" />
+                </a>
+                <a
+                  href={`https://dexscreener.com/base/${BASE_WLOVE_POOL}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-[#0a0a0d] px-3 py-1.5 text-[11px] font-medium text-zinc-300 hover:border-white/[0.2] hover:text-white"
+                >
+                  <span>DEXScreener</span>
+                  <ArrowUpRight className="h-3 w-3" />
+                </a>
+                <a
+                  href={`https://www.geckoterminal.com/base/pools/${BASE_WLOVE_POOL.toLowerCase()}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-[#0a0a0d] px-3 py-1.5 text-[11px] font-medium text-zinc-300 hover:border-white/[0.2] hover:text-white"
+                >
+                  <span>GeckoTerminal</span>
+                  <ArrowUpRight className="h-3 w-3" />
+                </a>
+                <a
+                  href={`https://basescan.org/tx/0x378a7f5bc92bc777aa991246fa3aa0d2bc713577cf1f9bc50dc7ea8c0331c4bc`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-[#0a0a0d] px-3 py-1.5 text-[11px] font-medium text-zinc-300 hover:border-white/[0.2] hover:text-white"
+                >
+                  <span>LP Burn Proof</span>
+                  <ArrowUpRight className="h-3 w-3" />
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* TAB 2: 1-CLICK MULTI-CHAIN BACKING VAULT                               */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {section === 'back' && (
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+          <div className="lg:col-span-6">
+            <QuickBackCard
+              onBacked={() => onRefreshBacking(true)}
+              onNotice={onNotice}
+            />
+          </div>
+
+          <div className="surface-card rounded-2xl p-5 lg:col-span-6">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-[14px] font-semibold text-zinc-100">
+                Live 4-Chain Reserve Breakdown
+              </h3>
+              <a
+                href="/api/backing/summary"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-[11px] text-zinc-400 hover:text-zinc-100"
+              >
+                <span>Live RPC JSON</span>
+                <ArrowUpRight className="h-3 w-3" />
+              </a>
+            </div>
+            <p className="mt-1 text-xs text-zinc-500">
+              Verified directly from <code className="font-mono text-zinc-300">0x37Ed…9265</code> across Base, Arbitrum, Optimism &amp; Polygon.
+            </p>
+
+            <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              {(backing?.chains ?? []).map((c) => (
+                <div
+                  key={c.chain_id}
+                  className="rounded-xl border border-white/[0.07] bg-[#0a0a0d] p-3.5 text-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium capitalize text-zinc-100">{c.chain}</span>
+                    <span className="font-mono text-[10px] text-emerald-400">
+                      {c.live ? 'Live' : 'Syncing'}
+                    </span>
+                  </div>
+                  <div className="mt-2 font-mono text-sm font-medium text-zinc-100 tabular-nums">
+                    {c.native_reserve_formatted} {c.native_symbol}
+                  </div>
+                  <div className="mt-0.5 font-mono text-[11px] text-zinc-400">
+                    {c.usdc_reserve_formatted} USDC · {c.deposits_count} deposit{c.deposits_count === 1 ? '' : 's'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* TAB 3: GUIDED 1-CLICK EVM HTLC BRIDGE + COLLAPSIBLE ADVANCED COMPILER  */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {section === 'bridge' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+            {/* Simple Guided EVM HTLC Locker */}
+            <div className="surface-card rounded-2xl p-5 lg:col-span-7">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <ArrowLeftRight className="h-4 w-4 text-emerald-400" />
+                  <h3 className="text-[14px] font-semibold text-zinc-100">
+                    Guided Atomic Bridge (Zero Custody)
+                  </h3>
+                </div>
+                <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] text-emerald-300">
+                  SHA-256 HTLC · 0xF564…987
+                </span>
+              </div>
+              <p className="mt-1.5 text-xs text-zinc-400">
+                Lock ETH, USDC, or wLOVE directly in the ownerless SHA-256 HTLC contract from your connected wallet — no manual hex, no base-unit math, automatic refund if not claimed.
+              </p>
+
+              {/* Step 1: Chain & Asset */}
+              <div className="mt-4 space-y-3">
+                <div className="grid grid-cols-4 gap-1.5">
+                  {(Object.keys(EVM_CHAINS) as EvmChainKey[]).map((key) => {
+                    const item = EVM_CHAINS[key];
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => {
+                          setGuidedChain(key);
+                          if (key !== 'base' && guidedAsset === 'WLOVE') setGuidedAsset('NATIVE');
+                        }}
+                        className={`rounded-xl border px-2 py-2 text-xs font-medium transition cursor-pointer ${
+                          guidedChain === key
+                            ? 'border-white/30 bg-white/[0.1] text-white'
+                            : 'border-white/[0.08] bg-[#0a0a0d] text-zinc-400 hover:text-zinc-100'
+                        }`}
+                      >
+                        {item.shortName}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-white/[0.08] bg-[#0a0a0d] p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-zinc-500">Asset &amp; Amount</span>
+                      <div className="inline-flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGuidedAsset('NATIVE');
+                            setGuidedAmount(guidedChain === 'polygon' ? '5' : '0.002');
+                          }}
+                          className={`rounded px-1.5 py-0.5 font-mono text-[10px] cursor-pointer ${
+                            guidedAsset === 'NATIVE'
+                              ? 'bg-white/[0.15] text-white'
+                              : 'text-zinc-500 hover:text-zinc-200'
+                          }`}
+                        >
+                          {guidedCfg.nativeSymbol}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGuidedAsset('USDC');
+                            setGuidedAmount('5');
+                          }}
+                          className={`rounded px-1.5 py-0.5 font-mono text-[10px] cursor-pointer ${
+                            guidedAsset === 'USDC'
+                              ? 'bg-white/[0.15] text-white'
+                              : 'text-zinc-500 hover:text-zinc-200'
+                          }`}
+                        >
+                          USDC
+                        </button>
+                        {guidedChain === 'base' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGuidedAsset('WLOVE');
+                              setGuidedAmount('100000');
+                            }}
+                            className={`rounded px-1.5 py-0.5 font-mono text-[10px] cursor-pointer ${
+                              guidedAsset === 'WLOVE'
+                                ? 'bg-white/[0.15] text-white'
+                                : 'text-zinc-500 hover:text-zinc-200'
+                            }`}
+                          >
+                            wLOVE
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={guidedAmount}
+                      onChange={(e) => setGuidedAmount(e.target.value)}
+                      placeholder="0.002"
+                      className="mt-2 w-full bg-transparent font-mono text-xl font-medium text-zinc-100 focus:outline-none tabular-nums"
+                    />
+                  </div>
+
+                  <div className="rounded-xl border border-white/[0.08] bg-[#0a0a0d] p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-zinc-500">Refund Timeout</span>
+                      <span className="font-mono text-[11px] text-zinc-300">
+                        {guidedTimeoutHours} hours
+                      </span>
+                    </div>
+                    <div className="mt-3 flex gap-1.5">
+                      {[2, 6, 12, 24].map((h) => (
+                        <button
+                          key={h}
+                          type="button"
+                          onClick={() => setGuidedTimeoutHours(h)}
+                          className={`flex-1 rounded-lg border py-1.5 font-mono text-[11px] transition cursor-pointer ${
+                            guidedTimeoutHours === h
+                              ? 'border-white/30 bg-white/[0.1] text-white'
+                              : 'border-white/[0.08] text-zinc-400 hover:text-zinc-100'
+                          }`}
+                        >
+                          {h}h
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[11px] text-zinc-400">
+                    Counterparty Maker EVM Address (receives locked {guidedSymbol} when they reveal the secret on L1)
+                  </label>
+                  <input
+                    type="text"
+                    value={guidedCounterparty}
+                    onChange={(e) => setGuidedCounterparty(e.target.value)}
+                    placeholder="0x… maker address"
+                    className="w-full rounded-xl border border-white/[0.1] bg-[#0a0a0d] px-3 py-2.5 font-mono text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-white/30 focus:outline-none"
+                  />
+                </div>
+
+                {/* Auto-Generated Secret Box */}
+                <div className="rounded-xl border border-white/[0.08] bg-[#0a0a0d] p-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[11px] font-medium text-zinc-300">
+                      Local SHA-256 Swap Secret (auto-created if blank)
+                    </span>
+                    <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => void handleGenerateLocalSecret()}
-                        className="inline-flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-medium text-emerald-300 hover:bg-emerald-500/20 cursor-pointer"
+                        className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-1 font-mono text-[10px] font-medium text-emerald-300 hover:bg-emerald-500/20 cursor-pointer"
                       >
                         <KeyRound className="h-3 w-3" />
-                        Generate Local Secret
+                        <span>{paymentHash ? 'Regenerate' : 'Generate Secret'}</span>
                       </button>
+                      {localPreimage && (
+                        <button
+                          type="button"
+                          onClick={handleDownloadSecretReceipt}
+                          className="inline-flex items-center gap-1 rounded-lg border border-white/[0.12] bg-white/[0.05] px-2.5 py-1 text-[10px] font-medium text-zinc-200 hover:bg-white/[0.1] cursor-pointer"
+                        >
+                          <Download className="h-3 w-3" />
+                          <span>Save Receipt</span>
+                        </button>
+                      )}
                     </div>
-                    <input
-                      type="text"
-                      required
-                      value={paymentHash}
-                      onChange={(e) => setPaymentHash(e.target.value)}
-                      placeholder="64-hex SHA-256 hash of 32-byte swap preimage"
-                      className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
-                    />
-                    {localPreimage && (
-                      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
-                        <span className="font-mono break-all">
-                          <strong className="text-amber-300">LOCAL SECRET PREIMAGE (keep private):</strong>{' '}
-                          {localPreimage}
-                        </span>
-                        <CopyButton value={localPreimage} label="Copy Secret" />
+                  </div>
+                  {paymentHash ? (
+                    <div className="mt-2 space-y-1 font-mono text-[10px]">
+                      <div className="flex items-center justify-between gap-2 text-zinc-400">
+                        <span className="truncate">Hash: {paymentHash}</span>
+                        <CopyButton value={paymentHash} />
+                      </div>
+                      {localPreimage && (
+                        <div className="truncate text-amber-300/90">
+                          Private Preimage: {truncateHash(localPreimage, 14, 10)} (saved locally only)
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-1.5 text-[11px] text-zinc-500">
+                      Click Lock below and we&apos;ll automatically generate a fresh 32-byte secret right inside your browser.
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={lockingHtlc !== null}
+                  onClick={() => void handleLockEvmHtlcDirect()}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-50 px-4 py-3 text-[13px] font-semibold text-zinc-950 transition hover:bg-white cursor-pointer disabled:opacity-50"
+                >
+                  {lockingHtlc ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>{lockingHtlc}</span>
+                    </>
+                  ) : !evmAddress ? (
+                    <>
+                      <Wallet className="h-4 w-4" />
+                      <span>Connect Wallet to Lock HTLC</span>
+                    </>
+                  ) : evmChainId !== guidedCfg.chainId ? (
+                    <span>Switch Wallet to {guidedCfg.name}</span>
+                  ) : (
+                    <span>
+                      Lock {guidedAmount || '0'} {guidedSymbol} in {guidedCfg.shortName} HTLC
+                    </span>
+                  )}
+                </button>
+
+                {htlcLockTx && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 text-xs text-emerald-200">
+                    <span className="inline-flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>HTLC locked on {guidedCfg.shortName}!</span>
+                    </span>
+                    <div className="flex items-center gap-3">
+                      {localPreimage && (
+                        <button
+                          type="button"
+                          onClick={handleDownloadSecretReceipt}
+                          className="font-mono text-[11px] underline cursor-pointer"
+                        >
+                          Download Secret JSON
+                        </button>
+                      )}
+                      <a
+                        href={`${guidedCfg.explorerUrl}/tx/${htlcLockTx}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 font-mono text-[11px] underline"
+                      >
+                        <span>View TX</span>
+                        <ArrowUpRight className="h-3 w-3" />
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Multi-Chain Wallet Auto-Fill & Native L1 Shortcut */}
+            <div className="space-y-4 lg:col-span-5">
+              <div className="surface-card rounded-2xl p-5">
+                <h3 className="text-[14px] font-semibold text-zinc-100">
+                  Connected Bridge Wallets
+                </h3>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Connect once — every address auto-fills below so you don&apos;t have to hunt for pubkeys.
+                </p>
+                <div className="mt-4 space-y-2 text-xs">
+                  <div className="flex items-center justify-between rounded-xl border border-white/[0.07] bg-[#0a0a0d] px-3.5 py-2.5">
+                    <div>
+                      <div className="font-medium text-zinc-200">EVM (Base / Arb / OP / Pol)</div>
+                      <div className="font-mono text-[10px] text-zinc-500">
+                        {evmAddress ? truncateHash(evmAddress, 8, 6) : 'Not connected'}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={openModal}
+                      className="rounded-lg border border-white/[0.12] px-2.5 py-1 text-[11px] text-zinc-200 hover:bg-white/[0.06] cursor-pointer"
+                    >
+                      {evmAddress ? 'Manage' : 'Connect'}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-xl border border-white/[0.07] bg-[#0a0a0d] px-3.5 py-2.5">
+                    <div>
+                      <div className="font-medium text-zinc-200">Solana (Phantom / Solflare)</div>
+                      <div className="font-mono text-[10px] text-zinc-500">
+                        {solanaAddress ? truncateHash(solanaAddress, 6, 5) : 'Not connected'}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void connectSolana()}
+                      className="rounded-lg border border-white/[0.12] px-2.5 py-1 text-[11px] text-zinc-200 hover:bg-white/[0.06] cursor-pointer"
+                    >
+                      {solanaAddress ? 'Connected' : 'Connect'}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-xl border border-white/[0.07] bg-[#0a0a0d] px-3.5 py-2.5">
+                    <div>
+                      <div className="font-medium text-zinc-200">Bitcoin (UniSat / Leather)</div>
+                      <div className="font-mono text-[10px] text-zinc-500">
+                        {btcAddress ? truncateHash(btcAddress, 8, 6) : 'Not connected'}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void connectBtc()}
+                      className="rounded-lg border border-white/[0.12] px-2.5 py-1 text-[11px] text-zinc-200 hover:bg-white/[0.06] cursor-pointer"
+                    >
+                      {btcAddress ? 'Connected' : 'Connect'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="surface-card rounded-2xl p-5 text-xs">
+                <div className="font-medium text-zinc-100">Need a fast swap instead?</div>
+                <p className="mt-1 text-zinc-400">
+                  If you don&apos;t have a peer-to-peer L1 maker lined up yet, use the Instant Swap tab to trade ETH or USDC directly into Base wLOVE in 1 click.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSection('swap')}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-white/[0.14] bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-zinc-100 hover:bg-white/[0.08] cursor-pointer"
+                >
+                  <span>Go to Instant Swap</span>
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Collapsible Advanced Power-User HTLC Compiler & Verifier */}
+          <div className="rounded-2xl border border-white/[0.08] bg-[#0f0f12]">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              className="flex w-full items-center justify-between px-5 py-4 text-left cursor-pointer"
+            >
+              <div>
+                <div className="text-xs font-semibold text-zinc-200">
+                  Advanced Developer Tools · Raw BTC / Lightning / Solana / EVM HTLC Compiler &amp; Dual-Chain Verifier
+                </div>
+                <div className="mt-0.5 text-[11px] text-zinc-500">
+                  Compile BIP-199 SegWit P2WSH scripts, decode BOLT-11 invoices, or cross-check live L1 + mempool.space locks.
+                </div>
+              </div>
+              {showAdvanced ? (
+                <ChevronUp className="h-4 w-4 text-zinc-400 shrink-0" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-zinc-400 shrink-0" />
+              )}
+            </button>
+
+            {showAdvanced && (
+              <div className="grid grid-cols-1 gap-6 border-t border-white/[0.07] p-5 xl:grid-cols-12">
+                <div className="xl:col-span-7">
+                  <Panel
+                    title="Raw Multi-Chain HTLC Compiler (BTC · Lightning · Solana · EVM)"
+                    subtitle="Canonical SHA-256 preimage contracts matching newsatoshi lock --hash"
+                    icon={<ArrowLeftRight className="h-4 w-4" />}
+                    accent="emerald"
+                  >
+                    <form onSubmit={handleCompile} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                        {(
+                          [
+                            ['evm_htlc', 'Base / EVM'],
+                            ['btc_onchain', 'BTC P2WSH'],
+                            ['lightning_bolt11', 'Lightning'],
+                            ['solana_htlc', 'Solana'],
+                          ] as const
+                        ).map(([r, label]) => (
+                          <button
+                            key={r}
+                            type="button"
+                            onClick={() => setRail(r)}
+                            className={`rounded-lg border px-2.5 py-2 text-xs font-medium transition cursor-pointer ${
+                              rail === r
+                                ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-200'
+                                : 'border-slate-800 bg-slate-950/70 text-slate-400 hover:text-slate-200'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <select
+                          value={direction}
+                          onChange={(e) => setDirection(e.target.value as 'btc_to_love' | 'love_to_btc')}
+                          className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-2 font-mono text-[11px] text-slate-200"
+                        >
+                          <option value="btc_to_love">Bridge In → LOVE</option>
+                          <option value="love_to_btc">LOVE → Bridge Out</option>
+                        </select>
+                        <select
+                          value={loveNet}
+                          onChange={(e) => setLoveNet(e.target.value as 'mainnet' | 'testnet')}
+                          className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-2 font-mono text-[11px] text-slate-200"
+                        >
+                          <option value="mainnet">LOVE Mainnet</option>
+                          <option value="testnet">LOVE Testnet</option>
+                        </select>
+                        {rail === 'solana_htlc' ? (
+                          <select
+                            value={solCluster}
+                            onChange={(e) => setSolCluster(e.target.value)}
+                            className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-2 font-mono text-[11px] text-slate-200"
+                          >
+                            <option value="mainnet-beta">Solana Mainnet</option>
+                            <option value="devnet">Solana Devnet</option>
+                          </select>
+                        ) : rail === 'evm_htlc' ? (
+                          <select
+                            value={evmChain}
+                            onChange={(e) => setEvmChain(e.target.value)}
+                            className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-2 font-mono text-[11px] text-slate-200"
+                          >
+                            <option value="base">Base (8453)</option>
+                            <option value="arbitrum">Arbitrum (42161)</option>
+                            <option value="optimism">Optimism (10)</option>
+                            <option value="polygon">Polygon (137)</option>
+                          </select>
+                        ) : (
+                          <select
+                            value={btcNet}
+                            onChange={(e) =>
+                              setBtcNet(e.target.value as 'mainnet' | 'testnet' | 'signet' | 'regtest')
+                            }
+                            className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-2 font-mono text-[11px] text-slate-200"
+                          >
+                            <option value="mainnet">BTC Mainnet</option>
+                            <option value="testnet">BTC Testnet</option>
+                            <option value="signet">BTC Signet</option>
+                            <option value="regtest">BTC Regtest</option>
+                          </select>
+                        )}
+                      </div>
+
+                      {rail !== 'lightning_bolt11' ? (
+                        <div className="space-y-3">
+                          <div>
+                            <div className="mb-1 flex items-center justify-between">
+                              <label className="font-mono text-[10px] uppercase tracking-wider text-slate-400">
+                                SHA-256 Payment Hash (64 hex chars)
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => void handleGenerateLocalSecret()}
+                                className="inline-flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-medium text-emerald-300 hover:bg-emerald-500/20 cursor-pointer"
+                              >
+                                <KeyRound className="h-3 w-3" />
+                                Generate Local Secret
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              required
+                              value={paymentHash}
+                              onChange={(e) => setPaymentHash(e.target.value)}
+                              placeholder="64-hex SHA-256 hash"
+                              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                            />
+                          </div>
+
+                          {rail === 'btc_onchain' && (
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                              <input
+                                type="text"
+                                required
+                                value={btcClaimPk}
+                                onChange={(e) => setBtcClaimPk(e.target.value)}
+                                placeholder="BTC Claim Pubkey (02…/03… 66 hex)"
+                                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                              />
+                              <input
+                                type="text"
+                                required
+                                value={btcRefundPk}
+                                onChange={(e) => setBtcRefundPk(e.target.value)}
+                                placeholder="BTC Refund Pubkey (auto-filled from UniSat)"
+                                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                              />
+                            </div>
+                          )}
+
+                          {rail === 'solana_htlc' && (
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                              <select
+                                value={sourceAsset}
+                                onChange={(e) => setSourceAsset(e.target.value)}
+                                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100"
+                              >
+                                <option value="USDC">USDC (SPL)</option>
+                                <option value="SOL">Native SOL</option>
+                              </select>
+                              <input
+                                type="text"
+                                required
+                                value={solSender}
+                                onChange={(e) => setSolSender(e.target.value)}
+                                placeholder="Solana sender (auto-filled from Phantom)"
+                                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                              />
+                              <input
+                                type="text"
+                                required
+                                value={solRecipient}
+                                onChange={(e) => setSolRecipient(e.target.value)}
+                                placeholder="Counterparty Base58 pubkey"
+                                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                              />
+                            </div>
+                          )}
+
+                          {rail === 'evm_htlc' && (
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                              <select
+                                value={sourceAsset}
+                                onChange={(e) => setSourceAsset(e.target.value)}
+                                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100"
+                              >
+                                <option value="USDC">USDC (ERC-20)</option>
+                                <option value="ETH">Native ETH</option>
+                              </select>
+                              <input
+                                type="text"
+                                required
+                                value={evmRecipient}
+                                onChange={(e) => setEvmRecipient(e.target.value)}
+                                placeholder="0x… counterparty address"
+                                className="sm:col-span-2 w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <textarea
+                          required
+                          rows={3}
+                          value={bolt11Invoice}
+                          onChange={(e) => setBolt11Invoice(e.target.value)}
+                          placeholder="Paste Lightning BOLT-11 invoice (lnbc… / lntb…)"
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                        />
+                      )}
+
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <input
+                          type="text"
+                          required
+                          value={amountLove}
+                          onChange={(e) => setAmountLove(e.target.value)}
+                          placeholder="LOVE amount (e.g. 250)"
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                        />
+                        <input
+                          type="number"
+                          min={1}
+                          required={rail !== 'lightning_bolt11'}
+                          value={amountBtcSats}
+                          onChange={(e) => setAmountBtcSats(e.target.value)}
+                          placeholder={
+                            rail === 'lightning_bolt11'
+                              ? 'Auto from BOLT-11'
+                              : rail === 'solana_htlc' || rail === 'evm_htlc'
+                                ? `${sourceAsset} base units`
+                                : 'BTC sats'
+                          }
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                        />
+                        <input
+                          type="number"
+                          min={1}
+                          max={20160}
+                          required
+                          value={loveTimeoutBlocks}
+                          onChange={(e) => setLoveTimeoutBlocks(e.target.value)}
+                          placeholder="LOVE timeout blocks (144)"
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <input
+                          type="text"
+                          required
+                          value={loveClaimAddr}
+                          onChange={(e) => setLoveClaimAddr(e.target.value)}
+                          placeholder="Newsatoshi claim address (ns1… / nsd1…)"
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                        />
+                        {rail === 'btc_onchain' ? (
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="number"
+                              min={1}
+                              required
+                              value={btcLocktime}
+                              onChange={(e) => setBtcLocktime(e.target.value)}
+                              placeholder="BTC CLTV height"
+                              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                            />
+                            <input
+                              type="number"
+                              min={1}
+                              value={btcCurrentHeight}
+                              onChange={(e) => setBtcCurrentHeight(e.target.value)}
+                              placeholder="BTC tip (opt)"
+                              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                            />
+                          </div>
+                        ) : (
+                          <input
+                            type="text"
+                            value={makerLabel}
+                            onChange={(e) => setMakerLabel(e.target.value)}
+                            placeholder="Optional tag"
+                            className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                          />
+                        )}
+                      </div>
+
+                      {compileError && (
+                        <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                          {compileError}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="submit"
+                          disabled={compiling}
+                          className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 cursor-pointer disabled:opacity-50"
+                        >
+                          <ShieldCheck className="h-4 w-4" />
+                          {compiling ? 'Compiling…' : 'Compile HTLC Contract'}
+                        </button>
+                        {hasOperatorToken && (
+                          <button
+                            type="button"
+                            disabled={publishing}
+                            onClick={() => void handlePublish()}
+                            className="inline-flex items-center gap-2 rounded-lg border border-sky-500/50 bg-sky-500/15 px-3.5 py-2 text-xs font-semibold text-sky-200 hover:bg-sky-500/25 cursor-pointer disabled:opacity-50"
+                          >
+                            {publishing ? 'Publishing…' : 'Publish to Board'}
+                          </button>
+                        )}
+                      </div>
+                    </form>
+
+                    {compiled && (
+                      <div className="mt-4 space-y-2.5 rounded-xl border border-emerald-500/35 bg-[#04080f] p-3.5 text-xs">
+                        <div className="flex items-center justify-between gap-2 font-mono text-emerald-200">
+                          <span>
+                            {compiled.swap_id} · {compiled.amount_love} LOVE
+                          </span>
+                          <span className="text-[10px]">
+                            {compiled.timelock_safe ? 'TIMELOCK SAFE' : 'CHECK TIMELOCK'}
+                          </span>
+                        </div>
+                        {compiled.btc_htlc && (
+                          <div className="flex items-center justify-between font-mono text-[11px]">
+                            <span className="text-slate-400">BTC P2WSH</span>
+                            <HashPill hash={compiled.btc_htlc.btc_p2wsh_address} full />
+                          </div>
+                        )}
+                        <div className="rounded-lg border border-slate-800 bg-slate-950 p-2.5">
+                          <div className="mb-1 flex items-center justify-between">
+                            <span className="font-mono text-[10px] text-emerald-400">
+                              L1 Lock Command
+                            </span>
+                            <CopyButton value={compiled.love_lock_command} label="Copy" />
+                          </div>
+                          <code className="block break-all font-mono text-[10px] text-emerald-200">
+                            {compiled.love_lock_command}
+                          </code>
+                        </div>
                       </div>
                     )}
-                  </div>
+                  </Panel>
+                </div>
 
-                  {rail === 'btc_onchain' && (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div>
-                        <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                          BTC Claim Pubkey (33-byte compressed hex)
-                        </label>
+                <div className="space-y-4 xl:col-span-5">
+                  <Panel
+                    title="Live Dual-Chain HTLC Verifier"
+                    subtitle="Checks Newsatoshi L1 + mempool.space live"
+                    icon={<SearchCheck className="h-4 w-4" />}
+                    accent="sky"
+                  >
+                    <form onSubmit={handleVerifyBothChains} className="space-y-2.5">
+                      <div className="grid grid-cols-3 gap-2">
                         <input
                           type="text"
                           required
-                          value={btcClaimPk}
-                          onChange={(e) => setBtcClaimPk(e.target.value)}
-                          placeholder="02… or 03… (66 hex chars)"
-                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
+                          value={verifyHash}
+                          onChange={(e) => setVerifyHash(e.target.value)}
+                          placeholder="64-hex payment hash"
+                          className="col-span-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
                         />
-                      </div>
-                      <div>
-                        <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                          BTC Refund Pubkey (33-byte compressed hex)
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={btcRefundPk}
-                          onChange={(e) => setBtcRefundPk(e.target.value)}
-                          placeholder="02… or 03… (66 hex chars)"
-                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {rail === 'solana_htlc' && (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <div>
-                        <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                          Solana Asset
-                        </label>
                         <select
-                          value={sourceAsset}
-                          onChange={(e) => setSourceAsset(e.target.value)}
-                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100"
+                          value={verifyLoveNet}
+                          onChange={(e) => setVerifyLoveNet(e.target.value as 'mainnet' | 'testnet')}
+                          className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-2 font-mono text-xs text-slate-200"
                         >
-                          <option value="USDC">USDC (SPL)</option>
-                          <option value="SOL">Native SOL</option>
+                          <option value="mainnet">Mainnet</option>
+                          <option value="testnet">Testnet</option>
                         </select>
                       </div>
-                      <div>
-                        <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                          Solana Sender (Base58)
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={solSender}
-                          onChange={(e) => setSolSender(e.target.value)}
-                          placeholder="Phantom wallet pubkey"
-                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                          Solana Maker Recipient
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={solRecipient}
-                          onChange={(e) => setSolRecipient(e.target.value)}
-                          placeholder="Counterparty Base58 pubkey"
-                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
-                        />
-                      </div>
-                    </div>
-                  )}
+                      <input
+                        type="text"
+                        value={verifyBtcAddr}
+                        onChange={(e) => setVerifyBtcAddr(e.target.value)}
+                        placeholder="Optional BTC P2WSH (bc1q…)"
+                        className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                      />
+                      <input
+                        type="text"
+                        value={verifyPreimage}
+                        onChange={(e) => setVerifyPreimage(e.target.value)}
+                        placeholder="Optional 64-hex preimage"
+                        className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                      />
+                      <button
+                        type="submit"
+                        disabled={verifying}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-sky-400 cursor-pointer disabled:opacity-50"
+                      >
+                        <Radio className="h-4 w-4" />
+                        {verifying ? 'Checking Live Chains…' : 'Verify Both Chains Live'}
+                      </button>
+                      {verifyError && (
+                        <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                          {verifyError}
+                        </div>
+                      )}
+                      {verifyResult && (
+                        <div className="space-y-1.5 rounded-lg border border-slate-800 bg-[#04080f] p-3 font-mono text-[11px]">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">L1 ({verifyResult.love_network})</span>
+                            <span className={verifyResult.love_confirmed ? 'text-emerald-300' : 'text-slate-300'}>
+                              {verifyResult.love_confirmed
+                                ? `CONFIRMED #${verifyResult.love_lock?.at.toLocaleString()}`
+                                : verifyResult.love_found
+                                  ? 'MEMPOOL'
+                                  : 'NOT FOUND'}
+                            </span>
+                          </div>
+                          {verifyResult.btc_address && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-400">Bitcoin</span>
+                              <span className="text-slate-200">
+                                {verifyResult.btc_found
+                                  ? `${verifyResult.btc_total_sats.toLocaleString()} sats`
+                                  : '0 UTXOs'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </form>
+                  </Panel>
 
-                  {rail === 'evm_htlc' && (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <div>
-                        <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                          EVM Asset
-                        </label>
-                        <select
-                          value={sourceAsset}
-                          onChange={(e) => setSourceAsset(e.target.value)}
-                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100"
-                        >
-                          <option value="USDC">USDC (ERC-20)</option>
-                          <option value="ETH">Native ETH</option>
-                        </select>
+                  <Panel
+                    title="Persisted Swap Board"
+                    subtitle="Strictly real persisted HTLC swap intents"
+                    icon={<AlertTriangle className="h-4 w-4 text-amber-400" />}
+                    badge={<span className="font-mono text-[11px] text-slate-300">{swapOffers.length} active</span>}
+                  >
+                    {swapOffers.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-slate-800 px-3 py-4 text-center text-xs text-slate-400">
+                        No open peer-to-peer swap intents yet. Use <strong>Instant Swap</strong> for immediate Base liquidity.
                       </div>
-                      <div className="sm:col-span-2">
-                        <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                          EVM Counterparty Recipient (0x…)
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={evmRecipient}
-                          onChange={(e) => setEvmRecipient(e.target.value)}
-                          placeholder="0x… maker address (Base / Arbitrum / Ethereum)"
-                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
-                        />
+                    ) : (
+                      <div className="space-y-2">
+                        {swapOffers.map((offer) => (
+                          <div
+                            key={offer.swap_id}
+                            className="rounded-lg border border-slate-800 bg-slate-950/80 p-2.5 text-xs"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono font-semibold text-slate-100">
+                                {offer.amount_love} LOVE ↔ {offer.amount_btc_sats.toLocaleString()} sats
+                              </span>
+                              <span className="font-mono text-[10px] text-slate-400">{offer.rail}</span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div>
-                  <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                    Lightning BOLT-11 Invoice (payment_hash &amp; sats decoded natively in Rust)
-                  </label>
-                  <textarea
-                    required
-                    rows={3}
-                    value={bolt11Invoice}
-                    onChange={(e) => setBolt11Invoice(e.target.value)}
-                    placeholder="lnbc… / lntb… / lnbcrt…"
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600 focus:border-amber-500 focus:outline-none"
-                  />
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div>
-                  <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                    LOVE Amount
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={amountLove}
-                    onChange={(e) => setAmountLove(e.target.value)}
-                    placeholder="e.g. 250"
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                    {rail === 'solana_htlc' || rail === 'evm_htlc'
-                      ? `${sourceAsset} Base Units`
-                      : 'BTC Amount (sats)'}
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    required={rail !== 'lightning_bolt11'}
-                    value={amountBtcSats}
-                    onChange={(e) => setAmountBtcSats(e.target.value)}
-                    placeholder={
-                      rail === 'lightning_bolt11'
-                        ? 'Auto from BOLT-11'
-                        : rail === 'solana_htlc' || rail === 'evm_htlc'
-                          ? 'e.g. 50000000 (50 USDC)'
-                          : 'e.g. 500000'
-                    }
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                    LOVE Timeout (blocks)
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={20160}
-                    required
-                    value={loveTimeoutBlocks}
-                    onChange={(e) => setLoveTimeoutBlocks(e.target.value)}
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100"
-                  />
+                    )}
+                  </Panel>
                 </div>
               </div>
+            )}
+          </div>
+        </div>
+      )}
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                    Newsatoshi Claim Address (ns1… / nsd1…)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={loveClaimAddr}
-                    onChange={(e) => setLoveClaimAddr(e.target.value)}
-                    placeholder="ns1… or nsd1…"
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
-                  />
-                </div>
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* TAB 4: EASY SETUP & AUXPOW MERGE-MINING                                */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {section === 'setup' && (
+        <div className="space-y-6">
+          {/* Top 2 Easy Setup Cards: Humans & AI Agents */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Card 1: Wallet & CLI Setup */}
+            <div className="surface-card rounded-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-emerald-400">
+                  Step-by-Step · 30 Seconds
+                </span>
+                <span className="rounded-full border border-white/[0.08] px-2.5 py-0.5 text-[10px] text-zinc-400">
+                  Humans &amp; Wallets
+                </span>
+              </div>
+              <h3 className="font-display text-2xl text-zinc-100">
+                Set up your wallets with zero friction.
+              </h3>
 
-                {rail === 'btc_onchain' ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                        BTC CLTV Height
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        required
-                        value={btcLocktime}
-                        onChange={(e) => setBtcLocktime(e.target.value)}
-                        placeholder="e.g. 920072"
-                        className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                        BTC Tip (optional)
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={btcCurrentHeight}
-                        onChange={(e) => setBtcCurrentHeight(e.target.value)}
-                        placeholder="For margin check"
-                        className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
-                      />
+              <div className="space-y-2.5 text-xs">
+                <div className="flex items-center justify-between rounded-xl border border-white/[0.07] bg-[#0a0a0d] p-3.5">
+                  <div>
+                    <div className="font-medium text-zinc-100">1. Connect EVM Wallet &amp; Add wLOVE</div>
+                    <div className="mt-0.5 text-[11px] text-zinc-500">
+                      {evmAddress
+                        ? `Connected ${truncateHash(evmAddress, 6, 4)}`
+                        : 'MetaMask, Coinbase Wallet, Rabby, or Phantom'}
                     </div>
                   </div>
-                ) : (
-                  <div>
-                    <label className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                      Counterparty Label (optional)
-                    </label>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={openModal}
+                      className="rounded-lg bg-zinc-100 px-3 py-1.5 text-[11px] font-semibold text-zinc-950 hover:bg-white cursor-pointer"
+                    >
+                      {evmAddress ? 'Wallet' : 'Connect'}
+                    </button>
+                    {evmAddress && (
+                      <button
+                        type="button"
+                        onClick={() => void addWloveToWallet()}
+                        className="rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-medium text-emerald-300 hover:bg-emerald-500/20 cursor-pointer"
+                      >
+                        + wLOVE
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/[0.07] bg-[#0a0a0d] p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-zinc-100">2. Native Shielded L1 Wallet (LOVE)</div>
+                      <div className="mt-0.5 text-[11px] text-zinc-500">
+                        Runs 100% in your browser via WASM — no install required.
+                      </div>
+                    </div>
+                    <a
+                      href="https://newsatoshi.org/wallet/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-white/[0.12] px-2.5 py-1.5 text-[11px] font-medium text-zinc-200 hover:bg-white/[0.06]"
+                    >
+                      <span>Open Wallet</span>
+                      <ArrowUpRight className="h-3 w-3" />
+                    </a>
+                  </div>
+                  <div className="flex gap-2">
                     <input
                       type="text"
-                      value={makerLabel}
-                      onChange={(e) => setMakerLabel(e.target.value)}
-                      placeholder="Optional swap tag"
-                      className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                      value={loveDraft}
+                      onChange={(e) => setLoveDraft(e.target.value)}
+                      placeholder="Paste ns1… address to save & auto-fill across the app"
+                      className="flex-1 rounded-lg border border-white/[0.08] bg-[#0f0f12] px-2.5 py-1.5 font-mono text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none"
                     />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoveAddress(loveDraft);
+                        onNotice('success', loveDraft.trim() ? 'Saved L1 address' : 'Cleared L1 address');
+                      }}
+                      className="rounded-lg border border-white/[0.12] px-3 py-1.5 text-[11px] text-zinc-200 hover:bg-white/[0.06] cursor-pointer"
+                    >
+                      Save
+                    </button>
                   </div>
-                )}
-              </div>
-
-              {compileError && (
-                <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
-                  {compileError}
-                </div>
-              )}
-
-              <div className="flex flex-wrap items-center gap-2.5 pt-1">
-                <button
-                  type="submit"
-                  disabled={compiling}
-                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 cursor-pointer disabled:opacity-50"
-                >
-                  <ShieldCheck className="h-4 w-4" />
-                  {compiling ? 'Compiling HTLC…' : 'Compile HTLC Swap Contract'}
-                </button>
-                {hasOperatorToken && (
-                  <button
-                    type="button"
-                    disabled={publishing}
-                    onClick={() => void handlePublish()}
-                    className="inline-flex items-center gap-2 rounded-lg border border-sky-500/50 bg-sky-500/15 px-3.5 py-2 text-xs font-semibold text-sky-200 hover:bg-sky-500/25 cursor-pointer disabled:opacity-50"
-                  >
-                    {publishing ? 'Publishing…' : 'Publish to Swap Board'}
-                  </button>
-                )}
-              </div>
-            </form>
-
-            {compiled && (
-              <div className="mt-5 space-y-3 rounded-xl border border-emerald-500/35 bg-[#04080f] p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                    <span className="font-mono text-xs font-semibold text-emerald-200">
-                      {compiled.swap_id} · {compiled.amount_love} LOVE ↔{' '}
-                      {compiled.amount_btc_sats.toLocaleString()} sats
-                    </span>
-                  </div>
-                  <span
-                    className={`rounded-full border px-2 py-0.5 font-mono text-[10px] font-semibold ${
-                      compiled.timelock_safe
-                        ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
-                        : 'border-amber-500/40 bg-amber-500/15 text-amber-300'
-                    }`}
-                  >
-                    {compiled.timelock_safe ? 'TIMELOCK SAFE' : 'CHECK TIMELOCK'}
-                  </span>
                 </div>
 
-                <p className="text-[11px] leading-relaxed text-slate-300">{compiled.timelock_note}</p>
-
-                {compiled.btc_htlc && (
-                  <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-950/90 p-3 text-xs">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-mono text-[10px] uppercase text-sky-300">
-                        Bitcoin SegWit v0 P2WSH HTLC Address ({compiled.btc_htlc.btc_network})
-                      </span>
-                      <HashPill hash={compiled.btc_htlc.btc_p2wsh_address} full />
-                    </div>
-                    <div>
-                      <div className="mb-1 flex items-center justify-between">
-                        <span className="font-mono text-[10px] uppercase text-slate-400">
-                          BIP-199 Witness Script (Hex)
-                        </span>
-                        <CopyButton value={compiled.btc_htlc.witness_script_hex} label="Copy Script" />
-                      </div>
-                      <code className="block break-all font-mono text-[10px] text-slate-300">
-                        {compiled.btc_htlc.witness_script_hex}
-                      </code>
-                    </div>
+                <div className="rounded-xl border border-white/[0.07] bg-[#0a0a0d] p-3.5">
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="font-medium text-zinc-100">3. Optional 1-Line CLI Installer</span>
+                    <CopyButton value={cliInstallCmd} label="Copy" />
                   </div>
-                )}
-
-                {compiled.bolt11 && (
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 font-mono text-[11px] text-amber-200">
-                    Decoded BOLT-11 ({compiled.bolt11.network}): payment_hash{' '}
-                    <span className="break-all text-slate-100">{compiled.bolt11.payment_hash_hex}</span>
-                    {compiled.bolt11.description ? ` · "${compiled.bolt11.description}"` : ''}
-                  </div>
-                )}
-
-                {compiled.solana_htlc && (
-                  <div className="space-y-2 rounded-lg border border-purple-500/35 bg-purple-500/5 p-3 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-[10px] uppercase text-purple-300">
-                        Solana SHA-256 HTLC Escrow ({compiled.solana_htlc.cluster} · {compiled.solana_htlc.asset})
-                      </span>
-                      <CopyButton value={compiled.solana_htlc.lock_instruction_hex} label="Copy 49B Ix" />
-                    </div>
-                    <code className="block break-all font-mono text-[10px] text-slate-200">
-                      {compiled.solana_htlc.pda_seeds_description}
-                    </code>
-                    <code className="block break-all font-mono text-[10px] text-purple-200">
-                      Lock Ix (49B): {compiled.solana_htlc.lock_instruction_hex}
-                    </code>
-                    <p className="text-[11px] text-slate-400">{compiled.solana_htlc.jupiter_route_note}</p>
-                  </div>
-                )}
-
-                {compiled.evm_htlc && (
-                  <div className="space-y-2 rounded-lg border border-sky-500/35 bg-sky-500/5 p-3 text-xs">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-mono text-[10px] uppercase text-sky-300">
-                        {compiled.evm_htlc.chain.toUpperCase()} (Chain {compiled.evm_htlc.chain_id}) · {compiled.evm_htlc.asset} HTLC
-                      </span>
-                      <CopyButton value={compiled.evm_htlc.cast_lock_command} label="Copy cast" />
-                    </div>
-                    <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] text-slate-300">
-                      <span>Contract:</span>
-                      {(() => {
-                        const explorerBase: Record<number, string> = {
-                          8453: 'https://basescan.org/address/',
-                          42161: 'https://arbiscan.io/address/',
-                          10: 'https://optimistic.etherscan.io/address/',
-                          137: 'https://polygonscan.com/address/',
-                        };
-                        const base = explorerBase[compiled.evm_htlc.chain_id];
-                        return base && compiled.evm_htlc.contract_address.startsWith('0x') ? (
-                          <a
-                            href={`${base}${compiled.evm_htlc.contract_address}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-emerald-400 hover:underline break-all"
-                          >
-                            {compiled.evm_htlc.contract_address} ↗
-                          </a>
-                        ) : (
-                          <code className="break-all text-slate-200">{compiled.evm_htlc.contract_address}</code>
-                        );
-                      })()}
-                    </div>
-                    <code className="block break-all font-mono text-[10px] text-sky-200">
-                      {compiled.evm_htlc.cast_lock_command}
-                    </code>
-                  </div>
-                )}
-
-                <div className="space-y-1.5 rounded-lg border border-slate-800 bg-slate-950/90 p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-[10px] uppercase text-emerald-400">
-                      Newsatoshi L1 Lock Command ({compiled.love_network})
-                    </span>
-                    <CopyButton value={compiled.love_lock_command} label="Copy CLI" />
-                  </div>
-                  <code className="block break-all font-mono text-[11px] text-emerald-200">
-                    {compiled.love_lock_command}
+                  <code className="block overflow-x-auto font-mono text-[11px] text-emerald-300">
+                    {cliInstallCmd}
                   </code>
                 </div>
               </div>
-            )}
-          </Panel>
-        </div>
-
-        {/* Live Dual-Chain HTLC Verifier + Swap Board */}
-        <div className="space-y-6 xl:col-span-5">
-          <Panel
-            title="Live Dual-Chain HTLC Verifier"
-            subtitle="Cross-checks Newsatoshi L1 (/api/lock?hash=) and Bitcoin (mempool.space UTXOs) in real time"
-            icon={<SearchCheck className="h-4 w-4" />}
-            accent="sky"
-          >
-            <form onSubmit={handleVerifyBothChains} className="space-y-3">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                <div className="sm:col-span-2">
-                  <label className="mb-1 block font-mono text-[10px] uppercase text-slate-400">
-                    SHA-256 Payment / Anchor Hash
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={verifyHash}
-                    onChange={(e) => setVerifyHash(e.target.value)}
-                    placeholder="64-hex hash to check on-chain"
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block font-mono text-[10px] uppercase text-slate-400">
-                    L1 Network
-                  </label>
-                  <select
-                    value={verifyLoveNet}
-                    onChange={(e) => setVerifyLoveNet(e.target.value as 'mainnet' | 'testnet')}
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-2 font-mono text-xs text-slate-200"
-                  >
-                    <option value="mainnet">Mainnet</option>
-                    <option value="testnet">Testnet</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block font-mono text-[10px] uppercase text-slate-400">
-                  Bitcoin P2WSH Address (optional — live mempool.space UTXO check)
-                </label>
-                <input
-                  type="text"
-                  value={verifyBtcAddr}
-                  onChange={(e) => setVerifyBtcAddr(e.target.value)}
-                  placeholder="bc1q… or tb1q…"
-                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block font-mono text-[10px] uppercase text-slate-400">
-                  Preimage Check (optional — verifies SHA256(preimage) == hash)
-                </label>
-                <input
-                  type="text"
-                  value={verifyPreimage}
-                  onChange={(e) => setVerifyPreimage(e.target.value)}
-                  placeholder="Optional 64-hex revealed preimage"
-                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={verifying}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-sky-400 cursor-pointer disabled:opacity-50"
-              >
-                <Radio className="h-4 w-4" />
-                {verifying ? 'Querying Live L1 Chains…' : 'Verify Both Chains Live'}
-              </button>
-
-              {verifyError && (
-                <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
-                  {verifyError}
-                </div>
-              )}
-
-              {verifyResult && (
-                <div className="space-y-2 rounded-lg border border-slate-800 bg-[#04080f] p-3 font-mono text-[11px]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Newsatoshi ({verifyResult.love_network})</span>
-                    <span
-                      className={
-                        verifyResult.love_confirmed
-                          ? 'font-semibold text-emerald-300'
-                          : verifyResult.love_found
-                            ? 'text-amber-300'
-                            : 'text-slate-400'
-                      }
-                    >
-                      {verifyResult.love_confirmed
-                        ? `CONFIRMED #${verifyResult.love_lock?.at.toLocaleString()} (${verifyResult.love_lock?.confirmations} confs)`
-                        : verifyResult.love_found
-                          ? 'IN MEMPOOL (UNCONFIRMED)'
-                          : 'NO LOCK FOUND'}
-                    </span>
-                  </div>
-                  {verifyResult.love_lock && (
-                    <div className="flex items-center justify-between text-[10px] text-slate-400">
-                      <span>Lock ID ({verifyResult.love_lock.state})</span>
-                      <HashPill hash={verifyResult.love_lock.id} />
-                    </div>
-                  )}
-                  {verifyResult.btc_address && (
-                    <div className="flex items-center justify-between border-t border-slate-800/80 pt-2">
-                      <span className="text-slate-400">Bitcoin P2WSH</span>
-                      <span
-                        className={
-                          verifyResult.btc_confirmed
-                            ? 'font-semibold text-emerald-300'
-                            : verifyResult.btc_found
-                              ? 'text-amber-300'
-                              : 'text-slate-400'
-                        }
-                      >
-                        {verifyResult.btc_error
-                          ? verifyResult.btc_error
-                          : verifyResult.btc_found
-                            ? `${verifyResult.btc_total_sats.toLocaleString()} sats (${verifyResult.btc_confirmed ? 'confirmed' : 'mempool'})`
-                            : '0 UTXOs (unfunded)'}
-                      </span>
-                    </div>
-                  )}
-                  {verifyResult.preimage_valid !== null && verifyResult.preimage_valid !== undefined && (
-                    <div className="flex items-center justify-between border-t border-slate-800/80 pt-2">
-                      <span className="text-slate-400">SHA-256 Preimage</span>
-                      <span
-                        className={
-                          verifyResult.preimage_valid
-                            ? 'font-semibold text-emerald-300'
-                            : 'font-semibold text-red-400'
-                        }
-                      >
-                        {verifyResult.preimage_valid ? 'VALID MATCH' : 'MISMATCH'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </form>
-          </Panel>
-
-          <Panel
-            title="Non-Custodial Swap Board"
-            subtitle="Strictly real persisted HTLC swap intents — zero fake orders or simulated liquidity"
-            icon={<AlertTriangle className="h-4 w-4 text-amber-400" />}
-            badge={
-              <span className="font-mono text-[11px] text-slate-300">
-                {swapOffers.length} active
-              </span>
-            }
-          >
-            {swapOffers.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-800 bg-slate-950/60 px-4 py-6 text-center text-xs text-slate-400">
-                No swap intents published yet. Compile any real HTLC contract on the left or run{' '}
-                <code className="font-mono text-emerald-300">newsatoshi-swap htlc</code> locally.
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {swapOffers.map((offer) => (
-                  <div
-                    key={offer.swap_id}
-                    className="rounded-lg border border-slate-800 bg-slate-950/80 p-3 text-xs"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono font-semibold text-slate-100">
-                        {offer.amount_love} LOVE ↔ {offer.amount_btc_sats.toLocaleString()} sats
-                      </span>
-                      <span className="rounded border border-slate-700 px-1.5 py-0.5 font-mono text-[10px] text-slate-300">
-                        {offer.love_network} · {offer.rail}
-                      </span>
-                    </div>
-                    <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
-                      <span>payment_hash</span>
-                      <HashPill hash={offer.payment_hash_hex} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Panel>
-        </div>
-      </div>
-      )}
-
-      {/* Section B: 1-Command AuxPoW Stratum Merge-Mining Kit + Field Meter Signer */}
-      {section === 'mining' && (
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Panel
-          title="1-Command AuxPoW Stratum Merge-Mining Kit"
-          subtitle="Mine Newsatoshi Mainnet (chainid = 20051) alongside Bitcoin on Bitaxe, NerdQAxe, Antminer S19/S21, or solo bitcoind"
-          icon={<Pickaxe className="h-4 w-4" />}
-          accent="amber"
-          badge={
-            <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-amber-300">
-              CHAIN ID 20051 · 50 LOVE/BLK
-            </span>
-          }
-        >
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-              <div className="rounded-lg border border-slate-800 bg-slate-950/75 p-2.5">
-                <div className="font-mono text-[10px] uppercase text-slate-500">Mainnet Height</div>
-                <div className="mt-0.5 font-mono text-sm font-bold text-emerald-300">
-                  {mainnet ? `#${mainnet.height.toLocaleString()}` : 'Offline'}
-                </div>
-              </div>
-              <div className="rounded-lg border border-slate-800 bg-slate-950/75 p-2.5">
-                <div className="font-mono text-[10px] uppercase text-slate-500">Difficulty</div>
-                <div className="mt-0.5 font-mono text-sm font-bold text-slate-100">
-                  {mainnet ? mainnet.difficulty.toFixed(2) : '—'}
-                </div>
-              </div>
-              <div className="rounded-lg border border-slate-800 bg-slate-950/75 p-2.5">
-                <div className="font-mono text-[10px] uppercase text-slate-500">Mainnet Locks</div>
-                <div className="mt-0.5 font-mono text-sm font-bold text-sky-300">
-                  {mainnet ? mainnet.locks.toLocaleString() : '—'}
-                </div>
-              </div>
-              <div className="rounded-lg border border-slate-800 bg-slate-950/75 p-2.5">
-                <div className="font-mono text-[10px] uppercase text-slate-500">Peers</div>
-                <div className="mt-0.5 font-mono text-sm font-bold text-slate-100">
-                  {mainnet ? mainnet.peers : '—'}
-                </div>
-              </div>
             </div>
 
-            {mainnet && (() => {
-              const ths = Math.max(0.001, Number(minerThs) || 1.2);
-              const hashesPerBlock = Math.max(1e-9, mainnet.difficulty) * 4_294_967_296;
-              const recent = mainnet.recent ?? [];
-              const mergePct = recent.length > 0
-                ? (recent.filter((b) => b.merge_mined).length / recent.length) * 100
-                : 0;
-              const obsDt = recent.length >= 2 && recent[0].time > recent[recent.length - 1].time
-                ? (recent[0].time - recent[recent.length - 1].time) / (recent.length - 1)
-                : 600;
-              const netHs = hashesPerBlock / Math.max(1, obsDt);
-              const netGhs = netHs / 1e9;
-              const minerHs = ths * 1e12;
-              const postAsertShare = minerHs / (netHs + minerHs);
-              const postAsertLoveDay = postAsertShare * 7_200;
-              return (
-                <div className="rounded-lg border border-amber-500/25 bg-amber-950/15 p-3 space-y-2.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-amber-300">
-                      Live AuxPoW Yield Calculator (Zero Extra Electricity)
-                    </span>
-                    <span className="font-mono text-[10px] text-slate-400">
-                      Est. Net: {netGhs.toFixed(2)} GH/s · {mergePct.toFixed(0)}% merge-mined
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {[
-                      { label: 'Bitaxe (1.2 TH/s)', v: '1.2' },
-                      { label: 'NerdQAxe++ (4.8)', v: '4.8' },
-                      { label: 'S19 (110)', v: '110' },
-                      { label: 'S21 (200)', v: '200' },
-                    ].map((preset) => (
-                      <button
-                        key={preset.v}
-                        type="button"
-                        onClick={() => setMinerThs(preset.v)}
-                        className={`rounded border px-2 py-0.5 font-mono text-[10px] transition cursor-pointer ${
-                          minerThs === preset.v
-                            ? 'border-amber-400/70 bg-amber-500/20 text-amber-200'
-                            : 'border-slate-700 bg-slate-900/70 text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                      <input
-                        type="number"
-                        min="0.001"
-                        step="0.1"
-                        value={minerThs}
-                        onChange={(e) => setMinerThs(e.target.value)}
-                        aria-label="Miner hashrate in TH/s"
-                        className="w-20 rounded border border-slate-700 bg-slate-950 px-2 py-0.5 font-mono text-[11px] text-slate-100"
-                      />
-                      <span className="font-mono text-[10px] text-slate-400">TH/s</span>
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-[11px]">
-                    <div className="rounded border border-slate-800/90 bg-slate-950/75 px-2.5 py-1.5">
-                      <div className="font-mono text-[9px] uppercase text-slate-500">Post-ASERT Share / 7,200 LOVE/Day</div>
-                      <div className="font-mono text-xs font-bold text-amber-300">
-                        {postAsertLoveDay.toLocaleString(undefined, { maximumFractionDigits: 1 })} LOVE/day ({(postAsertShare * 100).toFixed(2)}%)
-                      </div>
-                    </div>
-                    <div className="rounded border border-slate-800/90 bg-slate-950/75 px-2.5 py-1.5">
-                      <div className="font-mono text-[9px] uppercase text-slate-500">Supply Issued / 21M Cap</div>
-                      <div className="font-mono text-xs font-bold text-emerald-300">
-                        {Math.round(mainnet.issued / 1e8).toLocaleString()} LOVE ({((mainnet.issued / 1e8 / 21_000_000) * 100).toFixed(3)}%)
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-[10px] text-slate-400">
-                    Steady-state share of 144 blocks/day × 50 LOVE (7,200 LOVE/day global emission) after ASERT retargeting against live Mainnet hashrate ({netGhs.toFixed(2)} GH/s).
-                  </div>
-                </div>
-              );
-            })()}
-
-            <div className="rounded-lg border border-slate-800 bg-[#04080f] p-3">
-              <div className="mb-1.5 flex items-center justify-between">
-                <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase text-amber-300">
-                  <Terminal className="h-3.5 w-3.5" />
-                  1-Command Docker Launch (newsatoshi-0.1.0 + Stratum v1 :3333)
+            {/* Card 2: 10-Second AI Agent MCP Setup + Live Test */}
+            <div className="surface-card rounded-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-400">
+                  Zero API Keys · Official MCP Registry
                 </span>
-                <CopyButton value={dockerQuickstart} label="Copy" />
+                <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] text-emerald-300">
+                  14 Live Tools
+                </span>
               </div>
-              <pre className="overflow-x-auto font-mono text-[11px] leading-relaxed text-slate-200">
-                {dockerQuickstart}
-              </pre>
-            </div>
+              <h3 className="font-display text-2xl text-zinc-100">
+                Connect Claude, Cursor, or any AI agent.
+              </h3>
+              <p className="text-xs leading-relaxed text-zinc-400">
+                Drop this snippet into your MCP config to give any agent live mainnet telemetry, swap compilation, x402/PayWord verification, and STARK covenant checks.
+              </p>
 
-            <div className="rounded-lg border border-slate-800/80 bg-slate-950/70 px-3 py-2.5 text-[11px] text-slate-300">
-              Point any <strong className="text-slate-100">Bitaxe / NerdQAxe / Antminer</strong> at{' '}
-              <code className="font-mono text-emerald-300">stratum+tcp://&lt;HOST&gt;:3333</code>{' '}
-              (BIP-320 version rolling supported; live status on{' '}
-              <code className="font-mono text-sky-300">:3334/status</code>). Pass{' '}
-              <code className="font-mono text-amber-200">--btc-rpc-url</code> to simultaneously
-              merge-mine Bitcoin and Newsatoshi on the same hashes.
+              <div className="rounded-xl border border-white/[0.08] bg-[#0a0a0d] p-3.5">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="font-mono text-[10px] uppercase text-zinc-500">
+                    mcp.json · Streamable HTTP
+                  </span>
+                  <CopyButton value={MCP_SNIPPET} label="Copy JSON" />
+                </div>
+                <pre className="overflow-x-auto font-mono text-[11.5px] leading-relaxed text-zinc-200">
+                  {MCP_SNIPPET}
+                </pre>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  disabled={mcpTestBusy}
+                  onClick={() => void handleTestLiveMcp()}
+                  className="inline-flex items-center gap-2 rounded-xl bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-white cursor-pointer disabled:opacity-50"
+                >
+                  {mcpTestBusy ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Zap className="h-3.5 w-3.5" />
+                  )}
+                  <span>{mcpTestBusy ? 'Pinging /mcp…' : 'Test Live MCP Endpoint'}</span>
+                </button>
+
+                {mcpTestResult && (
+                  <span
+                    className={`font-mono text-xs ${
+                      mcpTestResult.ok ? 'text-emerald-300' : 'text-red-300'
+                    }`}
+                  >
+                    {mcpTestResult.ok
+                      ? `✓ ${mcpTestResult.toolCount} tools online (${mcpTestResult.latencyMs}ms)`
+                      : `Error: ${mcpTestResult.error}`}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-        </Panel>
 
-        <Panel
-          title="Zero-Disk-Secret Field Hardware Meter Daemon"
-          subtitle="Signs real solar inverter / smart-meter kWh deltas offline with NIST FIPS 205 SLH-DSA and posts directly to /api/telemetry"
-          icon={<Cpu className="h-4 w-4" />}
-          accent="sky"
-          badge={
-            <span className="rounded-full border border-sky-500/40 bg-sky-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-sky-300">
-              FIPS 205 SLH-DSA · 0 DISK SECRETS
-            </span>
-          }
-        >
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <div className="rounded-lg border border-slate-800 bg-slate-950/75 p-2.5">
-                <div className="font-mono text-[10px] uppercase text-slate-500">Supported Meters</div>
-                <div className="mt-0.5 font-mono text-slate-200">
-                  Shelly EM · Enphase IQ · Home Assistant · Generic JSON
+          {/* Mining & Hardware Kits */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Panel
+              title="1-Command AuxPoW Merge-Mining (Zero Extra Watts)"
+              subtitle="Mine Newsatoshi Mainnet (chainid 20051) alongside Bitcoin on Bitaxe, NerdQAxe, or Antminer"
+              icon={<Pickaxe className="h-4 w-4" />}
+              accent="amber"
+            >
+              <div className="space-y-4">
+                {mainnet &&
+                  (() => {
+                    const ths = Math.max(0.001, Number(minerThs) || 1.2);
+                    const hashesPerBlock = Math.max(1e-9, mainnet.difficulty) * 4_294_967_296;
+                    const recent = mainnet.recent ?? [];
+                    const obsDt =
+                      recent.length >= 2 && recent[0].time > recent[recent.length - 1].time
+                        ? (recent[0].time - recent[recent.length - 1].time) / (recent.length - 1)
+                        : 600;
+                    const netHs = hashesPerBlock / Math.max(1, obsDt);
+                    const netGhs = netHs / 1e9;
+                    const minerHs = ths * 1e12;
+                    const postAsertShare = minerHs / (netHs + minerHs);
+                    const postAsertLoveDay = postAsertShare * 7_200;
+                    return (
+                      <div className="space-y-2.5 rounded-xl border border-amber-500/20 bg-amber-950/15 p-3.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-mono text-[10px] uppercase text-amber-300">
+                            Live Yield Estimator (#{mainnet.height.toLocaleString()})
+                          </span>
+                          <span className="font-mono text-[10px] text-zinc-400">
+                            Net: {netGhs.toFixed(2)} GH/s
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {[
+                            { label: 'Bitaxe 1.2T', v: '1.2' },
+                            { label: 'NerdQAxe 4.8T', v: '4.8' },
+                            { label: 'S19 110T', v: '110' },
+                            { label: 'S21 200T', v: '200' },
+                          ].map((preset) => (
+                            <button
+                              key={preset.v}
+                              type="button"
+                              onClick={() => setMinerThs(preset.v)}
+                              className={`rounded-md border px-2 py-0.5 font-mono text-[10px] cursor-pointer ${
+                                minerThs === preset.v
+                                  ? 'border-amber-400/70 bg-amber-500/20 text-amber-200'
+                                  : 'border-white/[0.08] text-zinc-400 hover:text-zinc-200'
+                              }`}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                          <input
+                            type="number"
+                            min="0.001"
+                            step="0.1"
+                            value={minerThs}
+                            onChange={(e) => setMinerThs(e.target.value)}
+                            aria-label="Miner hashrate in TH/s"
+                            className="w-18 rounded-md border border-white/[0.1] bg-[#0a0a0d] px-2 py-0.5 font-mono text-[11px] text-zinc-100"
+                          />
+                          <span className="font-mono text-[10px] text-zinc-400">TH/s</span>
+                        </div>
+                        <div className="font-mono text-xs font-semibold text-amber-300">
+                          ~{postAsertLoveDay.toLocaleString(undefined, { maximumFractionDigits: 1 })}{' '}
+                          LOVE/day ({(postAsertShare * 100).toFixed(2)}% of 7,200 LOVE/day emission)
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                <div className="rounded-xl border border-white/[0.08] bg-[#0a0a0d] p-3">
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase text-amber-300">
+                      <Terminal className="h-3.5 w-3.5" />
+                      1-Command Docker Stratum v1 (:3333)
+                    </span>
+                    <CopyButton value={dockerQuickstart} label="Copy" />
+                  </div>
+                  <pre className="overflow-x-auto font-mono text-[11px] leading-relaxed text-zinc-200">
+                    {dockerQuickstart}
+                  </pre>
                 </div>
               </div>
-              <div className="rounded-lg border border-slate-800 bg-slate-950/75 p-2.5">
-                <div className="font-mono text-[10px] uppercase text-slate-500">Authorized Hardware Root</div>
-                <div className="mt-1">
-                  <HashPill hash={state?.keys.hardware_merkle_root ?? ''} />
+            </Panel>
+
+            <Panel
+              title="Field Hardware Energy Meter Signer (SLH-DSA)"
+              subtitle="Signs real solar inverter / Shelly EM / Enphase kWh deltas offline with zero disk secrets"
+              icon={<Cpu className="h-4 w-4" />}
+              accent="sky"
+            >
+              <div className="space-y-3">
+                <div className="rounded-xl border border-white/[0.08] bg-[#0a0a0d] p-3">
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="font-mono text-[10px] uppercase text-sky-300">
+                      Hardware Attestation Daemon
+                    </span>
+                    <CopyButton value={meterDaemonCmd} label="Copy" />
+                  </div>
+                  <pre className="overflow-x-auto font-mono text-[10.5px] leading-relaxed text-zinc-200">
+                    {meterDaemonCmd}
+                  </pre>
                 </div>
+                <p className="text-[11px] leading-relaxed text-zinc-400">
+                  First poll records your meter&apos;s real cumulative baseline with 0 synthetic emissions; every subsequent whole-kWh delta produces an offline NIST FIPS 205 SLH-DSA signature verified into a live Winterfell STARK proof.
+                </p>
               </div>
-            </div>
-
-            <div className="rounded-lg border border-slate-800 bg-[#04080f] p-3">
-              <div className="mb-1.5 flex items-center justify-between">
-                <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase text-sky-300">
-                  <Terminal className="h-3.5 w-3.5" />
-                  Run Real Hardware Meter Attestation (Keychain / Env Seeds Only)
-                </span>
-                <CopyButton value={meterDaemonCmd} label="Copy" />
-              </div>
-              <pre className="overflow-x-auto font-mono text-[11px] leading-relaxed text-slate-200">
-                {meterDaemonCmd}
-              </pre>
-            </div>
-
-            <div className="rounded-lg border border-slate-800/80 bg-slate-950/70 px-3 py-2.5 text-[11px] text-slate-300">
-              First poll records the physical cumulative baseline with{' '}
-              <strong className="text-slate-100">0 synthetic emissions</strong>. Every subsequent
-              whole-kWh production delta is signed offline with your cold-ceremony SLH-DSA key and
-              verified by this <code className="font-mono text-sky-300">--verify-only</code> server
-              into a live Winterfell STARK proof.
-            </div>
+            </Panel>
           </div>
-        </Panel>
-      </div>
+        </div>
       )}
     </div>
   );
