@@ -33,7 +33,8 @@
 > 2. **Comparison to Bitcoin `OP_CAT` / `OP_CTV` Covenants:** Instead of emulating introspection through Script stack ops, `OP_VERIFY_COVENANT_STARK` binds one 32-byte `covenant_vk_hash` directly in the shielded note commitment and checks a single constant-size STARK proof. Curious where Bitcoin covenant researchers see the sharpest tradeoff or soundness gap (especially around binding the degree-3 state chain to in-circuit SHA-256 vs. Phase-1 zkVM ELF verification).
 >
 > Full companion whitepaper (Markdown & LaTeX): `https://commons.newsatoshi.org/whitepaper`
-> Reference Rust implementation (MIT, 31 tests + clippy clean): `https://github.com/theguysaccount/newsatoshi-commons`
+> Reference Rust implementation (MIT, 36 tests + clippy clean + live 4-chain Backing Vault & HTLCs + x402 v2 / PayWord dual rail): `https://github.com/theguysaccount/newsatoshi-commons`
+> Live Proof-of-Backing across Base, Arbitrum, Optimism & Polygon (`0x37Ed…9265`): `https://commons.newsatoshi.org/api/backing/summary`
 
 ---
 
@@ -55,7 +56,9 @@
 > **Read & Independently Verify:**
 > - Whitepaper: `https://commons.newsatoshi.org/whitepaper`
 > - Lean 4 Kernel: `https://commons.newsatoshi.org/formal/NewsatoshiCovenants.lean`
-> - GitHub & LaTeX source (`v0.10.x`, MIT): `https://github.com/theguysaccount/newsatoshi-commons`
+> - Live 4-Chain Backing Vault (`0x37Ed94525DBE408fA72cDd156409875666679265` — ETH, USDC & POL live across Base/Arb/OP/Polygon): `https://commons.newsatoshi.org/api/backing/summary`
+> - Live Cross-App PayWord Partner (`SatSentry`, 6 Bitcoin/LN security endpoints): `https://satsentry.vercel.app/.well-known/l402.json`
+> - GitHub & LaTeX source (`v0.11.0`, MIT): `https://github.com/theguysaccount/newsatoshi-commons`
 >
 > Peer review, circuit attacks, and conjecture critiques are explicitly welcomed on GitHub Issues or directly in this thread.
 
@@ -77,7 +80,9 @@
 >
 > Whitepaper: `https://commons.newsatoshi.org/whitepaper`
 > Lean 4 Kernel: `https://commons.newsatoshi.org/formal/NewsatoshiCovenants.lean`
-> Official MCP Registry (`active`): `org.newsatoshi.commons/newsatoshi-commons` (`https://commons.newsatoshi.org/mcp`)
+> Official MCP Registry (`active`, 14 tools): `org.newsatoshi.commons/newsatoshi-commons` (`https://commons.newsatoshi.org/mcp`)
+> On-Chain ERC-8004 Identity (`0x8004A169…a432`): Base `#1229992` · Arbitrum `#1692` · Optimism `#42519` · Polygon `#715` (`https://commons.newsatoshi.org/.well-known/erc8004.json`)
+> Verified `x402 v2` + PayWord Endpoints (`402index.io` domain-verified): `https://commons.newsatoshi.org/.well-known/x402.json` (live Base USDC settlement proof TX: `0x07c2dea9e725bf141654be60b742764daa3debd18e8c37577487c14ac8da4e11`)
 
 ---
 
