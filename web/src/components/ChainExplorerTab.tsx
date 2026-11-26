@@ -31,36 +31,36 @@ function formatBlockTime(unix: number): string {
 
 const MIGRATION_PHASES = [
   {
-    phase: 'Phase 0',
-    title: 'Client-Side Validated (CSV) Commons & L1 Anchoring',
+    phase: 'Layer 1 (Narrow Waist)',
+    title: 'v1.0.0-core Minimalist SHA-2 Settlement Floor',
     status: 'IMPLEMENTED' as const,
     summary:
-      'Client-Side Validated Rust engine (`newsatoshi-commons`) with NIST FIPS 205 SLH-DSA, XMSS Merkle-Lamport hardware signers, Winterfell 0.13 single-step STARK proofs, and L1 `newsatoshi lock --hash` anchors.',
-    specs: ['Blind L1 Consensus', 'Winterfell 0.13 AIR', 'OP_RETURN 0x6a20'],
+      'Pure SHA-2 shielded cash (zero elliptic curves, zero novel ZK-hashes), Bitcoin AuxPoW (chainid 20051) + Day-1 ASERT ramp, BatchSpend K=2..16 compression (6.49x at K=8), work-proportional FlyClient MMR, 50% fee burn, PayWord channels, and minimal PriorLock. Alt-L1 bloat removed.',
+    specs: ['v1.0.0-core', '6.49x BatchSpend', '10 Lean + 249 Z3'],
   },
   {
-    phase: 'Phase 1',
-    title: '90-Day Testnet & SP1 / Miden Audit',
-    status: 'SPEC & HARNESS' as const,
+    phase: 'Layer 2 (Above Waist)',
+    title: 'Agent Commerce, Bridges & Labs Gateway (This Site)',
+    status: 'IMPLEMENTED' as const,
     summary:
-      'Upgrade single-step CSV proofs to constant-size recursive IVC chain-proof folding in SP1 Hypercube / Miden VM (`zkvm/covenant-circuit-core`) under a 90-day adversarial testnet soak.',
-    specs: ['SP1 Hypercube Guest', 'Miden MASM AIR', '90-Day Soak'],
+      'All rich application tooling segregated above L1: 30-tool MCP server, Native LOVE PayWords + x402 USDC bridge on-ramps, 4-chain ownerless EVM HTLCs & Backing Vaults, ERC-8004 identity, Web4 charters, off-chain mission launchpads, and zkTLS P2P verifier.',
+    specs: ['30 MCP Tools', 'Native LOVE + x402', '4-Chain HTLCs'],
   },
   {
-    phase: 'Phase 2',
-    title: 'OP_VERIFY_COVENANT_STARK (0xb4) Soft-Fork',
-    status: 'RFC-0021' as const,
+    phase: 'Launch Blocker',
+    title: '2 External Security Audits + >=3 Independent BTC Pools',
+    status: 'PENDING GATE' as const,
     summary:
-      'Backwards-compatible soft-fork redefining `OP_NOP5` (`0xb4`) via AuxPoW (`chainid = 20051`) merged-miner signaling. Enforces recursive `covenant_rule_hash` output continuity natively on L1.',
-    specs: ['OP_NOP5 -> 0xb4', 'AuxPoW ChainID 20051', 'Output Continuity'],
+      'Hard non-negotiable launch gates tracked live at /api/v2/cutover-readiness: currently 0/2 external security audits (Winterfell patch, spend.rs, batch_spend.rs, prior.rs, light.rs, pq_transport.rs) and 0/3 real-difficulty Bitcoin AuxPoW pools.',
+    specs: ['0/2 External Audits', '0/3 BTC Pools', 'AUDIT_SCOPE_V2.md'],
   },
   {
-    phase: 'Phase 3',
-    title: 'Physical Parcel Legal-Cryptographic Airlock',
-    status: 'TEMPLATE READY' as const,
+    phase: 'Mainnet v2 Genesis',
+    title: 'Single Bitcoin-Anchored Fair Launch (Canary Retired)',
+    status: 'PRE-LAUNCH' as const,
     summary:
-      'Bind real parcel deeds and metered hardware under counsel-reviewed Perpetual Purpose Trust §4.2 & Wyoming DUNA operating instruments tied to the active `covenant_rule_hash`.',
-    specs: ['Purpose Trust §4.2', 'Wyoming DUNA CLT', 'PayWord Streaming'],
+      'The Nov 10 v0.1.0 canary is retired ahead of one clean Bitcoin-block-anchored Mainnet v2 genesis (`newsatoshi genesis-v2 --btc-block-hash <FUTURE_HASH>`), proving zero secret premine or instamine.',
+    specs: ['One Canonical Genesis', 'Day-1 ASERT Ramp', 'Zero Premine'],
   },
 ];
 

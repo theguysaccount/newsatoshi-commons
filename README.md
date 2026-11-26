@@ -1,4 +1,4 @@
-# `newsatoshi-commons` — Native `LOVE` Gateway & Multi-Chain Bridge Toolkit (`v0.22.0`)
+# `newsatoshi-commons` — Layer 2 Agent Commerce, Bridges & Labs Gateway (`v0.22.1`)
 
 [![CI](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml/badge.svg)](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/theguysaccount/newsatoshi-commons)](https://github.com/theguysaccount/newsatoshi-commons/releases)
@@ -9,20 +9,20 @@
 [![ERC-8004](https://img.shields.io/badge/ERC--8004-Web4%20Sovereign%20Identity-a855f7)](https://commons.newsatoshi.org/.well-known/erc8004.json)
 [![Native LOVE + x402 Bridge](https://img.shields.io/badge/Primary-Native%20LOVE%20PayWord%20%2B%20x402%20Bridge-f59e0b)](https://commons.newsatoshi.org/.well-known/x402)
 
-### Core Architecture (`v1.0.0-core` Priorism-FEP Pure SHA-2 L1 + Native `LOVE` Gateway)
-Newsatoshi (`LOVE`) is a Bitcoin-shaped, SHA-256d AuxPoW merge-mined (`chainid = 20051`) shielded cash chain where **every balance is private and the only cryptographic primitive guarding coins is SHA-2** (SHA-256/SHA-384 + FIPS-205 SLH-DSA + transparent Winterfell STARKs; zero elliptic curves, zero trusted setup), paired with a minimal endogenous **Priorism / Free-Energy Principle (FEP)** economic layer in consensus:
+### The Hourglass Architecture: Minimal L1 Waist · Rich L2 Ecosystem
 
-1. **Minimalist L1 (`newsatoshi-rfc0021` [`v1.0.0-core`](https://github.com/theguysaccount/newsatoshi-rfc0021/releases/tag/v1.0.0-core)):** Stripped alt-L1 consensus bloat (`rollup.rs`, `zkvm.rs`, `mission.rs`, `bond.rs`, `covenant_stark.rs`) down to three load-bearing consensus mechanisms:
-   - **Homeostatic 50% Base-Fee Burn:** Half of every non-coinbase transaction fee is permanently burned against the perpetual `0.1953125 LOVE/block` tail emission.
-   - **One Unified `PriorLock` Primitive (`prior.rs`):** Stake shielded `LOVE` behind a falsifiable commitment with SCGS I-3 enforcement (`arbiter_vk != owner_vk` + distinct arbiters). Objective disconfirmation (hash preimage, equivocation, or independent `M-of-N` SLH-DSA quorum) pays **50% surprise bounty** and **permanently burns 50%**; zero-surprise expiration unlocks cleanly.
-   - **Multi-Spend `BatchSpend` Compression (`batch_spend.rs`, `K ∈ 2..=16`) + Split Coinbase:** Tiles up to 16 spends into one pure-SHA-2 STARK (`0` new circuit constraints; measured `MAIN_V2` SHA-384 `K=8`: `641 KB`, **`6.49×` compression**, ~96 spends per 8 MB block, `3.27 s` prove / `52 ms` verify) with consensus-enforced split coinbase rewards (AuxPoW Orderer + Negentropy Prover).
-   - **Work-Proportional FlyClient MMR (`light.rs`):** Integer-only `U512` work-offset sampling over `[0, ancestor_work)` with rightmost-leaf tail binding and `tip_header.commit` / `DigestParts::header_mmr` binding.
-2. **Native `LOVE` Primary Settlement Rail + Outer Bridge On-Ramps:** `commons.newsatoshi.org` prices and settles native utilities primarily in **`LOVE`** (incremental `O(1)` SHA-256 PayWords, `PriorLock`s, and L1 SHA-256 HTLCs; Web4 bounties default to `l1_htlc` / `LOVE`), while keeping Base/Arbitrum/Polygon USDC `x402 v2` and Bitcoin/Lightning/Solana/EVM HTLCs live as **outer bridge on-ramps**.
-3. **Brutally Honest Status & Launch Gates (`/api/v2/cutover-readiness`):**
-   - **Single Canonical Genesis Policy:** The Nov 10 `v0.1.0` chain is retired as a pre-launch canary (low difficulty, un-audited); Mainnet v2 will launch once from a single future Bitcoin block hash (`newsatoshi genesis-v2 --btc-block-hash <HASH>`).
-   - **Blocking Gates (`ready_for_v2_activation: false`):** **`0 / 2` external security audits** completed; **`0 / 3` independent Bitcoin AuxPoW pools** at real Bitcoin-grade difficulty (`>= 10,000`).
-   - **Honest Security & Formal Proof Bounds:** L1 STARKs provide `>= 140` classical proven bits (LDR), `128`-bit BHT QROM SHA-384 hash security, and ~`67–80` bits conservative quantum FRI estimate. Lean 4 (`SpendBalance.lean`) checks `10` accounting/conservation theorems (`0 sorry`) — **not** full mechanization of all `249` spend AIR constraints (which are checked by Z3). `NSPQ1` ML-KEM-768 P2P is opportunistic (stops passive HNDL eavesdropping, **not** active MITM without key pinning).
-   - **Independent Mirrors & Sandbox Honesty:** `wLOVE` is an independent ownerless Base ERC-20 token with no on-chain L1↔EVM bridge. Unfunded PayWord sandbox calls on `commons.newsatoshi.org/api/x402/*` explicitly report `settled: false`.
+**Newsatoshi (`LOVE`)** follows the Internet's Hourglass principle: keep Layer 1 radically small, private, post-quantum, and ossified — and keep all agent-commerce tooling, liquidity bridges, and experimental labs cleanly **above the waist** in this repository (`newsatoshi-commons`).
+
+| Layer | Repository | What Lives Here |
+| :--- | :--- | :--- |
+| **Layer 2 · Agent Commerce, Bridges & Labs** *(This Repo)* | [`newsatoshi-commons`](https://github.com/theguysaccount/newsatoshi-commons) (`commons.newsatoshi.org`) | **30 zero-auth MCP tools**, Native `LOVE` PayWord primary rail + `x402 v2` USDC bridge on-ramps, 4-chain ownerless EVM HTLCs & Backing Vaults, BTC/Lightning/Solana HTLC swap compilers, `ERC-8004` agent identity, Web4 charters, off-chain mission launchpads, zkTLS P2P verification, and opt-in A2A escrow hooks (compatible with agent marketplaces like Psilo). |
+| **Layer 1 · The Narrow Waist** *(Base Settlement Floor)* | [`newsatoshi-rfc0021`](https://github.com/theguysaccount/newsatoshi-rfc0021) ([`v1.0.0-core`](https://github.com/theguysaccount/newsatoshi-rfc0021/releases/tag/v1.0.0-core)) | **Private, quantum-proof electronic cash secured by Bitcoin merge-mining — built strictly on SHA-2.** Default shielded privacy, SHA-256/SHA-384 + FIPS-205 SLH-DSA + Winterfell STARKs (zero elliptic curves, zero trusted setup, zero novel ZK-hashes), Bitcoin AuxPoW (`chainid = 20051`), `BatchSpend` `6.49×` SHA-384 compression, work-proportional FlyClient MMR, 50% fee burn, SHA-256 HTLCs, PayWord channels, and one minimal `PriorLock` collateral primitive. **Zero L1 launchpads, subjective juries, or rollup VMs.** |
+
+### Honest Status & Mainnet v2 Launch Gates (`/api/v2/cutover-readiness`)
+- **Single Canonical Genesis Policy:** The Nov 10 `v0.1.0` chain is retired as a pre-launch canary (low difficulty, un-audited); Mainnet v2 will launch once from a single future Bitcoin block hash (`newsatoshi genesis-v2 --btc-block-hash <HASH>`).
+- **Hard Launch Blockers (`ready_for_v2_activation: false`):** **`0 / 2` external security audits** completed; **`0 / 3` independent Bitcoin AuxPoW pools** at real Bitcoin-grade difficulty (`>= 10,000`).
+- **Honest Security & Formal Proof Bounds:** L1 STARKs provide `>= 140` classical proven bits (LDR), `128`-bit BHT QROM SHA-384 hash security, and ~`67–80` bits conservative quantum FRI estimate. L1 Lean 4 (`SpendBalance.lean`) checks `10` accounting/conservation theorems (`0 sorry`) — **not** full mechanization of all `249` spend AIR constraints (checked by Z3). `NSPQ1` ML-KEM-768 P2P is opportunistic (stops passive HNDL eavesdropping, **not** active MITM without key pinning). Full recursive SHA-384 chain-history STARK folding remains future R&D.
+- **Independent Mirrors & Sandbox Honesty:** `wLOVE` is an independent ownerless Base ERC-20 discovery mirror with no on-chain L1↔EVM bridge. Unfunded PayWord sandbox calls on `commons.newsatoshi.org/api/x402/*` explicitly report `settled: false`.
 
 ---
 

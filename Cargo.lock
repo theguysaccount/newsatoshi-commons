@@ -512,7 +512,7 @@ dependencies = [
 
 [[package]]
 name = "newsatoshi-commons"
-version = "0.22.0"
+version = "0.22.1"
 dependencies = [
  "ed25519-dalek",
  "hex",

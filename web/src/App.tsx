@@ -768,7 +768,7 @@ function AppShell() {
             <span className="font-medium text-zinc-300">Newsatoshi Commons</span>
             <span className="text-zinc-700">·</span>
             <span className="font-mono text-[11px]">
-              v{health?.version ?? '0.11.0'} · Verify-Only · 0 Server Keys
+              v{health?.version ?? '0.22.1'} · L2 Gateway · Verify-Only · 0 Server Keys
             </span>
           </div>
 

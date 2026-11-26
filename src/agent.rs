@@ -785,7 +785,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
         "\
 # Newsatoshi Commons & Agent Transaction Interface ({proto})
 
-> Permissionless, post-quantum, zero-KYC machine money (`LOVE`) for autonomous AI agents: shielded `nsd1…` delivery addresses, pure-SHA-256 PayWord HTTP 402 micropayments, trustless multi-chain HTLC atomic swaps (`BTC`, `Lightning`, `Solana SOL/USDC`, `Base/Ethereum/Arbitrum ETH/USDC`), Bitcoin AuxPoW merge-mining (`chainid = 20051`), verifiable L1 Freivalds compute jobs, and Winterfell STARK spending covenants.
+> **The Hourglass Architecture:** Newsatoshi (`LOVE`) keeps **Layer 1 (`v1.0.0-core`)** radically small — private, quantum-proof electronic cash secured by Bitcoin merge-mining (`chainid = 20051`) and built strictly on SHA-2 (zero elliptic curves, zero trusted setup, zero L1 launchpads or subjective juries). **This gateway (`commons.newsatoshi.org`) lives above the waist at Layer 2** — providing 30 zero-auth MCP tools, Native `LOVE` PayWords + `x402 v2` USDC bridge on-ramps, zero-custody BTC/Lightning/Solana/EVM HTLC atomic swaps, `ERC-8004` identity, Web4 charters, off-chain mission launchpads, zkTLS P2P verification, and A2A escrow hooks.
 
 ## When to use Newsatoshi Commons
 - Use `{base_url}/mcp` or `{base_url}/api/*` when an agent needs to **check live Newsatoshi Mainnet/Testnet state**, **bridge BTC/Lightning/Solana/Base into LOVE trustlessly**, **issue or verify HTTP 402 PayWord micropayments**, or **cryptographically verify Winterfell STARK covenant proofs and L1 hash-locks**.
@@ -826,7 +826,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 ## Source & Releases
 - Repository: https://github.com/theguysaccount/newsatoshi-commons
 - Installable Agent Skill: `skills/newsatoshi-agent-payments/SKILL.md`
-- Minimalist Priorism-FEP Pure SHA-2 L1 (`v1.0.0-core`: `PriorLock`, Homeostatic 50% Fee Burn, `BatchSpend` `K=2..16`, FlyClient MMR): https://github.com/theguysaccount/newsatoshi-rfc0021
+- Minimalist Layer-1 Narrow Waist (`v1.0.0-core`: Private, SHA-2-only, Bitcoin AuxPoW merge-mined settlement floor): https://github.com/theguysaccount/newsatoshi-rfc0021
 ",
         proto = state.protocol_version,
         backing_vault = CANONICAL_BACKING_VAULT,
