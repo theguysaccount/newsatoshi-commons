@@ -34,11 +34,11 @@ export function CopyButton({ value, label, className = '', size = 'xs' }: CopyBu
       type="button"
       onClick={handleCopy}
       title={copied ? 'Copied' : `Copy ${label ?? 'value'}`}
-      className={`inline-flex items-center gap-1 rounded border transition-colors cursor-pointer ${
+      className={`inline-flex items-center gap-1.5 rounded-lg border transition-colors cursor-pointer ${
         copied
-          ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
-          : 'border-slate-700/80 bg-slate-900/80 text-slate-400 hover:border-slate-500 hover:text-slate-100'
-      } ${size === 'xs' ? 'px-1.5 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs'} ${className}`}
+          ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+          : 'border-white/[0.09] bg-white/[0.03] text-zinc-400 hover:border-white/[0.2] hover:text-zinc-100'
+      } ${size === 'xs' ? 'px-2 py-1 text-[11px]' : 'px-3 py-1.5 text-xs'} ${className}`}
     >
       {copied ? <Check className="h-3 w-3 shrink-0" /> : <Copy className="h-3 w-3 shrink-0" />}
       {label && <span className="font-medium">{copied ? 'Copied' : label}</span>}
@@ -70,18 +70,21 @@ export function HashPill({
   full = false,
 }: HashPillProps) {
   if (!hash) {
-    return <span className="font-mono text-xs text-slate-500">—</span>;
+    return <span className="font-mono text-xs text-zinc-500">—</span>;
   }
   const display = full ? hash : truncateHash(hash, head, tail);
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-md border border-slate-800/90 bg-slate-950/75 px-2 py-0.5 font-mono text-[11px] text-slate-300 ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-[#0a0a0d] px-2.5 py-1 font-mono text-[11px] text-zinc-300 ${className}`}
     >
-      {prefix && <span className="text-slate-500 select-none">{prefix}</span>}
+      {prefix && <span className="text-zinc-500 select-none">{prefix}</span>}
       <span className={full ? 'break-all' : 'whitespace-nowrap'} title={hash}>
         {display}
       </span>
-      <CopyButton value={hash} className="border-0 bg-transparent px-0.5 py-0 hover:bg-slate-800/80" />
+      <CopyButton
+        value={hash}
+        className="border-0 bg-transparent px-0.5 py-0 hover:bg-white/[0.06]"
+      />
     </span>
   );
 }

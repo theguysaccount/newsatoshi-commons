@@ -1,6 +1,17 @@
 export type SignatureScheme = 'xmss' | 'slh_dsa';
 
-export type WorkspaceTab = 'cockpit' | 'web4' | 'explorer' | 'swaps' | 'economics' | 'legal';
+export type PrimaryView = 'overview' | 'build' | 'bridge' | 'protocol';
+
+export type ProtocolSubTab = 'explorer' | 'cockpit' | 'economics' | 'legal';
+
+export type WorkspaceTab =
+  | 'overview'
+  | 'web4'
+  | 'swaps'
+  | 'explorer'
+  | 'cockpit'
+  | 'economics'
+  | 'legal';
 
 export interface HealthResponse {
   ok: boolean;

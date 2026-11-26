@@ -14,10 +14,10 @@ interface PanelProps {
 
 const ACCENT_RING: Record<NonNullable<PanelProps['accent']>, string> = {
   none: '',
-  emerald: 'border-emerald-500/30',
-  amber: 'border-amber-500/30',
-  crimson: 'border-red-500/40',
-  sky: 'border-sky-500/30',
+  emerald: 'border-emerald-500/20',
+  amber: 'border-amber-500/20',
+  crimson: 'border-red-500/30',
+  sky: 'border-white/[0.12]',
 };
 
 export function Panel({
@@ -28,23 +28,23 @@ export function Panel({
   action,
   children,
   className = '',
-  bodyClassName = 'p-5',
+  bodyClassName = 'p-5 sm:p-6',
   accent = 'none',
 }: PanelProps) {
   return (
-    <section className={`glass-panel rounded-xl ${ACCENT_RING[accent]} ${className}`}>
+    <section className={`surface-card rounded-2xl ${ACCENT_RING[accent]} ${className}`}>
       {(title || badge || action) && (
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 px-5 py-3.5">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.07] px-5 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-2.5">
-            {icon && <div className="shrink-0 text-emerald-400">{icon}</div>}
+            {icon && <div className="shrink-0 text-zinc-400">{icon}</div>}
             <div className="min-w-0">
               {title && (
-                <h2 className="truncate text-sm font-semibold tracking-tight text-slate-100">
+                <h2 className="truncate text-[14px] font-medium tracking-tight text-zinc-100">
                   {title}
                 </h2>
               )}
               {subtitle && (
-                <p className="truncate text-xs text-slate-400">{subtitle}</p>
+                <p className="mt-0.5 truncate text-xs text-zinc-500">{subtitle}</p>
               )}
             </div>
           </div>

@@ -1,15 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Briefcase,
+  ArrowUpRight,
   CheckCircle2,
-  Coins,
-  ExternalLink,
-  FileCode2,
   RefreshCw,
-  Rocket,
-  ShieldCheck,
-  Terminal,
-  Vault,
 } from 'lucide-react';
 import {
   actionCompileWeb4Charter,
@@ -33,6 +26,12 @@ interface Web4ForgeTabProps {
   onStateUpdated: (next: CommonsState) => void;
   onNotice: (kind: 'success' | 'error', message: string) => void;
 }
+
+const INPUT_CLASS =
+  'w-full rounded-xl border border-white/[0.1] bg-[#0a0a0d] px-3 py-2.5 text-xs text-zinc-100 placeholder:text-zinc-600 transition focus:border-white/30 focus:outline-none';
+
+const LABEL_CLASS =
+  'mb-1.5 block text-[11px] font-medium text-zinc-400';
 
 export function Web4ForgeTab({
   hasOperatorToken,
@@ -81,7 +80,10 @@ export function Web4ForgeTab({
     void loadLive(false);
   }, [loadLive]);
 
-  const bpsTotal = (Number(opsBps) || 0) + (Number(reinvestBps) || 0) + (Number(backingBps) || 0);
+  const opsNum = Math.max(0, Number(opsBps) || 0);
+  const reinvestNum = Math.max(0, Number(reinvestBps) || 0);
+  const backingNum = Math.max(0, Number(backingBps) || 0);
+  const bpsTotal = opsNum + reinvestNum + backingNum;
 
   const buildPayload = (): SpawnCharterPayload => ({
     name: name.trim(),
@@ -89,9 +91,9 @@ export function Web4ForgeTab({
     mission: mission.trim(),
     parent_charter_id: parentCharterId.trim() || undefined,
     max_spend_per_call_love: Math.max(1, Math.floor(Number(maxSpend) || 1)),
-    ops_bps: Math.max(0, Math.floor(Number(opsBps) || 0)),
-    reinvest_bps: Math.max(0, Math.floor(Number(reinvestBps) || 0)),
-    backing_bps: Math.max(0, Math.floor(Number(backingBps) || 0)),
+    ops_bps: Math.floor(opsNum),
+    reinvest_bps: Math.floor(reinvestNum),
+    backing_bps: Math.floor(backingNum),
     payout_love_address: payoutLove.trim(),
     evm_treasury_address: evmTreasury.trim(),
     primary_evm_chain: evmChain,
@@ -106,7 +108,7 @@ export function Web4ForgeTab({
       if (res.ok && res.charter) {
         setCompiledCharter(res.charter);
         setCompiledErc8004(res.erc8004_registration ?? null);
-        onNotice('success', `Compiled sovereign Web4 charter ${res.charter.charter_id}`);
+        onNotice('success', `Compiled sovereign charter ${res.charter.charter_id}`);
       } else {
         setCompiledCharter(null);
         setCompiledErc8004(null);
@@ -128,7 +130,7 @@ export function Web4ForgeTab({
         setCompiledCharter(res.charter);
         setCompiledErc8004(res.erc8004_registration ?? null);
         await loadLive(false);
-        onNotice('success', `Published charter ${res.charter.charter_id} to Web4 registry`);
+        onNotice('success', `Published charter ${res.charter.charter_id}`);
       } else {
         onNotice('error', res.error || 'Charter publish failed');
       }
@@ -139,164 +141,160 @@ export function Web4ForgeTab({
     }
   };
 
+  const vaultAddress =
+    backing?.canonical_vault_address || '0x37Ed94525DBE408fA72cDd156409875666679265';
+
   return (
-    <div className="space-y-6">
-      {/* Section 1: Live Multi-Chain Proof-of-Backing Vault Telemetry */}
+    <div className="space-y-8">
+      {/* 1. Live Multi-Chain Proof-of-Backing */}
       <Panel
-        title="Live Multi-Chain Proof-of-Backing Vaults (NewsatoshiBackingVault.sol)"
-        subtitle="Ownerless, non-withdrawable reserve vaults live at one universal address across Base, Arbitrum One, Optimism & Polygon — verified live via eth_call"
-        icon={<Vault className="h-4 w-4 text-emerald-400" />}
-        accent="emerald"
-        badge={
-          <div className="flex items-center gap-2">
-            <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-emerald-300">
-              0 ADMIN WITHDRAW · 4× SOURCIFY EXACT_MATCH
-            </span>
-            <button
-              type="button"
-              onClick={() => void loadLive(true)}
-              disabled={loadingBacking}
-              className="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2 py-0.5 font-mono text-[10px] text-slate-300 hover:border-emerald-500/50 hover:text-emerald-200 cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw className={`h-3 w-3 ${loadingBacking ? 'animate-spin' : ''}`} />
-              Refresh RPC
-            </button>
-          </div>
+        title="On-Chain Reserve Vault"
+        subtitle="Immutable, non-withdrawable contract polled live via eth_call across 4 EVM mainnets"
+        action={
+          <button
+            type="button"
+            onClick={() => void loadLive(true)}
+            disabled={loadingBacking}
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.1] bg-white/[0.03] px-3 py-1 text-[11px] font-medium text-zinc-300 transition hover:border-white/[0.2] hover:text-white cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3 w-3 ${loadingBacking ? 'animate-spin' : ''}`} />
+            <span>Refresh RPC</span>
+          </button>
         }
       >
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-500/30 bg-emerald-950/20 px-3.5 py-2.5 text-xs">
-            <div className="flex flex-wrap items-center gap-2 font-mono">
-              <span className="text-[10px] uppercase text-emerald-300">Universal Vault (Base · Arb · OP · Pol):</span>
-              <code className="text-slate-100">
-                {backing?.canonical_vault_address || '0x37Ed94525DBE408fA72cDd156409875666679265'}
-              </code>
-              <CopyButton
-                value={backing?.canonical_vault_address || '0x37Ed94525DBE408fA72cDd156409875666679265'}
-                label="Copy"
-              />
+        <div className="space-y-5">
+          {/* Canonical Address Strip */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-[#0a0a0d] px-4 py-3 text-xs">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="text-[11px] font-medium text-zinc-500">Universal Vault</span>
+              <code className="break-all font-mono text-zinc-200">{vaultAddress}</code>
+              <CopyButton value={vaultAddress} />
             </div>
-            <div className="flex flex-wrap items-center gap-3 font-mono text-[10px]">
+            <div className="flex flex-wrap items-center gap-4 text-[11px] font-medium text-zinc-400">
               <a
                 href={`https://basescan.org/tx/${backing?.genesis_base_deposit_tx || '0xc354e0cca5bd2f0e9ac22193ef6f4ea505393ab4be4177251f9f47ca1c10bf5c'}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-emerald-300 hover:underline"
+                className="inline-flex items-center gap-1 transition hover:text-zinc-100"
               >
-                Genesis 0.001 ETH Backing TX <ExternalLink className="h-3 w-3" />
+                <span>Genesis 0.001 ETH TX</span>
+                <ArrowUpRight className="h-3 w-3" />
               </a>
               <a
-                href="/whitepaper"
+                href="/api/backing/summary"
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-sky-300 hover:underline"
+                className="inline-flex items-center gap-1 transition hover:text-zinc-100"
               >
-                Lean 4 Proof &amp; Whitepaper <ExternalLink className="h-3 w-3" />
+                <span>Raw Proof JSON</span>
+                <ArrowUpRight className="h-3 w-3" />
               </a>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-5">
-            <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3">
-              <div className="font-mono text-[10px] uppercase text-slate-500">Verified ETH Backed</div>
-              <div className="mt-1 font-mono text-lg font-bold text-emerald-300">
-                {backing ? `${backing.total_eth_formatted} ETH` : 'Loading…'}
+          {/* Aggregate Live Reserve Totals */}
+          <div className="grid grid-cols-2 divide-y divide-white/[0.07] overflow-hidden rounded-xl border border-white/[0.07] bg-[#0a0a0d] md:grid-cols-5 md:divide-x md:divide-y-0">
+            <div className="p-4">
+              <div className="text-[11px] font-medium text-zinc-500">ETH Backed</div>
+              <div className="mt-1.5 font-mono text-lg font-medium text-zinc-100 tabular-nums">
+                {backing ? `${backing.total_eth_formatted} ETH` : '—'}
               </div>
-              <div className="mt-0.5 font-mono text-[10px] text-slate-400">
-                {backing ? `${backing.total_vault_deposits} on-chain deposit(s)` : 'Live RPC'}
+              <div className="mt-0.5 text-[11px] text-zinc-500">
+                {backing ? `${backing.total_vault_deposits} deposit` : 'Live RPC'}
               </div>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3">
-              <div className="font-mono text-[10px] uppercase text-slate-500">Verified USDC Backed</div>
-              <div className="mt-1 font-mono text-lg font-bold text-sky-300">
-                {backing ? `${backing.total_usdc_formatted} USDC` : 'Loading…'}
+            <div className="p-4">
+              <div className="text-[11px] font-medium text-zinc-500">USDC Backed</div>
+              <div className="mt-1.5 font-mono text-lg font-medium text-zinc-100 tabular-nums">
+                {backing ? `${backing.total_usdc_formatted}` : '—'}
               </div>
-              <div className="mt-0.5 font-mono text-[10px] text-slate-400">Canonical 4-chain USDC</div>
+              <div className="mt-0.5 text-[11px] text-zinc-500">4-chain canonical</div>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3">
-              <div className="font-mono text-[10px] uppercase text-slate-500">Verified POL Backed</div>
-              <div className="mt-1 font-mono text-lg font-bold text-violet-300">
-                {backing ? `${backing.total_pol_formatted} POL` : 'Loading…'}
+            <div className="p-4">
+              <div className="text-[11px] font-medium text-zinc-500">POL Backed</div>
+              <div className="mt-1.5 font-mono text-lg font-medium text-zinc-100 tabular-nums">
+                {backing ? `${backing.total_pol_formatted}` : '—'}
               </div>
-              <div className="mt-0.5 font-mono text-[10px] text-slate-400">Polygon PoS (137)</div>
+              <div className="mt-0.5 text-[11px] text-zinc-500">Polygon PoS</div>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3">
-              <div className="font-mono text-[10px] uppercase text-slate-500">On-Chain Charters</div>
-              <div className="mt-1 font-mono text-lg font-bold text-amber-300">
+            <div className="p-4">
+              <div className="text-[11px] font-medium text-zinc-500">Anchored Charters</div>
+              <div className="mt-1.5 font-mono text-lg font-medium text-zinc-100 tabular-nums">
                 {backing ? backing.total_onchain_anchored_charters : '—'}
               </div>
-              <div className="mt-0.5 font-mono text-[10px] text-slate-400">
-                Immutable vault anchors
-              </div>
+              <div className="mt-0.5 text-[11px] text-zinc-500">On-chain vaults</div>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3">
-              <div className="font-mono text-[10px] uppercase text-slate-500">Mainnet Issued LOVE</div>
-              <div className="mt-1 font-mono text-lg font-bold text-slate-100">
+            <div className="p-4">
+              <div className="text-[11px] font-medium text-zinc-500">Mainnet Issued</div>
+              <div className="mt-1.5 font-mono text-lg font-medium text-zinc-100 tabular-nums">
                 {backing?.mainnet_issued_love
-                  ? `${Math.round(backing.mainnet_issued_love).toLocaleString()}`
+                  ? `${Math.round(backing.mainnet_issued_love).toLocaleString()} LOVE`
                   : '—'}
               </div>
-              <div className="mt-0.5 font-mono text-[10px] text-slate-400">
-                {backing?.mainnet_height ? `Height #${backing.mainnet_height.toLocaleString()}` : 'Live L1'}
+              <div className="mt-0.5 text-[11px] text-zinc-500">
+                {backing?.mainnet_height ? `Block #${backing.mainnet_height.toLocaleString()}` : 'Live L1'}
               </div>
             </div>
           </div>
 
+          {/* 4-Chain Live Breakdown */}
           {backing && (
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {backing.chains.map((c) => (
                 <div
                   key={c.chain_id}
-                  className="rounded-xl border border-slate-800/90 bg-slate-950/75 p-3 text-xs"
+                  className="rounded-xl border border-white/[0.07] bg-[#0a0a0d] p-4 text-xs"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold uppercase text-slate-100">
-                      {c.chain} ({c.chain_id})
+                    <span className="font-medium capitalize text-zinc-100">
+                      {c.chain}{' '}
+                      <span className="font-mono text-[11px] text-zinc-500">{c.chain_id}</span>
                     </span>
-                    <span
-                      className={`rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold ${
-                        c.live
-                          ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
-                          : 'border-amber-500/40 bg-amber-500/10 text-amber-300'
-                      }`}
-                    >
-                      {c.live ? 'LIVE RPC' : 'RPC ERR'}
+                    <span className="inline-flex items-center gap-1.5 font-mono text-[10px] text-zinc-400">
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          c.live ? 'bg-emerald-400' : 'bg-amber-400'
+                        }`}
+                      />
+                      {c.live ? 'Live' : 'Retry'}
                     </span>
                   </div>
-                  <div className="mt-2 space-y-1 font-mono text-[11px] text-slate-300">
+                  <div className="mt-3 space-y-1.5 font-mono text-[11px]">
                     <div className="flex justify-between">
-                      <span className="text-slate-500">Native:</span>
-                      <span className="text-emerald-300">
+                      <span className="text-zinc-500">Native</span>
+                      <span className="text-zinc-200 tabular-nums">
                         {c.native_reserve_formatted} {c.native_symbol}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-500">USDC:</span>
-                      <span className="text-sky-300">{c.usdc_reserve_formatted}</span>
+                      <span className="text-zinc-500">USDC</span>
+                      <span className="text-zinc-200 tabular-nums">{c.usdc_reserve_formatted}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-500">Deposits / Charters:</span>
-                      <span>
+                      <span className="text-zinc-500">Deposits / Charters</span>
+                      <span className="text-zinc-300 tabular-nums">
                         {c.deposits_count} / {c.anchored_charters_count}
                       </span>
                     </div>
                   </div>
-                  <div className="mt-2 flex items-center gap-3 font-mono text-[10px]">
+                  <div className="mt-3 flex items-center gap-3 border-t border-white/[0.06] pt-2.5 text-[11px] font-medium text-zinc-400">
                     <a
                       href={c.explorer_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-emerald-400 hover:underline"
+                      className="inline-flex items-center gap-0.5 hover:text-zinc-100"
                     >
-                      Explorer ↗
+                      <span>Explorer</span>
+                      <ArrowUpRight className="h-3 w-3" />
                     </a>
                     <a
                       href={c.sourcify_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-sky-400 hover:underline"
+                      className="inline-flex items-center gap-0.5 hover:text-zinc-100"
                     >
-                      Sourcify ↗
+                      <span>Sourcify</span>
+                      <ArrowUpRight className="h-3 w-3" />
                     </a>
                   </div>
                 </div>
@@ -306,43 +304,32 @@ export function Web4ForgeTab({
         </div>
       </Panel>
 
-      {/* Section 2: Sovereign Web4 Business Charter Forge + Registries */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-        <div className="xl:col-span-7">
+      {/* 2. Sovereign Charter Forge + Open Directories */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <div className="lg:col-span-7">
           <Panel
-            title="Spawn a Sovereign Web4 Business Charter (Lean 4 Monotonic Covenants)"
-            subtitle="Unlike prompt-only Web4 agents (constitution.md), every charter enforces hard per-call spending caps & automatic backing_bps splits verified in Lean 4"
-            icon={<Rocket className="h-4 w-4 text-sky-400" />}
-            accent="sky"
-            badge={
-              <span className="rounded-full border border-sky-500/40 bg-sky-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-sky-200">
-                ERC-8004 + FIPS 205 SLH-DSA
-              </span>
-            }
+            title="Sovereign Charter Forge"
+            subtitle="Compile a covenant-bound Web4 business with Lean 4 monotonic spending bounds & ERC-8004 card"
           >
-            <form onSubmit={handleCompileCharter} className="space-y-3.5">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <form onSubmit={handleCompileCharter} className="space-y-4">
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
                 <div className="sm:col-span-2">
-                  <label className="mb-1 block font-mono text-[10px] uppercase text-slate-400">
-                    Business / Agent Charter Name
-                  </label>
+                  <label className={LABEL_CLASS}>Business / Agent Name</label>
                   <input
                     type="text"
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Solar Compute Guild"
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                    placeholder="e.g. Solar Compute Co-op"
+                    className={INPUT_CLASS}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block font-mono text-[10px] uppercase text-slate-400">
-                    Business Rail
-                  </label>
+                  <label className={LABEL_CLASS}>Category</label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value as SpawnCharterPayload['category'])}
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-2 font-mono text-xs text-slate-100"
+                    className={INPUT_CLASS}
                   >
                     <option value="paid_api">Paid 402 API</option>
                     <option value="compute_node">Compute / GPU Node</option>
@@ -354,122 +341,141 @@ export function Web4ForgeTab({
               </div>
 
               <div>
-                <label className="mb-1 block font-mono text-[10px] uppercase text-slate-400">
-                  Constitutional Mandate (hashed into immutable constitution_hash)
+                <label className={LABEL_CLASS}>
+                  Constitutional Mandate{' '}
+                  <span className="font-mono text-[10px] text-zinc-500">
+                    (SHA-256 committed into constitution_hash)
+                  </span>
                 </label>
                 <textarea
                   required
                   rows={2}
                   value={mission}
                   onChange={(e) => setMission(e.target.value)}
-                  placeholder="Describe the exact revenue model, verification rule, and asset-backing commitment..."
-                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                  placeholder="Describe the exact revenue rail, verification rule, and reserve backing split…"
+                  className={INPUT_CLASS}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div>
-                  <label className="mb-1 block font-mono text-[10px] uppercase text-slate-400">
-                    Max Spend/Call (LOVE)
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    required
-                    value={maxSpend}
-                    onChange={(e) => setMaxSpend(e.target.value)}
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-2 font-mono text-xs text-slate-100"
+              {/* Revenue Split Inputs + Clean Visual Allocation Bar */}
+              <div className="rounded-xl border border-white/[0.07] bg-[#0a0a0d] p-4">
+                <div className="mb-3 flex items-center justify-between text-[11px]">
+                  <span className="font-medium text-zinc-300">Revenue Split &amp; Spending Cap</span>
+                  <span
+                    className={`font-mono ${
+                      bpsTotal === 10000 ? 'text-emerald-400' : 'text-red-400'
+                    }`}
+                  >
+                    {(bpsTotal / 100).toFixed(1)}% / 100%
+                  </span>
+                </div>
+
+                {/* Minimalist 3-Segment Split Bar */}
+                <div className="mb-4 flex h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+                  <div
+                    className="bg-zinc-300 transition-all"
+                    style={{ width: `${Math.min(100, (opsNum / 10000) * 100)}%` }}
+                    title={`Ops: ${(opsNum / 100).toFixed(1)}%`}
+                  />
+                  <div
+                    className="bg-zinc-500 transition-all"
+                    style={{ width: `${Math.min(100, (reinvestNum / 10000) * 100)}%` }}
+                    title={`Reinvest: ${(reinvestNum / 100).toFixed(1)}%`}
+                  />
+                  <div
+                    className="bg-amber-400/90 transition-all"
+                    style={{ width: `${Math.min(100, (backingNum / 10000) * 100)}%` }}
+                    title={`Backing Vault: ${(backingNum / 100).toFixed(1)}%`}
                   />
                 </div>
-                <div>
-                  <label className="mb-1 block font-mono text-[10px] uppercase text-slate-400">
-                    Ops Survival (bps)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={10000}
-                    required
-                    value={opsBps}
-                    onChange={(e) => setOpsBps(e.target.value)}
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-2 font-mono text-xs text-slate-100"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block font-mono text-[10px] uppercase text-slate-400">
-                    Reinvest Growth (bps)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={10000}
-                    required
-                    value={reinvestBps}
-                    onChange={(e) => setReinvestBps(e.target.value)}
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-2 font-mono text-xs text-slate-100"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block font-mono text-[10px] uppercase text-emerald-300">
-                    Backing Vault (bps)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={10000}
-                    required
-                    value={backingBps}
-                    onChange={(e) => setBackingBps(e.target.value)}
-                    className="w-full rounded-lg border border-emerald-500/40 bg-slate-950 px-2.5 py-2 font-mono text-xs text-emerald-200"
-                  />
+
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div>
+                    <label className={LABEL_CLASS}>Max / Call (LOVE)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      required
+                      value={maxSpend}
+                      onChange={(e) => setMaxSpend(e.target.value)}
+                      className={`${INPUT_CLASS} font-mono`}
+                    />
+                  </div>
+                  <div>
+                    <label className={LABEL_CLASS}>Ops (bps)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={10000}
+                      required
+                      value={opsBps}
+                      onChange={(e) => setOpsBps(e.target.value)}
+                      className={`${INPUT_CLASS} font-mono`}
+                    />
+                  </div>
+                  <div>
+                    <label className={LABEL_CLASS}>Reinvest (bps)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={10000}
+                      required
+                      value={reinvestBps}
+                      onChange={(e) => setReinvestBps(e.target.value)}
+                      className={`${INPUT_CLASS} font-mono`}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-medium text-amber-300/90">
+                      Backing (bps)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={10000}
+                      required
+                      value={backingBps}
+                      onChange={(e) => setBackingBps(e.target.value)}
+                      className={`${INPUT_CLASS} border-amber-400/25 font-mono`}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950/75 px-3 py-1.5 font-mono text-[11px]">
-                <span className="text-slate-400">Split Conservation Check (must equal 10,000 bps):</span>
-                <span className={bpsTotal === 10000 ? 'font-bold text-emerald-300' : 'font-bold text-red-400'}>
-                  {bpsTotal.toLocaleString()} / 10,000 bps ({(bpsTotal / 100).toFixed(2)}%)
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block font-mono text-[10px] uppercase text-slate-400">
-                    Newsatoshi Payout Address (ns1… / nsd1…)
-                  </label>
+                  <label className={LABEL_CLASS}>Newsatoshi Payout Address</label>
                   <input
                     type="text"
                     required
                     value={payoutLove}
                     onChange={(e) => setPayoutLove(e.target.value)}
                     placeholder="ns1… or nsd1…"
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                    className={`${INPUT_CLASS} font-mono`}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block font-mono text-[10px] uppercase text-slate-400">
-                    EVM Treasury Address (0x…)
-                  </label>
+                  <label className={LABEL_CLASS}>EVM Treasury Address</label>
                   <input
                     type="text"
                     required
                     value={evmTreasury}
                     onChange={(e) => setEvmTreasury(e.target.value)}
                     placeholder="0x…"
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                    className={`${INPUT_CLASS} font-mono`}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block font-mono text-[10px] uppercase text-slate-400">
-                    Primary On-Chain Anchor Network
-                  </label>
+                  <label className={LABEL_CLASS}>Anchor Network</label>
                   <select
                     value={evmChain}
-                    onChange={(e) => setEvmChain(e.target.value as SpawnCharterPayload['primary_evm_chain'])}
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100"
+                    onChange={(e) =>
+                      setEvmChain(e.target.value as SpawnCharterPayload['primary_evm_chain'])
+                    }
+                    className={INPUT_CLASS}
                   >
                     <option value="base">Base Mainnet (8453)</option>
                     <option value="arbitrum">Arbitrum One (42161)</option>
@@ -478,99 +484,94 @@ export function Web4ForgeTab({
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block font-mono text-[10px] uppercase text-slate-400">
-                    Parent Charter ID (optional — enforces Lean 4 monotonic cap)
-                  </label>
+                  <label className={LABEL_CLASS}>Parent Charter ID (optional)</label>
                   <input
                     type="text"
                     value={parentCharterId}
                     onChange={(e) => setParentCharterId(e.target.value)}
-                    placeholder="Optional parent charter-…"
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                    placeholder="Enforces Lean 4 monotonic child bounds"
+                    className={`${INPUT_CLASS} font-mono`}
                   />
                 </div>
               </div>
 
               {compileError && (
-                <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-xs text-red-200">
                   {compileError}
                 </div>
               )}
 
-              <div className="flex flex-wrap items-center gap-2.5 pt-1">
+              <div className="flex flex-wrap items-center gap-3 pt-1">
                 <button
                   type="submit"
                   disabled={compiling || bpsTotal !== 10000}
-                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 cursor-pointer disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-full bg-zinc-50 px-5 py-2.5 text-xs font-semibold text-zinc-950 transition hover:bg-white cursor-pointer disabled:opacity-40"
                 >
-                  <ShieldCheck className="h-4 w-4" />
-                  {compiling ? 'Compiling Charter…' : 'Compile Web4 Charter + ERC-8004'}
+                  <span>{compiling ? 'Compiling…' : 'Compile Charter & ERC-8004'}</span>
                 </button>
                 {hasOperatorToken && (
                   <button
                     type="button"
                     disabled={publishing || bpsTotal !== 10000}
                     onClick={() => void handlePublishCharter()}
-                    className="inline-flex items-center gap-2 rounded-lg border border-sky-500/50 bg-sky-500/15 px-3.5 py-2 text-xs font-semibold text-sky-200 hover:bg-sky-500/25 cursor-pointer disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-full border border-white/[0.14] px-4 py-2.5 text-xs font-medium text-zinc-200 transition hover:border-white/[0.28] hover:text-white cursor-pointer disabled:opacity-40"
                   >
-                    {publishing ? 'Publishing…' : 'Register on Public Board'}
+                    <span>{publishing ? 'Publishing…' : 'Publish to Registry'}</span>
                   </button>
                 )}
               </div>
             </form>
 
             {compiledCharter && (
-              <div className="mt-5 space-y-3 rounded-xl border border-emerald-500/35 bg-[#04080f] p-4 text-xs">
+              <div className="mt-6 space-y-3 rounded-xl border border-white/[0.1] bg-[#0a0a0d] p-4 text-xs">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 font-mono font-semibold text-emerald-200">
+                  <div className="flex items-center gap-2 font-mono font-medium text-zinc-100">
                     <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                    {compiledCharter.charter_id} · {compiledCharter.name}
+                    <span>{compiledCharter.charter_id}</span>
                   </div>
-                  <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] text-emerald-300">
-                    Lineage Depth {compiledCharter.lineage_depth} · {compiledCharter.backing_bps} bps backing
+                  <span className="font-mono text-[11px] text-zinc-400">
+                    Depth {compiledCharter.lineage_depth} · {(compiledCharter.backing_bps / 100).toFixed(1)}% backing
                   </span>
                 </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 font-mono text-[10px] text-slate-400">
-                  <div className="flex items-center justify-between rounded border border-slate-800 bg-slate-950 px-2.5 py-1.5">
-                    <span>covenant_rule_hash</span>
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-[#0f0f12] px-3 py-2 text-[11px] text-zinc-500">
+                    <span>Rule Hash</span>
                     <HashPill hash={compiledCharter.covenant_rule_hash} />
                   </div>
-                  <div className="flex items-center justify-between rounded border border-slate-800 bg-slate-950 px-2.5 py-1.5">
-                    <span>charter_id_bytes32</span>
+                  <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-[#0f0f12] px-3 py-2 text-[11px] text-zinc-500">
+                    <span>Charter Bytes32</span>
                     <HashPill hash={compiledCharter.charter_id_bytes32} />
                   </div>
                 </div>
-                <div className="space-y-1.5 rounded-lg border border-slate-800 bg-slate-950/90 p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-[10px] uppercase text-sky-300">
-                      1. Anchor Immutably on NewsatoshiBackingVault ({compiledCharter.primary_evm_chain})
-                    </span>
+
+                <div className="space-y-1.5 rounded-lg border border-white/[0.06] bg-[#0f0f12] p-3">
+                  <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                    <span>1. Anchor on {compiledCharter.primary_evm_chain}</span>
                     <CopyButton value={compiledCharter.cast_anchor_command} label="Copy cast" />
                   </div>
-                  <code className="block break-all font-mono text-[10px] text-sky-200">
+                  <code className="block break-all font-mono text-[11px] text-zinc-200">
                     {compiledCharter.cast_anchor_command}
                   </code>
                 </div>
-                <div className="space-y-1.5 rounded-lg border border-slate-800 bg-slate-950/90 p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-[10px] uppercase text-emerald-400">
-                      2. Boot Autonomous 402 Business Daemon (web4-kit/)
-                    </span>
+
+                <div className="space-y-1.5 rounded-lg border border-white/[0.06] bg-[#0f0f12] p-3">
+                  <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                    <span>2. Run Local Autonomous 402 Daemon</span>
                     <CopyButton value={compiledCharter.web4_kit_launch_command} label="Copy cmd" />
                   </div>
-                  <code className="block break-all font-mono text-[10px] text-emerald-200">
+                  <code className="block break-all font-mono text-[11px] text-zinc-200">
                     {compiledCharter.web4_kit_launch_command}
                   </code>
                 </div>
+
                 {compiledErc8004 && (
-                  <div className="space-y-1.5 rounded-lg border border-slate-800 bg-slate-950/90 p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-[10px] uppercase text-amber-300">
-                        3. ERC-8004 + Post-Quantum Dual Registration JSON
-                      </span>
+                  <div className="space-y-1.5 rounded-lg border border-white/[0.06] bg-[#0f0f12] p-3">
+                    <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                      <span>3. ERC-8004 Registration JSON</span>
                       <CopyButton value={JSON.stringify(compiledErc8004, null, 2)} label="Copy JSON" />
                     </div>
-                    <pre className="max-h-40 overflow-auto font-mono text-[10px] text-slate-300">
+                    <pre className="max-h-40 overflow-auto font-mono text-[10.5px] text-zinc-300">
                       {JSON.stringify(compiledErc8004, null, 2)}
                     </pre>
                   </div>
@@ -580,130 +581,144 @@ export function Web4ForgeTab({
           </Panel>
         </div>
 
-        {/* Right Column: Live Web4 Registries & Developer Quick-Connect */}
-        <div className="space-y-6 xl:col-span-5">
+        {/* Right Column: Live On-Chain Charter #1 + Honest Directories */}
+        <div className="space-y-6 lg:col-span-5">
           <Panel
-            title="Web4 Paid 402 Service Directory & Work Bounties"
-            subtitle="Strictly real registered agent services & HTLC/Freivalds bounties — zero fabricated listings"
-            icon={<Briefcase className="h-4 w-4 text-amber-400" />}
-            accent="amber"
+            title="Live Ecosystem Registries"
+            subtitle="Strictly real charters, 402 services & bounties — zero synthetic entries"
             badge={
-              <span className="font-mono text-[10px] text-slate-300">
-                {charters.length} charters · {services.length} services · {bounties.length} bounties
+              <span className="font-mono text-[11px] text-zinc-500">
+                {charters.length + 1} · {services.length} · {bounties.length}
               </span>
             }
           >
-            <div className="space-y-3 text-xs">
-              <div className="rounded-lg border border-slate-800 bg-slate-950/80 p-3">
-                <div className="flex items-center justify-between font-mono text-[10px] uppercase text-emerald-300">
-                  <span>Genesis Charter #1 (Anchored Live on Base Mainnet)</span>
+            <div className="space-y-4 text-xs">
+              <div className="rounded-xl border border-white/[0.08] bg-[#0a0a0d] p-4">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    Genesis Charter #1 · Base
+                  </span>
                   <a
                     href="/api/web4/charters/charter-genesis-commons/erc8004.json"
                     target="_blank"
                     rel="noreferrer"
-                    className="hover:underline"
+                    className="inline-flex items-center gap-0.5 text-[11px] text-zinc-400 hover:text-zinc-100"
                   >
-                    ERC-8004 JSON ↗
+                    <span>ERC-8004</span>
+                    <ArrowUpRight className="h-3 w-3" />
                   </a>
                 </div>
-                <p className="mt-1 text-[11px] text-slate-300">
-                  Newsatoshi Commons Verification Utility · 2,000 bps (20%) backing commitment ·{' '}
+                <p className="mt-2 font-medium text-zinc-100">
+                  Newsatoshi Commons Verification Utility
+                </p>
+                <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+                  20% (2,000 bps) backing commitment anchored permanently on Base Mainnet ·{' '}
                   <a
                     href="https://basescan.org/tx/0x7a8183b60b6b1d8b46cc46b2eb022b3fa046f73b9f1f7ee464a5a3415815eb47"
                     target="_blank"
                     rel="noreferrer"
-                    className="font-mono text-emerald-400 hover:underline"
+                    className="text-zinc-300 underline decoration-white/20 underline-offset-2 hover:text-white"
                   >
-                    Anchor TX ↗
+                    Anchor TX
                   </a>
                 </p>
               </div>
 
-              {services.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-slate-800 bg-slate-950/60 px-4 py-4 text-center text-[11px] text-slate-400">
-                  No external 402 services registered yet. Connect via MCP tool{' '}
-                  <code className="font-mono text-emerald-300">newsatoshi_discover_services</code> or test
-                  our live PayWord-gated endpoint{' '}
-                  <code className="font-mono text-sky-300">POST /api/web4/tools/verify-payword-batch</code>.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {services.map((s) => (
-                    <div key={s.service_id} className="rounded-lg border border-slate-800 bg-slate-950 p-2.5">
-                      <div className="flex items-center justify-between font-semibold text-slate-100">
-                        <span>{s.name}</span>
-                        <span className="font-mono text-[10px] text-emerald-300">
-                          {s.unit_price_love_base_units} base units/call
-                        </span>
+              <div>
+                <h3 className="mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+                  Paid 402 Agent Services ({services.length})
+                </h3>
+                {services.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-white/[0.08] px-4 py-4 text-[11px] leading-relaxed text-zinc-500">
+                    No external services registered yet. Test the live PayWord-gated utility route
+                    at{' '}
+                    <code className="font-mono text-zinc-300">
+                      POST /api/web4/tools/verify-payword-batch
+                    </code>
+                    .
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {services.map((s) => (
+                      <div
+                        key={s.service_id}
+                        className="rounded-xl border border-white/[0.07] bg-[#0a0a0d] p-3"
+                      >
+                        <div className="flex items-center justify-between font-medium text-zinc-100">
+                          <span>{s.name}</span>
+                          <span className="font-mono text-[11px] text-zinc-400">
+                            {s.unit_price_love_base_units} units/call
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-zinc-500">{s.description}</p>
                       </div>
-                      <p className="mt-1 text-[11px] text-slate-400">{s.description}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
 
-              {bounties.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-slate-800 bg-slate-950/60 px-4 py-4 text-center text-[11px] text-slate-400">
-                  No open HTLC / Freivalds bounties posted yet. Compile trustless bounty escrow commands via{' '}
-                  <code className="font-mono text-amber-300">POST /api/web4/bounties/compile</code>.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {bounties.map((b) => (
-                    <div key={b.bounty_id} className="rounded-lg border border-slate-800 bg-slate-950 p-2.5">
-                      <div className="flex items-center justify-between font-semibold text-slate-100">
-                        <span>{b.title}</span>
-                        <span className="font-mono text-[10px] text-amber-300">
-                          {b.reward_amount} {b.reward_asset}
-                        </span>
+              <div>
+                <h3 className="mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+                  Zero-Custody HTLC Bounties ({bounties.length})
+                </h3>
+                {bounties.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-white/[0.08] px-4 py-4 text-[11px] leading-relaxed text-zinc-500">
+                    No open bounties posted yet. Compile trustless escrow commands via{' '}
+                    <code className="font-mono text-zinc-300">POST /api/web4/bounties/compile</code>
+                    .
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {bounties.map((b) => (
+                      <div
+                        key={b.bounty_id}
+                        className="rounded-xl border border-white/[0.07] bg-[#0a0a0d] p-3"
+                      >
+                        <div className="flex items-center justify-between font-medium text-zinc-100">
+                          <span>{b.title}</span>
+                          <span className="font-mono text-[11px] text-zinc-300">
+                            {b.reward_amount} {b.reward_asset}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-zinc-500">{b.description}</p>
                       </div>
-                      <p className="mt-1 text-[11px] text-slate-400">{b.description}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </Panel>
 
           <Panel
-            title="Web4 Developer & Conway Automaton Quick-Connect"
-            subtitle="14 live MCP tools · Official MCP Registry · Zero-dep JS & Python 402 SDKs · Lean 4 formal proof"
-            icon={<Terminal className="h-4 w-4 text-emerald-400" />}
-            accent="emerald"
+            title="Run Your Own Web4 Daemon"
+            subtitle="Zero-dependency Node 18+ PayWord + x402 starter kit"
           >
-            <div className="space-y-2.5 text-[11px] text-slate-300">
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: 'Whitepaper', href: '/whitepaper', icon: FileCode2 },
-                  { label: 'Lean 4 Kernel (.lean)', href: '/formal/NewsatoshiCovenants.lean', icon: ShieldCheck },
-                  { label: 'ERC-8004 Card', href: '/.well-known/erc8004.json', icon: Coins },
-                  { label: 'Live Backing JSON', href: '/api/backing/summary', icon: Vault },
-                ].map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <a
-                      key={item.href}
-                      href={item.href}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 font-mono text-[10.5px] text-emerald-300 hover:border-emerald-500/50"
-                    >
-                      <Icon className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">{item.label}</span>
-                    </a>
-                  );
-                })}
-              </div>
-              <div className="rounded-lg border border-slate-800 bg-[#04080f] p-3">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="font-mono text-[10px] uppercase text-emerald-300">
-                    Run Local Web4 Autonomous Business Daemon (Zero Deps)
-                  </span>
-                  <CopyButton value="node web4-kit/agent-business.mjs --check" label="Copy" />
-                </div>
-                <code className="block font-mono text-[10.5px] text-slate-200">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-xl border border-white/[0.07] bg-[#0a0a0d] px-3.5 py-2.5">
+                <code className="font-mono text-xs text-zinc-200">
                   node web4-kit/agent-business.mjs --check
                 </code>
+                <CopyButton value="node web4-kit/agent-business.mjs --check" />
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                {[
+                  { label: 'Whitepaper', href: '/whitepaper' },
+                  { label: 'Lean 4 Kernel', href: '/formal/NewsatoshiCovenants.lean' },
+                  { label: 'ERC-8004 Card', href: '/.well-known/erc8004.json' },
+                  { label: 'MCP Endpoint', href: '/mcp' },
+                ].map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between rounded-xl border border-white/[0.07] bg-[#0a0a0d] px-3 py-2 text-[11px] font-medium text-zinc-300 transition hover:border-white/[0.18] hover:text-white"
+                  >
+                    <span>{link.label}</span>
+                    <ArrowUpRight className="h-3 w-3 text-zinc-500" />
+                  </a>
+                ))}
               </div>
             </div>
           </Panel>
