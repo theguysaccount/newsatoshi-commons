@@ -2680,6 +2680,61 @@ fn http_api_web4_charters_erc8004_services_bounties_and_paid_402_tool() {
     assert_eq!(paid_body["paid"], true);
     assert_eq!(paid_body["verification"]["valid"], true);
 
+    // 4. Spec-compliant x402 v2 + PayWord dual-rail endpoints & /.well-known/x402.json
+    let x402_idx: Value = serde_json::from_str(
+        &agent
+            .get(&format!("{base}/.well-known/x402.json"))
+            .call()
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(x402_idx["version"], 2);
+    assert_eq!(x402_idx["resources"].as_array().unwrap().len(), 3);
+
+    let r_x402_unpaid = agent
+        .get(&format!("{base}/api/x402/bridge-quote"))
+        .call()
+        .unwrap();
+    assert_eq!(r_x402_unpaid.status().as_u16(), 402);
+    let pr_hdr = r_x402_unpaid
+        .headers()
+        .get("Payment-Required")
+        .and_then(|v| v.to_str().ok())
+        .expect("Payment-Required base64 header");
+    let decoded_pr: Value = serde_json::from_slice(
+        &newsatoshi_commons::x402::base64_decode(pr_hdr).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(decoded_pr["x402Version"], 2);
+    assert_eq!(decoded_pr["accepts"][0]["network"], "eip155:8453");
+
+    let mut r_x402_pw = agent
+        .post(&format!("{base}/api/x402/verify-payword"))
+        .header("Content-Type", "application/json")
+        .header(
+            "X-Newsatoshi-PayWord",
+            &format!("tip={},token={},ticks=1", hex::encode(tip), hex::encode(h2)),
+        )
+        .send(
+            serde_json::json!({
+                "tip_hex": hex::encode(tip),
+                "token_hex": hex::encode(h1),
+                "ticks": 2
+            })
+            .to_string()
+            .as_str(),
+        )
+        .unwrap();
+    assert_eq!(r_x402_pw.status().as_u16(), 200);
+    let x402_pw_body: Value =
+        serde_json::from_str(&r_x402_pw.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(x402_pw_body["ok"], true);
+    assert_eq!(x402_pw_body["verification"]["valid"], true);
+    assert_eq!(x402_pw_body["settlement"]["rail"], "NEWSATOSHI-PAYWORD-SHA256/1.0");
+
     srv.stop();
     let _ = std::fs::remove_dir_all(&tmp_dir);
 }

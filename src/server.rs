@@ -31,6 +31,11 @@ use crate::web4::{
     render_gateway_erc8004, validate_web4_service, CreateBountyRequest, RegisterServiceRequest,
     SpawnCharterRequest,
 };
+use crate::x402::{
+    authorize_dual_402, build_bridge_quote_response, build_x402_v2_challenge,
+    render_well_known_x402, route_spec_bridge_quote, route_spec_compile_htlc,
+    route_spec_verify_payword,
+};
 use crate::{CheckedWorkProof, StreamingChannel};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -338,7 +343,12 @@ fn cors_headers() -> Vec<Header> {
         Header::from_bytes("Access-Control-Allow-Methods", "GET, POST, OPTIONS").unwrap(),
         Header::from_bytes(
             "Access-Control-Allow-Headers",
-            "Content-Type, Authorization, Accept, Mcp-Session-Id, X-Newsatoshi-Payment, X-Newsatoshi-PayWord",
+            "Content-Type, Authorization, Accept, Mcp-Session-Id, Payment-Signature, X-Payment, X-Newsatoshi-Payment, X-Newsatoshi-PayWord",
+        )
+        .unwrap(),
+        Header::from_bytes(
+            "Access-Control-Expose-Headers",
+            "Payment-Required, Payment-Response, X-Payment-Response, WWW-Authenticate",
         )
         .unwrap(),
         Header::from_bytes("X-Content-Type-Options", "nosniff").unwrap(),
@@ -426,6 +436,54 @@ fn respond_json<T: Serialize>(req: Request, status: u16, payload: &T) {
         .with_header(Header::from_bytes("X-API-Version", "2026-11").unwrap())
         .with_header(Header::from_bytes("RateLimit-Policy", "120;w=60").unwrap())
         .with_header(Header::from_bytes("RateLimit-Limit", "120").unwrap());
+    for h in cors_headers() {
+        resp = resp.with_header(h);
+    }
+    let _ = req.respond(resp);
+}
+
+fn header_value_ci(req: &Request, name: &'static str) -> Option<String> {
+    req.headers()
+        .iter()
+        .find(|h| h.field.equiv(name))
+        .map(|h| h.value.as_str().trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
+fn respond_x402_challenge(req: Request, payment_required_b64: &str, body: &Value) {
+    let bytes = serde_json::to_vec(body).unwrap_or_else(|_| b"{}".to_vec());
+    let mut resp = Response::from_data(bytes)
+        .with_status_code(StatusCode(402))
+        .with_header(Header::from_bytes("Content-Type", "application/json; charset=utf-8").unwrap())
+        .with_header(Header::from_bytes("Cache-Control", "no-store").unwrap())
+        .with_header(Header::from_bytes("Payment-Required", payment_required_b64).unwrap())
+        .with_header(
+            Header::from_bytes(
+                "WWW-Authenticate",
+                r#"NEWSATOSHI-402 scheme="payword-sha256", x402="v2", network="eip155:8453", asset="USDC""#,
+            )
+            .unwrap(),
+        );
+    for h in cors_headers() {
+        resp = resp.with_header(h);
+    }
+    let _ = req.respond(resp);
+}
+
+fn respond_x402_paid<T: Serialize>(req: Request, payload: &T, payment_response_b64: Option<&str>) {
+    let bytes = serde_json::to_vec(payload).unwrap_or_else(|_| b"{}".to_vec());
+    let mut resp = Response::from_data(bytes)
+        .with_status_code(StatusCode(200))
+        .with_header(Header::from_bytes("Content-Type", "application/json; charset=utf-8").unwrap())
+        .with_header(Header::from_bytes("Cache-Control", "no-store").unwrap());
+    if let Some(hdr) = payment_response_b64 {
+        if let Ok(h1) = Header::from_bytes("Payment-Response", hdr) {
+            resp = resp.with_header(h1);
+        }
+        if let Ok(h2) = Header::from_bytes("X-Payment-Response", hdr) {
+            resp = resp.with_header(h2);
+        }
+    }
     for h in cors_headers() {
         resp = resp.with_header(h);
     }
@@ -608,6 +666,8 @@ fn handle_request(mut req: Request, state: &AppState) {
             "/.well-known/api-catalog" => Some("application/linkset+json; charset=utf-8"),
             "/.well-known/agent.json"
             | "/.well-known/erc8004.json"
+            | "/.well-known/x402.json"
+            | "/.well-known/x402"
             | "/.well-known/mcp.json"
             | "/.well-known/mcp/server-card.json"
             | "/.well-known/agent-skills/index.json"
@@ -756,6 +816,96 @@ fn handle_request(mut req: Request, state: &AppState) {
                 hex::encode(engine.rule.rule_hash())
             };
             respond_json(req, 200, &render_gateway_erc8004(&base_url, &rule_hash));
+        }
+        (Method::Get, "/.well-known/x402.json") | (Method::Get, "/.well-known/x402") => {
+            let base_url = infer_base_url(&req);
+            respond_json(req, 200, &render_well_known_x402(&base_url));
+        }
+        (Method::Get, "/api/x402/bridge-quote") => {
+            let base_url = infer_base_url(&req);
+            let spec = route_spec_bridge_quote();
+            let (challenge_obj, hdr_b64, challenge_body) = build_x402_v2_challenge(&base_url, &spec);
+            let payword_hdr = header_value_ci(&req, "X-Newsatoshi-PayWord");
+            let x402_hdr = header_value_ci(&req, "Payment-Signature")
+                .or_else(|| header_value_ci(&req, "X-Payment"));
+            match authorize_dual_402(payword_hdr.as_deref(), x402_hdr.as_deref(), &challenge_obj) {
+                Ok(Some(receipt)) => {
+                    let backing = state.get_backing_summary(false);
+                    let payload = build_bridge_quote_response(&backing, Some(&receipt));
+                    respond_x402_paid(req, &payload, receipt.payment_response_b64.as_deref());
+                }
+                Ok(None) => respond_x402_challenge(req, &hdr_b64, &challenge_body),
+                Err(e) => {
+                    let mut err_body = challenge_body;
+                    err_body["error"] = json!(e);
+                    respond_x402_challenge(req, &hdr_b64, &err_body);
+                }
+            }
+        }
+        (Method::Post, "/api/x402/compile-htlc") => {
+            let base_url = infer_base_url(&req);
+            let spec = route_spec_compile_htlc();
+            let (challenge_obj, hdr_b64, challenge_body) = build_x402_v2_challenge(&base_url, &spec);
+            let payword_hdr = header_value_ci(&req, "X-Newsatoshi-PayWord");
+            let x402_hdr = header_value_ci(&req, "Payment-Signature")
+                .or_else(|| header_value_ci(&req, "X-Payment"));
+            match authorize_dual_402(payword_hdr.as_deref(), x402_hdr.as_deref(), &challenge_obj) {
+                Ok(Some(receipt)) => {
+                    let body = read_body_string(&mut req).unwrap_or_default();
+                    let parsed: CompileSwapRequest = match serde_json::from_str(&body) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            respond_json(req, 400, &json!({ "ok": false, "error": format!("invalid JSON: {e}"), "settlement": receipt }));
+                            return;
+                        }
+                    };
+                    match compile_atomic_swap(&parsed) {
+                        Ok(contract) => respond_x402_paid(
+                            req,
+                            &json!({ "ok": true, "contract": contract, "settlement": receipt }),
+                            receipt.payment_response_b64.as_deref(),
+                        ),
+                        Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e, "settlement": receipt })),
+                    }
+                }
+                Ok(None) => respond_x402_challenge(req, &hdr_b64, &challenge_body),
+                Err(e) => {
+                    let mut err_body = challenge_body;
+                    err_body["error"] = json!(e);
+                    respond_x402_challenge(req, &hdr_b64, &err_body);
+                }
+            }
+        }
+        (Method::Post, "/api/x402/verify-payword") => {
+            let base_url = infer_base_url(&req);
+            let spec = route_spec_verify_payword();
+            let (challenge_obj, hdr_b64, challenge_body) = build_x402_v2_challenge(&base_url, &spec);
+            let payword_hdr = header_value_ci(&req, "X-Newsatoshi-PayWord");
+            let x402_hdr = header_value_ci(&req, "Payment-Signature")
+                .or_else(|| header_value_ci(&req, "X-Payment"));
+            match authorize_dual_402(payword_hdr.as_deref(), x402_hdr.as_deref(), &challenge_obj) {
+                Ok(Some(receipt)) => {
+                    let body = read_body_string(&mut req).unwrap_or_default();
+                    let parsed: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+                    let tip = parsed.get("tip_hex").and_then(|v| v.as_str()).unwrap_or("");
+                    let tok = parsed.get("token_hex").and_then(|v| v.as_str()).unwrap_or("");
+                    let ticks = parsed.get("ticks").and_then(|v| v.as_u64()).unwrap_or(1);
+                    match verify_payword_token(tip, tok, ticks, 10_000) {
+                        Ok(res) => respond_x402_paid(
+                            req,
+                            &json!({ "ok": true, "verification": res, "settlement": receipt }),
+                            receipt.payment_response_b64.as_deref(),
+                        ),
+                        Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e, "settlement": receipt })),
+                    }
+                }
+                Ok(None) => respond_x402_challenge(req, &hdr_b64, &challenge_body),
+                Err(e) => {
+                    let mut err_body = challenge_body;
+                    err_body["error"] = json!(e);
+                    respond_x402_challenge(req, &hdr_b64, &err_body);
+                }
+            }
         }
         (Method::Get, "/.well-known/mcp.json") => {
             let base_url = infer_base_url(&req);
