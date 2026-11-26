@@ -1122,3 +1122,462 @@ export function createDual402Gate({
     },
   };
 }
+
+// =============================================================================
+// Verifiable Economic Clearinghouse & Sovereign L2 Substrate SDK (v0.16.0)
+// RFC-0023 (Sovereign L2 Rollup Vaults) · RFC-0024 (Universal Trust Bonds) ·
+// RFC-0025 (Scoped Agent Session Policies) · RFC-0026 (Collective Signaling) ·
+// Tier-1 zkTLS Attestation Verification & Tier-2 Optimistic Compute Spot-Checks
+// =============================================================================
+
+/**
+ * Verify a canonical Newsatoshi L1 `MerkleMap` inclusion proof (`nsMKL`/`nsMKB`).
+ * Works identically for RFC-0022 channels, RFC-0024 Trust Bonds, RFC-0023 Rollup
+ * Vaults, and batch `withdraw_root` exits.
+ */
+export async function verifyMerkleMapProof(merkleProof, expectedRootHex = null) {
+  if (!merkleProof || typeof merkleProof !== "object") return false;
+  const root = expectedRootHex || merkleProof.root;
+  if (!root) return false;
+  if (expectedRootHex && merkleProof.root && expectedRootHex.toLowerCase() !== merkleProof.root.toLowerCase()) {
+    return false;
+  }
+  return verifyChannelMerkleProof({ ...merkleProof, root });
+}
+
+function resolveSeedUrl(network, seedBaseUrl) {
+  if (seedBaseUrl) return seedBaseUrl.replace(/\/+$/, "");
+  return (network === "testnet" ? DEFAULT_TESTNET_SEED_URL : DEFAULT_MAINNET_SEED_URL).replace(/\/+$/, "");
+}
+
+/**
+ * Query and cryptographically verify a live RFC-0024 Universal Trust Bond from an L1 node
+ * (`GET /api/bond?id=...`). Checks canonical Merkle inclusion proof when confirmed.
+ */
+export async function fetchL1TrustBond({
+  bondIdHex,
+  network = "mainnet",
+  seedBaseUrl = null,
+  expectedBondsRootHex = null,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const id = String(bondIdHex || "").trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(id)) {
+    throw new Error("bondIdHex must be 64 hex characters");
+  }
+  const base = resolveSeedUrl(network, seedBaseUrl);
+  const resp = await fetchImpl(`${base}/api/bond?id=${id}`);
+  if (!resp.ok) {
+    return { found: false, reason: `HTTP ${resp.status} from ${base}/api/bond` };
+  }
+  const data = await resp.json();
+  if (!data || !data.found) {
+    return { found: false, height: data?.height ?? null, reason: "trust bond not found on L1" };
+  }
+  let merkleVerified = false;
+  if (data.merkle_proof) {
+    merkleVerified = await verifyMerkleMapProof(data.merkle_proof, expectedBondsRootHex);
+  }
+  return {
+    found: true,
+    confirmed: Boolean(data.confirmed),
+    merkleVerified,
+    height: Number(data.height || 0),
+    id: data.id,
+    ownerVk: data.owner_vk,
+    ownerAddress: data.owner_address,
+    stake: Number(data.stake || 0),
+    slashBurnBps: Number(data.slash_burn_bps || 0),
+    unbondDelay: Number(data.unbond_delay || 0),
+    quorumM: Number(data.quorum_m || 0),
+    arbiterVks: Array.isArray(data.arbiter_vks) ? data.arbiter_vks : [],
+    settledCount: Number(data.settled_count || 0),
+    settledVolume: BigInt(data.settled_volume || "0"),
+    slashCount: Number(data.slash_count || 0),
+    slashedTotal: BigInt(data.slashed_total || "0"),
+    unbondRequestedAt: data.unbond_requested_at ?? null,
+    unbondAmount: Number(data.unbond_amount || 0),
+    actionNonce: Number(data.action_nonce || 0),
+    merkleProof: data.merkle_proof || null,
+  };
+}
+
+/**
+ * Query and cryptographically verify a live RFC-0023 Sovereign L2 Rollup Vault (`GET /api/rollup?id=...`).
+ */
+export async function fetchL1RollupVault({
+  rollupIdHex,
+  network = "mainnet",
+  seedBaseUrl = null,
+  expectedRollupsRootHex = null,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const id = String(rollupIdHex || "").trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(id)) {
+    throw new Error("rollupIdHex must be 64 hex characters");
+  }
+  const base = resolveSeedUrl(network, seedBaseUrl);
+  const resp = await fetchImpl(`${base}/api/rollup?id=${id}`);
+  if (!resp.ok) {
+    return { found: false, reason: `HTTP ${resp.status} from ${base}/api/rollup` };
+  }
+  const data = await resp.json();
+  if (!data || !data.found) {
+    return { found: false, height: data?.height ?? null, reason: "rollup vault not found on L1" };
+  }
+  let merkleVerified = false;
+  if (data.merkle_proof) {
+    merkleVerified = await verifyMerkleMapProof(data.merkle_proof, expectedRollupsRootHex);
+  }
+  return {
+    found: true,
+    confirmed: Boolean(data.confirmed),
+    merkleVerified,
+    height: Number(data.height || 0),
+    id: data.id,
+    vkHash: data.vk_hash,
+    genesisRoot: data.genesis_root,
+    stateRoot: data.state_root,
+    depositAcc: data.deposit_acc,
+    depositCount: Number(data.deposit_count || 0),
+    batchSeq: Number(data.batch_seq || 0),
+    totalL2Txs: Number(data.total_l2_txs || 0),
+    tvl: Number(data.tvl || 0),
+    pendingWithdrawals: Number(data.pending_withdrawals || 0),
+    withdrawRoots: Array.isArray(data.withdraw_roots) ? data.withdraw_roots : [],
+    sequencerVk: data.sequencer_vk || null,
+    merkleProof: data.merkle_proof || null,
+  };
+}
+
+/**
+ * Query RFC-0026 live BIP-9 collective protocol signaling & ossification state (`GET /api/signaling`).
+ */
+export async function fetchL1Signaling({
+  network = "mainnet",
+  seedBaseUrl = null,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const base = resolveSeedUrl(network, seedBaseUrl);
+  const resp = await fetchImpl(`${base}/api/signaling`);
+  if (!resp.ok) {
+    throw new Error(`HTTP ${resp.status} from ${base}/api/signaling`);
+  }
+  return resp.json();
+}
+
+/**
+ * Compute exact L1 RFC-0024 Trust Bond commitment message:
+ *   SHA256("nsBONDCOMMIT" || bond_id_32 || context_nonce_u64_le || payload_hash_32)
+ * Signing two distinct `payloadHashHex` values for the same `(bondIdHex, contextNonce)`
+ * allows anyone to permissionlessly slash the bond via `Action::BondSlashEquivocation`.
+ */
+export async function bondCommitMessageHex(bondIdHex, contextNonce, payloadHashHex) {
+  const bond = hexToBytes(bondIdHex);
+  const payload = hexToBytes(payloadHashHex);
+  if (bond.length !== 32 || payload.length !== 32) {
+    throw new Error("bondIdHex and payloadHashHex must be 32 bytes (64 hex chars)");
+  }
+  const msg = new Uint8Array(12 + 32 + 8 + 32);
+  msg.set(new TextEncoder().encode("nsBONDCOMMIT"), 0);
+  msg.set(bond, 12);
+  new DataView(msg.buffer).setBigUint64(44, BigInt(contextNonce), true);
+  msg.set(payload, 52);
+  return bytesToHex(await sha256(msg));
+}
+
+function writeU16LE(out, v) {
+  out.push(v & 0xff, (v >> 8) & 0xff);
+}
+function writeU64LE(out, v) {
+  let x = BigInt(v);
+  for (let i = 0; i < 8; i++) {
+    out.push(Number(x & 0xffn));
+    x >>= 8n;
+  }
+}
+
+/**
+ * Encode an L1 RFC-0023 `Tx::Act(Action::RollupWithdraw)` (tx tag `2`, action tag `19`)
+ * for trustless L2 -> L1 shielded exit via `POST /api/tx`.
+ */
+export function encodeRollupWithdrawTx({
+  rollupIdHex,
+  batchSeq,
+  withdrawalIdHex,
+  recipientApkHex,
+  amount,
+  minerFee,
+  merkleProof,
+}) {
+  const rollup = hexToBytes(rollupIdHex);
+  const wid = hexToBytes(withdrawalIdHex);
+  const apk = hexToBytes(recipientApkHex);
+  const key = hexToBytes(merkleProof.key);
+  const vhash = hexToBytes(merkleProof.value_hash || merkleProof.valueHash);
+  const siblings = (merkleProof.siblings || []).map(hexToBytes);
+  if (rollup.length !== 32 || wid.length !== 32 || apk.length !== 32 || key.length !== 32 || vhash.length !== 32) {
+    throw new Error("rollupId, withdrawalId, recipientApk, proof.key, proof.value_hash must be 32 bytes");
+  }
+  const out = [2, 19]; // Tx::Act, Action::RollupWithdraw
+  out.push(...rollup);
+  writeU64LE(out, batchSeq);
+  out.push(...wid);
+  out.push(...apk);
+  writeU64LE(out, amount);
+  writeU64LE(out, minerFee);
+  out.push(...key);
+  out.push(...vhash);
+  writeU16LE(out, siblings.length);
+  for (const s of siblings) {
+    if (s.length !== 32) throw new Error("each Merkle sibling must be 32 bytes");
+    out.push(...s);
+  }
+  return new Uint8Array(out);
+}
+
+/**
+ * RFC-0025: Programmable, Policy-Constrained Scoped Agent Session Key.
+ * Keeps root spending keys isolated while bounding autonomous AI agent spend by:
+ * - maxPerCall / maxPerHour / maxTotal (base units)
+ * - minCounterpartyBond (verified live against L1 RFC-0024 `/api/bond` + maxSlashCount)
+ * - allowedEndpoints allowlist, expiryUnix, and automatic profitSweepAddress.
+ */
+export function createScopedAgentSession({
+  sessionId,
+  maxPerCall,
+  maxPerHour,
+  maxTotal,
+  minCounterpartyBond = 0,
+  maxCounterpartySlashes = 0,
+  allowedEndpoints = null,
+  profitSweepAddress = "",
+  expiryUnix = Math.floor(Date.now() / 1000) + 86400,
+  nowSec = () => Math.floor(Date.now() / 1000),
+} = {}) {
+  if (!sessionId) throw new Error("sessionId is required");
+  let totalSpent = 0;
+  const hourlyLog = []; // { ts, amount }
+
+  function pruneHour(now) {
+    const cutoff = now - 3600;
+    while (hourlyLog.length > 0 && hourlyLog[0].ts < cutoff) {
+      hourlyLog.shift();
+    }
+  }
+
+  return {
+    policy: {
+      sessionId,
+      maxPerCall,
+      maxPerHour,
+      maxTotal,
+      minCounterpartyBond,
+      maxCounterpartySlashes,
+      allowedEndpoints,
+      profitSweepAddress,
+      expiryUnix,
+    },
+    stats() {
+      const now = nowSec();
+      pruneHour(now);
+      const spentLastHour = hourlyLog.reduce((s, e) => s + e.amount, 0);
+      return { totalSpent, spentLastHour, remainingTotal: Math.max(0, maxTotal - totalSpent) };
+    },
+    async authorizeSpend({ amount, endpoint = "", counterpartyBond = null } = {}) {
+      const now = nowSec();
+      if (now > expiryUnix) {
+        return { allowed: false, reason: "agent session policy expired" };
+      }
+      if (!Number.isInteger(amount) || amount <= 0) {
+        return { allowed: false, reason: "spend amount must be a positive integer" };
+      }
+      if (amount > maxPerCall) {
+        return { allowed: false, reason: `amount ${amount} exceeds maxPerCall ${maxPerCall}` };
+      }
+      if (allowedEndpoints && Array.isArray(allowedEndpoints) && allowedEndpoints.length > 0) {
+        const ok = allowedEndpoints.some((prefix) => endpoint.startsWith(prefix));
+        if (!ok) {
+          return { allowed: false, reason: `endpoint '${endpoint}' not in session allowlist` };
+        }
+      }
+      if (minCounterpartyBond > 0) {
+        if (!counterpartyBond || !counterpartyBond.found) {
+          return { allowed: false, reason: "counterparty lacks a verified L1 Trust Bond" };
+        }
+        if (counterpartyBond.stake < minCounterpartyBond) {
+          return {
+            allowed: false,
+            reason: `counterparty bond stake ${counterpartyBond.stake} below required ${minCounterpartyBond}`,
+          };
+        }
+        if ((counterpartyBond.slashCount || 0) > maxCounterpartySlashes) {
+          return {
+            allowed: false,
+            reason: `counterparty slashCount ${counterpartyBond.slashCount} exceeds allowed ${maxCounterpartySlashes}`,
+          };
+        }
+      }
+      pruneHour(now);
+      const spentLastHour = hourlyLog.reduce((s, e) => s + e.amount, 0);
+      if (spentLastHour + amount > maxPerHour) {
+        return { allowed: false, reason: `hourly spend limit exceeded (${spentLastHour + amount} > ${maxPerHour})` };
+      }
+      if (totalSpent + amount > maxTotal) {
+        return { allowed: false, reason: `total session budget exceeded (${totalSpent + amount} > ${maxTotal})` };
+      }
+      hourlyLog.push({ ts: now, amount });
+      totalSpent += amount;
+      const digestInput = new TextEncoder().encode(
+        `nsSESS|${sessionId}|${now}|${amount}|${totalSpent}|${endpoint}`
+      );
+      const authDigestHex = bytesToHex(await sha256(digestInput));
+      return {
+        allowed: true,
+        authDigestHex,
+        totalSpent,
+        spentLastHour: spentLastHour + amount,
+        profitSweepAddress,
+      };
+    },
+  };
+}
+
+/**
+ * Tier-1 Truth Engine: Canonical zkTLS Web2 Attestation Verifier.
+ * Verifies domain binding, HTTP status, timestamp freshness, canonical payload digest,
+ * required field predicates (e.g. bank wire / Venmo / Wise / GitHub / API settlement),
+ * and produces a deterministic `receiptHashHex` ready for L1 `BondAttest` or L2 settlement.
+ */
+export async function verifyZkTlsAttestation(
+  attestation,
+  {
+    expectedDomain,
+    expectedStatus = 200,
+    maxAgeSec = 300,
+    requiredFields = {},
+    nowSec = () => Math.floor(Date.now() / 1000),
+  } = {}
+) {
+  if (!attestation || typeof attestation !== "object") {
+    return { valid: false, reason: "missing attestation object" };
+  }
+  const domain = String(attestation.domain || "").toLowerCase();
+  if (expectedDomain && domain !== String(expectedDomain).toLowerCase()) {
+    return { valid: false, reason: `domain mismatch: got ${domain}, expected ${expectedDomain}` };
+  }
+  if (Number(attestation.httpStatus) !== Number(expectedStatus)) {
+    return { valid: false, reason: `unexpected HTTP status ${attestation.httpStatus}` };
+  }
+  const ts = Number(attestation.timestampUnix || 0);
+  const now = nowSec();
+  if (ts <= 0 || Math.abs(now - ts) > maxAgeSec) {
+    return { valid: false, reason: `attestation timestamp ${ts} outside freshness window (${maxAgeSec}s)` };
+  }
+  if (!/^[0-9a-f]{64}$/i.test(String(attestation.proofDigestHex || ""))) {
+    return { valid: false, reason: "missing 32-byte zkTLS proofDigestHex" };
+  }
+  const rawBody = typeof attestation.responseBody === "string"
+    ? attestation.responseBody
+    : JSON.stringify(attestation.responseBody ?? {});
+  const bodyHashHex = bytesToHex(await sha256(new TextEncoder().encode(rawBody)));
+  if (
+    attestation.bodySha256Hex &&
+    attestation.bodySha256Hex.toLowerCase() !== bodyHashHex
+  ) {
+    return { valid: false, reason: "zkTLS response body SHA-256 digest mismatch" };
+  }
+  let parsed = null;
+  try {
+    parsed = typeof attestation.responseBody === "string"
+      ? JSON.parse(attestation.responseBody)
+      : attestation.responseBody;
+  } catch {
+    if (Object.keys(requiredFields).length > 0) {
+      return { valid: false, reason: "responseBody is not valid JSON for predicate evaluation" };
+    }
+  }
+  for (const [k, expectedVal] of Object.entries(requiredFields)) {
+    const actualVal = parsed?.[k];
+    if (typeof expectedVal === "function") {
+      if (!expectedVal(actualVal)) {
+        return { valid: false, reason: `zkTLS predicate failed for field '${k}'` };
+      }
+    } else if (actualVal !== expectedVal) {
+      return { valid: false, reason: `zkTLS field '${k}' mismatch: got ${actualVal}, expected ${expectedVal}` };
+    }
+  }
+  const canonical = new TextEncoder().encode(
+    `nsZKTLS1|${domain}|${attestation.httpStatus}|${ts}|${bodyHashHex}|${attestation.proofDigestHex.toLowerCase()}`
+  );
+  const receiptHashHex = bytesToHex(await sha256(canonical));
+  return { valid: true, domain, timestampUnix: ts, bodyHashHex, receiptHashHex };
+}
+
+/**
+ * Tier-2 Truth Engine: Optimistic Compute/AI Equivocation & Spot-Check Detector.
+ * Detects conflicting commitments by the same bonded worker on the same `contextNonce`
+ * and returns the exact L1 `BondSlashEquivocation` commitment digests.
+ */
+export async function detectOptimisticEquivocation({
+  bondIdHex,
+  contextNonce,
+  payloadHashAHex,
+  payloadHashBHex,
+}) {
+  const a = String(payloadHashAHex || "").toLowerCase();
+  const b = String(payloadHashBHex || "").toLowerCase();
+  if (a === b) {
+    return { equivocated: false, reason: "payload hashes are identical" };
+  }
+  const [msgAHex, msgBHex] = await Promise.all([
+    bondCommitMessageHex(bondIdHex, contextNonce, a),
+    bondCommitMessageHex(bondIdHex, contextNonce, b),
+  ]);
+  return {
+    equivocated: true,
+    bondIdHex: bondIdHex.toLowerCase(),
+    contextNonce: Number(contextNonce),
+    msgAHex,
+    msgBHex,
+  };
+}
+
+/**
+ * 5-Line Clearinghouse Client for Autonomous AI Agents:
+ * Enforces Scoped Session Policy + live L1 Trust Bond verification + optional Tier-1 zkTLS
+ * verification before releasing an O(1) PayWord HTTP 402 payment.
+ */
+export function createClearinghouseClient({
+  session,
+  paywordWallet,
+  network = "mainnet",
+  seedBaseUrl = null,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  return {
+    async callBondedApi(url, { bondIdHex = null, ticks = 1, unitPriceBaseUnits = 1000, fetchOptions = {} } = {}) {
+      let bond = null;
+      if (bondIdHex) {
+        bond = await fetchL1TrustBond({ bondIdHex, network, seedBaseUrl, fetchImpl });
+      }
+      const auth = await session.authorizeSpend({
+        amount: ticks * unitPriceBaseUnits,
+        endpoint: url,
+        counterpartyBond: bond,
+      });
+      if (!auth.allowed) {
+        throw new Error(`Clearinghouse session policy denied spend: ${auth.reason}`);
+      }
+      const payment =
+        typeof paywordWallet.nextPaymentAsync === "function"
+          ? await paywordWallet.nextPaymentAsync(ticks)
+          : paywordWallet.nextPayment(ticks);
+      const headers = new Headers(fetchOptions.headers || {});
+      headers.set("X-Newsatoshi-PayWord", payment.headerValue);
+      headers.set("X-Newsatoshi-Session-Auth", auth.authDigestHex);
+      const response = await fetchImpl(url, { ...fetchOptions, headers });
+      return { response, payment, auth, counterpartyBond: bond };
+    },
+  };
+}
