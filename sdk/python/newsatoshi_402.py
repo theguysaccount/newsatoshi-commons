@@ -1169,3 +1169,33 @@ def mission_claim_task_message_hex(
         + bytes.fromhex(contributor_apk_hex)
         + int(miner_fee).to_bytes(8, "little")
     ).hexdigest()
+
+
+# =============================================================================
+# v0.19.0: Cryptographic zkTLS Verifier, Cutover Gate & Bonded P2P Desk Helpers
+# =============================================================================
+
+
+def verify_zktls_proof_remote(
+    payload: Dict[str, Any], commons_base_url: str = DEFAULT_COMMONS_URL, timeout: int = 12
+) -> Dict[str, Any]:
+    """POST a `reclaim_v1`, `tlsnotary_v1`, or `newsatoshi_pq_notary_v1` proof to `/api/zktls/verify`."""
+    url = f"{commons_base_url.rstrip('/')}/api/zktls/verify"
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read(1_048_576).decode("utf-8"))
+
+
+def fetch_v2_cutover_readiness(
+    commons_base_url: str = DEFAULT_COMMONS_URL, timeout: int = 12
+) -> Dict[str, Any]:
+    """Fetch honest live Mainnet v2 cutover readiness status (`GET /api/v2/cutover-readiness`)."""
+    url = f"{commons_base_url.rstrip('/')}/api/v2/cutover-readiness"
+    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read(1_048_576).decode("utf-8"))

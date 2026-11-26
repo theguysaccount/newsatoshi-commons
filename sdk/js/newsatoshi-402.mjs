@@ -1718,3 +1718,44 @@ export async function missionClaimTaskMessageHex(
   dv.setBigUint64(143, BigInt(minerFee), true);
   return bytesToHex(await sha256(buf));
 }
+
+// =============================================================================
+// v0.19.0: Cryptographic zkTLS Verifier, Cutover Gate & Bonded P2P Desk Helpers
+// =============================================================================
+
+/** Verify a `reclaim_v1`, `tlsnotary_v1`, or `newsatoshi_pq_notary_v1` zkTLS proof via Commons. */
+export async function verifyZkTlsProofRemote(
+  payload,
+  { commonsBaseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}
+) {
+  const resp = await fetchImpl(`${commonsBaseUrl.replace(/\/+$/, "")}/api/zktls/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return resp.json();
+}
+
+/** Query the live honest Mainnet v2 cutover readiness gate (`GET /api/v2/cutover-readiness`). */
+export async function fetchV2CutoverReadiness({
+  commonsBaseUrl = DEFAULT_COMMONS_URL,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const resp = await fetchImpl(`${commonsBaseUrl.replace(/\/+$/, "")}/api/v2/cutover-readiness`, {
+    headers: { Accept: "application/json" },
+  });
+  return resp.json();
+}
+
+/** Compile a zero-custody RFC-0024 Trust-Bonded zkTLS P2P offer (`POST /api/p2p/compile-offer`). */
+export async function compileBondedP2pOfferRemote(
+  offerReq,
+  { commonsBaseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}
+) {
+  const resp = await fetchImpl(`${commonsBaseUrl.replace(/\/+$/, "")}/api/p2p/compile-offer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(offerReq),
+  });
+  return resp.json();
+}
