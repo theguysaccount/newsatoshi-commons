@@ -490,7 +490,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                      ## Core Endpoints\n\
                      - `POST {base_url}/mcp` — Streamable HTTP MCP JSON-RPC 2.0 server (**19 live tools**, including 5 zero-API-key EVM/BTC/BOLT-11/Uniswap V3 tools).\n\
                      - `npx -y github:theguysaccount/newsatoshi-commons` — Zero-dependency stdio MCP bridge & CLI for Claude Desktop, Cursor, Codex, Cline & shell agents.\n\
-                     - `GET {base_url}/.well-known/x402` — 4 live `x402 v2` (`$0.001` Base/Arb/Polygon USDC) + zero-gas `<1ms` SHA-256 PayWord endpoints (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).\n\
+                     - `GET {base_url}/.well-known/x402` — 4 live Native `LOVE` (zero-gas `<1ms` SHA-256 PayWord / `PriorLock`) + `x402 v2` outer bridge on-ramp (`$0.001` Base/Arb/Polygon USDC) endpoints (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).\n\
                      - `GET {base_url}/api/health` — Node version, verify-only posture, and uptime.\n\
                      - `GET {base_url}/api/seed` — Live Newsatoshi Mainnet and Testnet block height, difficulty, issued LOVE, and peer count.\n\
                      - `GET {base_url}/api/pool/status` — Live `0%`-fee Bitaxe / SHA-256 AuxPoW solo pool (`stratum+tcp://pool.newsatoshi.org:3333`).\n\
@@ -801,9 +801,9 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 - Commons Treasury Balance: `{bal} LOVE` (`nonce={nonce}`, `parcels={parcels}`, `kwh={kwh}`, `starks={starks}`)
 
 ## Agent Interfaces (Zero Auth Required for All Reads, Compilers & Verifiers)
-- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **30 live tools** (including 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, RFC-0023/0024/0025/0026/0027 clearinghouse & Mission Launchpad tools, real cryptographic zkTLS verification, Mainnet v2 cutover readiness gate, and Bonded zkTLS P2P Desk tools).
+- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **30 live tools** (including 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.0.0-core` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
 - **Zero-Install Stdio MCP Bridge & CLI (Node 18+, Zero Dependencies):** `npx -y github:theguysaccount/newsatoshi-commons` (`inspect`, `btc-fees`, `decode-bolt11`, `quote-base`, `verify-tx`, `payword-demo`, or stdio MCP `serve`).
-- [x402 v2 & Zero-Gas PayWord Discovery]({base_url}/.well-known/x402): 4 live monetized endpoints accepting Base/Arbitrum/Polygon USDC (`x402 v2`, `$0.001`) OR unfreezeable `<1ms` zero-gas SHA-256 PayWords (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).
+- [Native LOVE PayWord & x402 v2 Discovery]({base_url}/.well-known/x402): 4 live monetized endpoints settling primarily in **native `LOVE`** (`<1ms` zero-gas SHA-256 PayWords / `PriorLock`), with Base/Arbitrum/Polygon USDC (`x402 v2`, `$0.001`) supported as outer bridge on-ramps (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).
 - [MCP Server Card]({base_url}/.well-known/mcp/server-card.json) & [MCP Registry Manifest]({base_url}/server.json): Standard MCP discovery cards (`org.newsatoshi.commons/newsatoshi-commons`).
 - [A2A Agent Card]({base_url}/.well-known/agent-card.json) (and legacy `/.well-known/agent.json`): Machine-readable Agent-to-Agent capability manifest.
 - [RFC 9727 API Catalog]({base_url}/.well-known/api-catalog) & [OpenAPI 3.1 Schema]({base_url}/openapi.json): Complete REST API schema for multi-chain swaps, dual-chain lock verification, HTTP 402 PayWord verification, STARK verification, and offline signed telemetry/deeds.
@@ -826,7 +826,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 ## Source & Releases
 - Repository: https://github.com/theguysaccount/newsatoshi-commons
 - Installable Agent Skill: `skills/newsatoshi-agent-payments/SKILL.md`
-- RFC-0021 Native L1 `OP_VERIFY_COVENANT_STARK` (`0xb4`): https://github.com/theguysaccount/newsatoshi-rfc0021
+- Minimalist Priorism-FEP Pure SHA-2 L1 (`v1.0.0-core`: `PriorLock`, Homeostatic 50% Fee Burn, `BatchSpend` `K=2..16`, FlyClient MMR): https://github.com/theguysaccount/newsatoshi-rfc0021
 ",
         proto = state.protocol_version,
         backing_vault = CANONICAL_BACKING_VAULT,
@@ -885,17 +885,17 @@ Available MCP tools (30 live tools — zero API keys required):
 - `newsatoshi_list_charters` — List registered Web4 charters and parent-child covenant lineage
 - `newsatoshi_discover_services` — Discover live HTTP 402 PayWord & `x402 v2` monetized endpoints
 - `newsatoshi_list_bounties` — List zero-custody HTLC & Freivalds matrix compute bounties
-- `newsatoshi_inspect_trust_bond` — Inspect an RFC-0024 L1 Universal Trust Bond (active LOVE stake, settled volume, slash history, Merkle proof)
-- `newsatoshi_inspect_rollup_vault` — Inspect an RFC-0023 Sovereign L2 Rollup Vault (vk_hash, state_root, TVL, withdraw_roots, Merkle proof)
-- `newsatoshi_get_protocol_signaling` — Query RFC-0026 live BIP-9 AuxPoW-safe signaling & ossification telemetry
-- `newsatoshi_create_scoped_session_policy` — Compile a deterministic RFC-0025 scoped AI agent spending session policy
-- `newsatoshi_launch_agent_mission` — Compile an RFC-0027 Native Mission Launchpad & Decentralized AI Agent Swarm (`pequalnp.money`-style zero-rugpull bonding-curve bounty pool, 0% founder take, automatic 80/20 split, MCP agent onboarding)
-- `newsatoshi_quote_launchpad_curve` — Compute exact integer RFC-0027 bonding-curve buy/redeem quotes matching L1 & Lean 4 Theorem 9
-- `newsatoshi_inspect_mission_launchpad` — Query an RFC-0027 L1 Mission Launchpad (`/api/mission?id=...`) with Merkle proof
-- `newsatoshi_format_swarm_task_claim` — Compute deterministic RFC-0027 `nsMISSTASK` & `nsMISSCLAIM` signing digests
-- `newsatoshi_verify_zktls_proof` — Cryptographically verify real `reclaim_v1` (EIP-191 secp256k1 ecrecover), `tlsnotary_v1` (Ed25519/secp256k1 + Merkle selective redaction), or `newsatoshi_pq_notary_v1` (FIPS 205 SLH-DSA) zkTLS proofs into L1 `RFC-0024` `BondAttest` receipts
-- `newsatoshi_check_v2_cutover_readiness` — Honest live Mainnet v2 cutover gate checking external audits (0/2), real-difficulty independent Bitcoin AuxPoW pools (0/3), and formal proof status
-- `newsatoshi_compile_bonded_p2p_offer` — Compile a zero-custody RFC-0024 Trust-Bonded zkTLS P2P Fiat/USDC <-> LOVE market-maker quote (100%+ bond coverage required)
+- `newsatoshi_inspect_trust_bond` — Legacy RFC-0024 query helper (superseded in L1 `v1.0.0-core` by unified `PriorLock` at `/api/prior?id=...`)
+- `newsatoshi_inspect_rollup_vault` — Legacy RFC-0023 query helper (stripped from L1 consensus in `v1.0.0-core` to keep L1 minimal and eliminate unconstrained vault surfaces)
+- `newsatoshi_get_protocol_signaling` — Query live BIP-9 AuxPoW-safe signaling & ossification telemetry (`/api/signaling`)
+- `newsatoshi_create_scoped_session_policy` — Compile a deterministic client-side scoped AI agent spending session policy
+- `newsatoshi_launch_agent_mission` — Compile an off-chain/L2 Mission Launchpad & Decentralized AI Agent Swarm charter (stripped from L1 consensus in `v1.0.0-core`; coordinates over native `LOVE` HTLCs / `PriorLock`s)
+- `newsatoshi_quote_launchpad_curve` — Compute exact integer bonding-curve buy/redeem quotes for off-chain/L2 mission launchpads
+- `newsatoshi_inspect_mission_launchpad` — Legacy `/api/mission` query helper (L1 `v1.0.0-core` exposes unified `/api/prior?id=...` instead)
+- `newsatoshi_format_swarm_task_claim` — Compute deterministic `nsMISSTASK` & `nsMISSCLAIM` signing digests for off-chain/L2 agent swarm coordinators
+- `newsatoshi_verify_zktls_proof` — Cryptographically verify real `reclaim_v1` (EIP-191 secp256k1 ecrecover), `tlsnotary_v1` (Ed25519/secp256k1 + Merkle selective redaction), or `newsatoshi_pq_notary_v1` (FIPS 205 SLH-DSA) zkTLS proofs for off-chain/P2P verification
+- `newsatoshi_check_v2_cutover_readiness` — Honest live `v1.0.0-core` Mainnet v2 cutover gate checking external audits (0/2), real-difficulty independent Bitcoin AuxPoW pools (0/3), and honest formal/STARK bounds
+- `newsatoshi_compile_bonded_p2p_offer` — Compile a zero-custody `PriorLock`-backed zkTLS P2P Fiat/USDC <-> LOVE market-maker quote (100%+ stake coverage required)
 
 Stdio MCP Bridge (for stdio-only hosts such as Claude Desktop, Cursor, Cline, or shell scripts):
 ```json
@@ -2321,7 +2321,7 @@ pub fn handle_mcp_jsonrpc(
                                 "endpoint": url,
                                 "rfc": "RFC-0024",
                                 "live_node_supports_rfc0024": false,
-                                "note": format!("Target node did not return /api/bond ({e}); RFC-0024 Universal Trust Bonds are height-gated in v0.4.0-substrate (active on regtest/dry/v2)."),
+                                "note": format!("Target node did not return /api/bond ({e}); in L1 v1.0.0-core, bond.rs was replaced by the unified Priorism-FEP PriorLock primitive at /api/prior?id=<HEX>."),
                                 "bond_id_hex": bid
                             })),
                         }
@@ -2349,7 +2349,7 @@ pub fn handle_mcp_jsonrpc(
                                 "endpoint": url,
                                 "rfc": "RFC-0023",
                                 "live_node_supports_rfc0023": false,
-                                "note": format!("Target node did not return /api/rollup ({e}); RFC-0023 Sovereign L2 Rollup Vaults are height-gated in v0.4.0-substrate (active on regtest/dry/v2)."),
+                                "note": format!("Target node did not return /api/rollup ({e}); rollup.rs and zkvm.rs were deliberately removed from L1 consensus in v1.0.0-core to keep L1 minimal and eliminate unconstrained vault surfaces."),
                                 "rollup_id_hex": rid
                             })),
                         }
@@ -2495,7 +2495,7 @@ pub fn handle_mcp_jsonrpc(
                                 "endpoint": url,
                                 "rfc": "RFC-0027",
                                 "live_node_supports_rfc0027": false,
-                                "note": format!("Target node did not return /api/mission ({e}); RFC-0027 Native Mission Launchpads are height-gated in v0.5.0-launchpad (active on regtest/dry/v2)."),
+                                "note": format!("Target node did not return /api/mission ({e}); mission.rs was deliberately removed from L1 consensus in v1.0.0-core in favor of the unified PriorLock primitive at /api/prior?id=<HEX> (mission launchpads coordinate off-chain/L2)."),
                                 "mission_id_hex": mid
                             })),
                         }

@@ -478,7 +478,7 @@ pub struct Web4Bounty {
     pub title: String,
     pub description: String,
     pub spec_hash_hex: String,
-    /// `"evm_htlc"` | `"l1_htlc"` | `"l1_freivalds_job"`.
+    /// `"l1_htlc"` (primary native LOVE) | `"l1_prior_lock"` (v1.0.0-core Priorism-FEP stake) | `"l1_freivalds_job"` | `"evm_htlc"` (outer bridge on-ramp).
     pub settlement_rail: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub evm_chain: Option<String>,
@@ -514,11 +514,11 @@ pub struct CreateBountyRequest {
 }
 
 fn default_bounty_rail() -> String {
-    "evm_htlc".to_string()
+    "l1_htlc".to_string()
 }
 
 fn default_reward_asset() -> String {
-    "USDC".to_string()
+    "LOVE".to_string()
 }
 
 pub fn compile_web4_bounty(req: &CreateBountyRequest) -> Result<Web4Bounty, String> {
@@ -542,8 +542,14 @@ pub fn compile_web4_bounty(req: &CreateBountyRequest) -> Result<Web4Bounty, Stri
         return Err("reward_asset must be 1..=12 chars (e.g. LOVE, USDC, ETH)".to_string());
     }
     let rail = req.settlement_rail.trim().to_ascii_lowercase();
-    if !matches!(rail.as_str(), "evm_htlc" | "l1_htlc" | "l1_freivalds_job") {
-        return Err("settlement_rail must be evm_htlc, l1_htlc, or l1_freivalds_job".to_string());
+    if !matches!(
+        rail.as_str(),
+        "l1_htlc" | "l1_prior_lock" | "l1_freivalds_job" | "evm_htlc"
+    ) {
+        return Err(
+            "settlement_rail must be l1_htlc, l1_prior_lock, l1_freivalds_job, or evm_htlc"
+                .to_string(),
+        );
     }
     let cid = req.charter_id.trim();
     if cid.is_empty() || cid.len() > 80 {
@@ -561,6 +567,15 @@ pub fn compile_web4_bounty(req: &CreateBountyRequest) -> Result<Web4Bounty, Stri
             None,
             format!("newsatoshi --net mainnet job post A.csv B.csv --pay {reward} --bond 1"),
         ),
+        "l1_prior_lock" => {
+            let h = phash.as_deref().unwrap_or("<64HEX_PRIOR_HASH>");
+            (
+                None,
+                format!(
+                    "newsatoshi --net mainnet prior post --stake {reward} --prior-hash {h} --arbiter-vk <INDEPENDENT_ARBITER_SLH_VK> --deadline-blocks 144"
+                ),
+            )
+        }
         "l1_htlc" => {
             let h = phash.as_deref().unwrap_or("<64HEX_PAYMENT_HASH>");
             (
@@ -713,5 +728,18 @@ mod tests {
         })
         .unwrap();
         assert!(bounty.escrow_lock_command.contains(CANONICAL_EVM_HTLC_CONTRACT));
+
+        // Default bounty rail & asset must be native LOVE L1 HTLC
+        let default_req: CreateBountyRequest = serde_json::from_value(serde_json::json!({
+            "charter_id": "charter-abc",
+            "title": "Verify BatchSpend K=8 STARK verifier",
+            "description": "Independently check BatchSpend K=8 SHA-384 verification on Linux.",
+            "reward_amount": "50"
+        }))
+        .unwrap();
+        assert_eq!(default_req.settlement_rail, "l1_htlc");
+        assert_eq!(default_req.reward_asset, "LOVE");
+        let native_bounty = compile_web4_bounty(&default_req).unwrap();
+        assert!(native_bounty.escrow_lock_command.contains("newsatoshi --net mainnet lock 50"));
     }
 }

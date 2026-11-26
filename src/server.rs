@@ -461,7 +461,7 @@ fn respond_x402_challenge(req: Request, payment_required_b64: &str, body: &Value
         .with_header(
             Header::from_bytes(
                 "WWW-Authenticate",
-                r#"NEWSATOSHI-402 scheme="payword-sha256", x402="v2", network="eip155:8453", asset="USDC""#,
+                r#"NEWSATOSHI-402 scheme="payword-sha256", asset="LOVE", x402="v2", bridge_network="eip155:8453", bridge_asset="USDC""#,
             )
             .unwrap(),
         );

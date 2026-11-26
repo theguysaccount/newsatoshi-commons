@@ -2190,15 +2190,20 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
     .unwrap();
     assert_eq!(cutover["ok"], true);
     assert_eq!(cutover["ready_for_v2_activation"], false);
+    assert_eq!(cutover["genesis_policy"]["nov10_canary_retired"], true);
     assert_eq!(cutover["gates"]["external_security_audits"]["completed"], 0);
-    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["lean4_theorems"], 14);
-    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["zk_stark_proven_bits"], 192);
-    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["zkvm_logup_rom_rap"], true);
-    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["pq_mlkem_p2p_transport"], true);
-    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["flyclient_mmr_light_client"], true);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["l1_release_tag"], "v1.0.0-core");
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["lean4_theorems"], 10);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["stark_classical_proven_bits"], 140);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["stark_sha384_qrom_hash_bits"], 128);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["prior_lock_fep"], true);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["homeostatic_fee_burn_bps"], 5000);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["batch_spend_split_coinbase"], true);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["work_proportional_flyclient_mmr"], true);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["opportunistic_pq_mlkem_p2p"], true);
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["independent_second_verifier_client"], true);
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["utreexo_compact_frontier_max_bytes"], 1024);
-    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["permissionless_l1_zkvm_verified"], true);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["nov10_canary_retired"], true);
 
     let p2p_list: Value = serde_json::from_str(
         &ureq::get(&format!("{base}/api/p2p/offers"))
@@ -2797,6 +2802,9 @@ fn http_api_web4_charters_erc8004_services_bounties_and_paid_402_tool() {
     )
     .unwrap();
     assert_eq!(x402_idx["version"], 2);
+    assert_eq!(x402_idx["primary_settlement_asset"], "LOVE");
+    assert_eq!(x402_idx["evm_usdc_rail_role"], "outer_bridge_onramp");
+    assert_eq!(x402_idx["l1_release_target"], "v1.0.0-core");
     assert_eq!(x402_idx["resources"].as_array().unwrap().len(), 4);
 
     let r_x402_unpaid = agent

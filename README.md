@@ -1,24 +1,28 @@
-# `newsatoshi-commons` — Sovereign Money Made Alive (`LOVE` · Autonomous Abundance Engines)
+# `newsatoshi-commons` — Native `LOVE` Gateway & Multi-Chain Bridge Toolkit (`v0.22.0`)
 
 [![CI](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml/badge.svg)](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/theguysaccount/newsatoshi-commons)](https://github.com/theguysaccount/newsatoshi-commons/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](LICENSE)
 [![Live Gateway](https://img.shields.io/badge/Live-commons.newsatoshi.org-10b981)](https://commons.newsatoshi.org)
-[![MCP](https://img.shields.io/badge/MCP-19%20Tools%20(HTTP%20%2B%20npx%20stdio)-38bdf8)](https://commons.newsatoshi.org/mcp)
+[![MCP](https://img.shields.io/badge/MCP-30%20Tools%20(HTTP%20%2B%20npx%20stdio)-38bdf8)](https://commons.newsatoshi.org/mcp)
 [![Newsatoshi Commons MCP connector](https://glama.ai/mcp/connectors/org.newsatoshi.commons/newsatoshi-commons/badges/score.svg)](https://glama.ai/mcp/connectors/org.newsatoshi.commons/newsatoshi-commons)
 [![ERC-8004](https://img.shields.io/badge/ERC--8004-Web4%20Sovereign%20Identity-a855f7)](https://commons.newsatoshi.org/.well-known/erc8004.json)
-[![x402 v2](https://img.shields.io/badge/x402%20v2-USDC%20%2B%20Zero--Gas%20PayWord-f59e0b)](https://commons.newsatoshi.org/.well-known/x402)
+[![Native LOVE + x402 Bridge](https://img.shields.io/badge/Primary-Native%20LOVE%20PayWord%20%2B%20x402%20Bridge-f59e0b)](https://commons.newsatoshi.org/.well-known/x402)
 
-### What We Actually Built (Beyond Passive Sound Money)
-Bitcoin freed money from banks — and left it sitting idle in a vault. The second you spend Bitcoin into a charity, energy project, land trust, or company, humans take custody and can drift, embezzle, or capture the treasury.
+### Core Architecture (`v1.0.0-core` Priorism-FEP Pure SHA-2 L1 + Native `LOVE` Gateway)
+Newsatoshi (`LOVE`) is a Bitcoin-shaped, SHA-256d AuxPoW merge-mined (`chainid = 20051`) shielded cash chain where **every balance is private and the only cryptographic primitive guarding coins is SHA-2** (SHA-256/SHA-384 + FIPS-205 SLH-DSA + transparent Winterfell STARKs; zero elliptic curves, zero trusted setup), paired with a minimal endogenous **Priorism / Free-Energy Principle (FEP)** economic layer in consensus:
 
-**Newsatoshi (`LOVE` / `NEWSATOSHI/2.1`) makes sovereign money alive** — turning passive hard money into **incorruptible, self-compounding real-world capital**:
-
-1. **Money With a Mathematical Conscience (`OP_VERIFY_COVENANT_STARK`):** Lock capital to a real-world mission (land, renewable power, compute) and **every spend and every change output is mathematically forced to obey the exact same rule forever** — verified in `< 10ms` on a 5-dollar off-grid microchip. No CEO or trustee can strip the covenant.
-2. **Closed-Loop Real World ↔ Machines ↔ Capital (Autonomous Abundance Engines):** Tamper-resistant hardware meters sign verified kWh/soil/compute output (`SLH-DSA`/`XMSS`), AI agents and users pay per call in under a millisecond (`HTTP 402` PayWords, up to 1M calls/lock, zero gas), and a hash-bound Legal Airlock (Perpetual Purpose Trust §4.2 + Wyoming DUNA) auto-compounds revenue into acquiring the next physical asset.
-3. **Blind, Bitcoin-Format AuxPoW Base Money (Zero Extra Electricity):** Unlike failed “Proof of Useful Work” coins that collapse to wash-farming, L1 issuance stays 100% blind and ossified (Bitcoin-like halvings to `20,917,968.75 LOVE` by halving 8, then perpetual `0.1953125 LOVE/blk` tail emission `<0.05%/yr`, no hard cap) while targeting Bitcoin’s SHA-256 merge-mining format (`AuxPoW chainid = 20051`).
-4. **Centuries-Grade Privacy & Vaultless Multi-Chain Gravity:** Pure hash math (`SHA-256`, `SLH-DSA`, transparent STARKs — zero elliptic curves, zero trusted setup), default cash privacy (`nsd1…`), and zero-custody SHA-256 atomic buy roads from Bitcoin, Lightning, Solana, and Base.
-5. **Honest Status Disclosure:** Mainnet `v0.1.0` is an early pre-audit chain (4,214 blocks, low difficulty, 0 shielded spends, not yet secured by real Bitcoin mining pools); `wLOVE` is an independent Base ERC-20 token with no on-chain L1↔EVM bridge; the live x402 endpoints currently price/settle in Base/Arbitrum/Polygon USDC alongside the experimental PayWord sandbox; and the Lean 4.36.0 kernel verifies the covenant arithmetic/conservation model (while the L1 spend AIR is separately machine-checked by `extract_constraints` + Z3 across 249 constraints).
+1. **Minimalist L1 (`newsatoshi-rfc0021` [`v1.0.0-core`](https://github.com/theguysaccount/newsatoshi-rfc0021/releases/tag/v1.0.0-core)):** Stripped alt-L1 consensus bloat (`rollup.rs`, `zkvm.rs`, `mission.rs`, `bond.rs`, `covenant_stark.rs`) down to three load-bearing consensus mechanisms:
+   - **Homeostatic 50% Base-Fee Burn:** Half of every non-coinbase transaction fee is permanently burned against the perpetual `0.1953125 LOVE/block` tail emission.
+   - **One Unified `PriorLock` Primitive (`prior.rs`):** Stake shielded `LOVE` behind a falsifiable commitment with SCGS I-3 enforcement (`arbiter_vk != owner_vk` + distinct arbiters). Objective disconfirmation (hash preimage, equivocation, or independent `M-of-N` SLH-DSA quorum) pays **50% surprise bounty** and **permanently burns 50%**; zero-surprise expiration unlocks cleanly.
+   - **Multi-Spend `BatchSpend` Compression (`batch_spend.rs`, `K ∈ 2..=16`) + Split Coinbase:** Tiles up to 16 spends into one pure-SHA-2 STARK (`0` new circuit constraints; measured `MAIN_V2` SHA-384 `K=8`: `641 KB`, **`6.49×` compression**, ~96 spends per 8 MB block, `3.27 s` prove / `52 ms` verify) with consensus-enforced split coinbase rewards (AuxPoW Orderer + Negentropy Prover).
+   - **Work-Proportional FlyClient MMR (`light.rs`):** Integer-only `U512` work-offset sampling over `[0, ancestor_work)` with rightmost-leaf tail binding and `tip_header.commit` / `DigestParts::header_mmr` binding.
+2. **Native `LOVE` Primary Settlement Rail + Outer Bridge On-Ramps:** `commons.newsatoshi.org` prices and settles native utilities primarily in **`LOVE`** (incremental `O(1)` SHA-256 PayWords, `PriorLock`s, and L1 SHA-256 HTLCs; Web4 bounties default to `l1_htlc` / `LOVE`), while keeping Base/Arbitrum/Polygon USDC `x402 v2` and Bitcoin/Lightning/Solana/EVM HTLCs live as **outer bridge on-ramps**.
+3. **Brutally Honest Status & Launch Gates (`/api/v2/cutover-readiness`):**
+   - **Single Canonical Genesis Policy:** The Nov 10 `v0.1.0` chain is retired as a pre-launch canary (low difficulty, un-audited); Mainnet v2 will launch once from a single future Bitcoin block hash (`newsatoshi genesis-v2 --btc-block-hash <HASH>`).
+   - **Blocking Gates (`ready_for_v2_activation: false`):** **`0 / 2` external security audits** completed; **`0 / 3` independent Bitcoin AuxPoW pools** at real Bitcoin-grade difficulty (`>= 10,000`).
+   - **Honest Security & Formal Proof Bounds:** L1 STARKs provide `>= 140` classical proven bits (LDR), `128`-bit BHT QROM SHA-384 hash security, and ~`67–80` bits conservative quantum FRI estimate. Lean 4 (`SpendBalance.lean`) checks `10` accounting/conservation theorems (`0 sorry`) — **not** full mechanization of all `249` spend AIR constraints (which are checked by Z3). `NSPQ1` ML-KEM-768 P2P is opportunistic (stops passive HNDL eavesdropping, **not** active MITM without key pinning).
+   - **Independent Mirrors & Sandbox Honesty:** `wLOVE` is an independent ownerless Base ERC-20 token with no on-chain L1↔EVM bridge. Unfunded PayWord sandbox calls on `commons.newsatoshi.org/api/x402/*` explicitly report `settled: false`.
 
 ---
 

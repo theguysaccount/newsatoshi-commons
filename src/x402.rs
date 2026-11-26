@@ -1,12 +1,14 @@
-//! Spec-compliant x402 v2 + Newsatoshi PayWord Dual-Rail Payment & Discovery Engine.
+//! Native LOVE (PayWord + PriorLock + L1 HTLC) Primary Rail + x402 v2 Outer Bridge On-Ramp.
 //!
-//! Supports:
-//! - Standard HTTP `402 Payment Required` with base64-encoded `Payment-Required` header
-//!   (`x402Version: 2`, `scheme: "exact"`, CAIP-2 `eip155:8453` Base USDC + Arbitrum + Polygon,
-//!   and `extensions.bazaar` discovery metadata for Coinbase x402 Bazaar, x402scan, and 402index.io).
-//! - Live settlement via `POST /verify` + `POST /settle` against an open x402 facilitator
-//!   (default `https://facilitator.payai.network`, overrideable via `X402_FACILITATOR_URL`).
-//! - Zero-gas, post-quantum pure-SHA-256 `X-Newsatoshi-PayWord` fast path (`<1ms`, 0 gas).
+//! Positioning:
+//! - **Primary Settlement Asset & Unit of Account:** Native `LOVE` via zero-gas, post-quantum
+//!   pure-SHA-256 `X-Newsatoshi-PayWord` hash-chains (`<1ms`, 0 gas), L1 `PriorLock` falsifiable
+//!   stake commitments (`v1.0.0-core`), and L1 SHA-256 HTLCs.
+//! - **Outer Bridge On-Ramps (Spec-Compliant x402 v2):** Standard HTTP `402 Payment Required` with
+//!   base64-encoded `Payment-Required` header (`x402Version: 2`, `scheme: "exact"`, CAIP-2
+//!   `eip155:8453` Base USDC + Arbitrum + Polygon, plus `extensions.bazaar` discovery metadata)
+//!   verified/settled via an open x402 facilitator (`X402_FACILITATOR_URL`) for EVM callers that
+//!   do not yet hold native `LOVE`.
 
 use crate::agent::verify_payword_token_incremental;
 use crate::backing::{BackingProofSummary, CANONICAL_BACKING_VAULT};
@@ -128,7 +130,8 @@ pub fn build_x402_v2_challenge(base_url: &str, spec: &X402RouteSpec) -> (Value, 
             "maxTimeoutSeconds": 300,
             "extra": {
                 "name": "USD Coin",
-                "version": "2"
+                "version": "2",
+                "railRole": "outer_bridge_onramp"
             }
         },
         {
@@ -140,7 +143,8 @@ pub fn build_x402_v2_challenge(base_url: &str, spec: &X402RouteSpec) -> (Value, 
             "maxTimeoutSeconds": 300,
             "extra": {
                 "name": "USD Coin",
-                "version": "2"
+                "version": "2",
+                "railRole": "outer_bridge_onramp"
             }
         },
         {
@@ -152,7 +156,8 @@ pub fn build_x402_v2_challenge(base_url: &str, spec: &X402RouteSpec) -> (Value, 
             "maxTimeoutSeconds": 300,
             "extra": {
                 "name": "USD Coin",
-                "version": "2"
+                "version": "2",
+                "railRole": "outer_bridge_onramp"
             }
         }
     ]);
@@ -160,6 +165,7 @@ pub fn build_x402_v2_challenge(base_url: &str, spec: &X402RouteSpec) -> (Value, 
     let payment_required_obj = json!({
         "x402Version": 2,
         "error": "Payment required",
+        "primarySettlementAsset": "LOVE",
         "resource": {
             "url": full_url,
             "description": spec.description,
@@ -191,6 +197,22 @@ pub fn build_x402_v2_challenge(base_url: &str, spec: &X402RouteSpec) -> (Value, 
     let body = json!({
         "x402Version": 2,
         "error": "Payment required",
+        "primary_settlement_asset": "LOVE",
+        "native_love_primary_rail": {
+            "asset": "LOVE",
+            "protocol": "NEWSATOSHI-PAYWORD-SHA256/1.0",
+            "l1_primitives": ["PayWord SHA-256 hash-chain", "PriorLock falsifiable stake (v1.0.0-core)", "SHA-256 HTLC"],
+            "unit_price_love_base_units": 100_000,
+            "header": "X-Newsatoshi-PayWord: tip=<64hex>,token=<64hex>,ticks=<n>",
+            "gas_usd": 0,
+            "local_verify_latency_ms": "<1",
+            "note": "Primary unit of account is native LOVE (unfunded PayWord vouchers are explicitly marked settled=false on this public verify-only sandbox; production merchants enforce funded on-chain L1 locks or PriorLocks)."
+        },
+        "outer_bridge_onramps": {
+            "role": "outer_bridge_onramp",
+            "note": "Base/Arbitrum/Polygon USDC x402 v2 rails are supported as outer EVM bridge on-ramps for callers not yet holding native LOVE.",
+            "accepts": payment_required_obj["accepts"]
+        },
         "accepts": payment_required_obj["accepts"],
         "resource": payment_required_obj["resource"],
         "payword_fast_path": {
@@ -199,7 +221,7 @@ pub fn build_x402_v2_challenge(base_url: &str, spec: &X402RouteSpec) -> (Value, 
             "header": "X-Newsatoshi-PayWord: tip=<64hex>,token=<64hex>,ticks=<n>",
             "gas_usd": 0,
             "local_verify_latency_ms": "<1",
-            "note": "Zero-gas local voucher metering (demo mode on public verify-only sandbox; production merchants enforce funded on-chain L1/EVM lock verification)"
+            "note": "Primary native LOVE metering path (demo mode on public verify-only sandbox; production merchants enforce funded on-chain L1 locks or PriorLocks)"
         },
         "backing_vault": CANONICAL_BACKING_VAULT
     });
@@ -468,7 +490,7 @@ pub fn route_spec_bridge_quote() -> X402RouteSpec {
         path: "/api/x402/bridge-quote",
         method: "GET",
         name: "Newsatoshi Multi-Chain Bridge & Proof-of-Backing Quote",
-        description: "Real-time multi-chain bridge & backing intelligence for Newsatoshi (LOVE): live Base Uniswap V3 wLOVE/WETH pool metrics, 4-chain ownerless NewsatoshiBackingVault reserves (Base/Arbitrum/Optimism/Polygon), and live Mainnet L1 AuxPoW issuance. Accepts Base/Arb/Polygon USDC via x402 ($0.001) or zero-gas SHA-256 PayWords.",
+        description: "Real-time multi-chain bridge & backing intelligence for Newsatoshi (LOVE): live Base Uniswap V3 wLOVE/WETH pool metrics, 4-chain ownerless NewsatoshiBackingVault reserves (Base/Arbitrum/Optimism/Polygon), and live L1 AuxPoW issuance. Primary rail: native LOVE (zero-gas SHA-256 PayWords / PriorLock); outer x402 bridge on-ramp: Base/Arb/Polygon USDC ($0.001).",
         amount_usdc_atomic: "1000",
         tags: &["crypto", "defi", "bridge", "post-quantum", "proof-of-backing", "newsatoshi"],
         input_info: json!({
@@ -492,7 +514,7 @@ pub fn route_spec_compile_htlc() -> X402RouteSpec {
         path: "/api/x402/compile-htlc",
         method: "POST",
         name: "Newsatoshi 4-Chain SHA-256 Atomic Swap HTLC Compiler",
-        description: "Compiles zero-custody SHA-256 atomic swap HTLC contracts across Bitcoin BIP-199 P2WSH, Lightning BOLT-11, Solana PDA, and Base/Arbitrum/Optimism/Polygon NewsatoshiHtlc.sol (0xF564…8987). Accepts x402 USDC ($0.001) or zero-gas SHA-256 PayWords.",
+        description: "Compiles zero-custody SHA-256 atomic swap HTLC contracts across Bitcoin BIP-199 P2WSH, Lightning BOLT-11, Solana PDA, and Base/Arbitrum/Optimism/Polygon NewsatoshiHtlc.sol (0xF564…8987). Primary rail: native LOVE (zero-gas SHA-256 PayWords / PriorLock); outer x402 bridge on-ramp: Base/Arb/Polygon USDC ($0.001).",
         amount_usdc_atomic: "1000",
         tags: &["crypto", "atomic-swap", "htlc", "bitcoin", "base", "post-quantum"],
         input_info: json!({
@@ -519,7 +541,7 @@ pub fn route_spec_verify_payword() -> X402RouteSpec {
         path: "/api/x402/verify-payword",
         method: "POST",
         name: "Newsatoshi Post-Quantum SHA-256 PayWord Verifier",
-        description: "Verifies pure-SHA-256 PayWord micropayment hash-chains (SHA256^ticks(token) == tip) for sub-millisecond, zero-gas AI agent billing. Accepts x402 USDC ($0.001) or PayWord.",
+        description: "Verifies pure-SHA-256 PayWord micropayment hash-chains (SHA256^ticks(token) == tip) for sub-millisecond, zero-gas native LOVE AI agent billing. Primary rail: native LOVE PayWord; outer x402 bridge on-ramp: USDC ($0.001).",
         amount_usdc_atomic: "1000",
         tags: &["crypto", "payments", "payword", "post-quantum", "x402"],
         input_info: json!({
@@ -544,7 +566,7 @@ pub fn route_spec_evm_security_scan() -> X402RouteSpec {
         path: "/api/x402/evm-security-scan",
         method: "POST",
         name: "Multi-Chain EVM Smart Contract Security Scan (ETH/Base/Arb/OP/Polygon)",
-        description: "Live on-chain security & rug-risk audit for any EVM contract: bytecode size, EIP-1967 proxy implementation/admin slots, active owner() privileges, ERC-20 supply/metadata, and Sourcify source verification. Accepts x402 USDC ($0.001) or zero-gas SHA-256 PayWord.",
+        description: "Live on-chain security & rug-risk audit for any EVM contract: bytecode size, EIP-1967 proxy implementation/admin slots, active owner() privileges, ERC-20 supply/metadata, and Sourcify source verification. Primary rail: native LOVE (zero-gas SHA-256 PayWords); outer x402 bridge on-ramp: USDC ($0.001).",
         amount_usdc_atomic: "1000",
         tags: &["crypto", "security", "evm", "audit", "base", "ethereum", "x402"],
         input_info: json!({
@@ -596,6 +618,10 @@ pub fn render_well_known_x402(base_url: &str) -> Value {
     json!({
         "version": 2,
         "provider": "Newsatoshi Commons",
+        "primary_settlement_asset": "LOVE",
+        "primary_rail": "NEWSATOSHI-PAYWORD-SHA256/1.0",
+        "l1_release_target": "v1.0.0-core",
+        "evm_usdc_rail_role": "outer_bridge_onramp",
         "website": "https://newsatoshi.org",
         "commons": base_url.trim_end_matches('/'),
         "mcp": format!("{}/mcp", base_url.trim_end_matches('/')),
