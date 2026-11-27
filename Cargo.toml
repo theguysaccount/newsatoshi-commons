@@ -1,6 +1,6 @@
 [package]
 name = "newsatoshi-commons"
-version = "0.26.0"
+version = "0.27.0"
 edition = "2021"
 description = "Newsatoshi Commons Gateway (Live Mainnet v2 nsM2 / v1.2.0 Pure SHA-2 L1 aligned: Bitcoin #977,738 anchored Genesis, >=100-bit QROM Quartic FRI, patched Goldilocks f64, full 249-constraint Lean 4 proof, real STARK-in-STARK IVC, incentive-compatible BatchSpend prover_fee, O(log N) Merkle state, NSPQ2 P2P): Native LOVE PayWord/PriorLock primary rails, x402 outer EVM bridge on-ramps, NIST FIPS 205 SLH-DSA, Winterfell 0.13 STARK verification, trustless multi-chain SHA-256 HTLC swaps, zkTLS verification, and honest live telemetry."
 

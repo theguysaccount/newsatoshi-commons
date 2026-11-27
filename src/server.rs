@@ -649,7 +649,7 @@ fn handle_request(mut req: Request, state: &AppState) {
 
     if method == Method::Head {
         let head_ct = match path.as_str() {
-            "/" | "/index.html" | "/whitepaper" | "/docs" | "/developers" | "/about" | "/contact" | "/privacy" => {
+            "/" | "/index.html" | "/whitepaper" | "/manifesto" | "/docs" | "/developers" | "/about" | "/contact" | "/privacy" => {
                 if wants_markdown(&req) {
                     Some("text/markdown; charset=utf-8")
                 } else {
@@ -666,7 +666,7 @@ fn handle_request(mut req: Request, state: &AppState) {
                 Some("text/plain; charset=utf-8")
             }
             "/sitemap.xml" => Some("application/xml; charset=utf-8"),
-            "/llms.txt" | "/llms-full.txt" | "/whitepaper.md" | "/skills/newsatoshi-agent-payments/SKILL.md" => {
+            "/llms.txt" | "/llms-full.txt" | "/whitepaper.md" | "/whitepaper-v2.1.md" | "/manifesto.md" | "/skills/newsatoshi-agent-payments/SKILL.md" => {
                 Some("text/markdown; charset=utf-8")
             }
             "/.well-known/api-catalog" => Some("application/linkset+json; charset=utf-8"),
@@ -733,7 +733,23 @@ fn handle_request(mut req: Request, state: &AppState) {
                 req,
                 200,
                 "text/markdown; charset=utf-8",
+                crate::agent::WHITEPAPER_V2_2_MARKDOWN.to_string(),
+            );
+        }
+        (Method::Get, "/whitepaper-v2.1.md") => {
+            respond_text(
+                req,
+                200,
+                "text/markdown; charset=utf-8",
                 WHITEPAPER_MARKDOWN.to_string(),
+            );
+        }
+        (Method::Get, "/manifesto.md") => {
+            respond_text(
+                req,
+                200,
+                "text/markdown; charset=utf-8",
+                crate::agent::MANIFESTO_MARKDOWN.to_string(),
             );
         }
         (Method::Get, "/whitepaper.tex") => {
@@ -752,7 +768,7 @@ fn handle_request(mut req: Request, state: &AppState) {
                 LEAN_FORMAL_PROOF.to_string(),
             );
         }
-        (Method::Get, "/whitepaper" | "/docs" | "/developers" | "/about" | "/contact" | "/privacy") => {
+        (Method::Get, "/whitepaper" | "/manifesto" | "/docs" | "/developers" | "/about" | "/contact" | "/privacy") => {
             let base_url = infer_base_url(&req);
             if let Some((ct, body)) = render_public_page(&path, &base_url, wants_markdown(&req)) {
                 let mut resp = Response::from_string(body)

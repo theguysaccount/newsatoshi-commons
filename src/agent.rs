@@ -200,6 +200,8 @@ pub const INSTALL_SCRIPT_SH: &str = include_str!("../scripts/install.sh");
 
 /// Embedded NEWSATOSHI/2.1 companion whitepaper (Markdown & IACR ePrint LaTeX) + Lean 4 formal kernel.
 pub const WHITEPAPER_MARKDOWN: &str = include_str!("../docs/NEWSATOSHI-2.1-WHITEPAPER.md");
+pub const WHITEPAPER_V2_2_MARKDOWN: &str = include_str!("../docs/NEWSATOSHI-2.2-WHITEPAPER.md");
+pub const MANIFESTO_MARKDOWN: &str = include_str!("../docs/MANIFESTO.md");
 pub const WHITEPAPER_LATEX: &str = include_str!("../docs/newsatoshi_2_1_whitepaper.tex");
 pub const LEAN_FORMAL_PROOF: &str = include_str!("../formal/NewsatoshiCovenants.lean");
 
@@ -435,42 +437,72 @@ fn wrap_public_html(
 /// (`/docs`, `/developers`, `/about`, `/contact`, `/privacy`).
 pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<(&'static str, String)> {
     match slug {
+        "/manifesto" => {
+            if wants_md {
+                Some(("text/markdown; charset=utf-8", MANIFESTO_MARKDOWN.to_string()))
+            } else {
+                let html = wrap_public_html(
+                    base_url,
+                    "/manifesto",
+                    "The Newsatoshi Manifesto — Money for Minds, Human and Machine",
+                    "Why humans and autonomous AI agents require unfreezable, private, quantum-proof, Bitcoin-merge-mined electronic cash with zero premine and brutal honesty.",
+                    &format!(
+                        "<h1>The Newsatoshi Manifesto: Money for Minds, Human and Machine</h1>\n\
+                         <p><strong>Canonical Mainnet v2 (<code>nsM2</code> · <code>v1.2.1</code>) · Anchored to Bitcoin Block <code>#977,738</code></strong> · November 27, 2026</p>\n\
+                         <p>Read or download: <a href=\"/manifesto.md\">Full Manifesto (.md)</a> · <a href=\"https://newsatoshi.org/manifesto/\">Terminal Edition (newsatoshi.org)</a> · <a href=\"/whitepaper\">NEWSATOSHI/2.2 Whitepaper</a></p>\n\
+                         <h2>I. The Age of Synthetic Commerce Has Arrived &mdash; Without Free Money</h2>\n\
+                         <p>For the first time in human history, intelligence is no longer exclusively biological. Billions of autonomous AI agents will soon negotiate compute, buy data, verify claims, rent hardware, and settle trillions of micro-transactions every day. They cannot open checking accounts, pass KYC, or sue in court. Corporate stablecoins can be frozen with one compliance switch and expose every supplier and margin on a public ledger; transparent legacy crypto turns financial surveillance permanent and leaves elliptic-curve keys exposed to future quantum computers. <strong>Free minds require free money.</strong></p>\n\
+                         <h2>II. Seven Non-Negotiable Laws of Neutral Money</h2>\n\
+                         <ol>\n\
+                           <li><strong>No Kill Switch.</strong> Zero issuer, zero admin key, zero blacklist, zero foundation multisig.</li>\n\
+                           <li><strong>Private by Default.</strong> Every balance and payment is shielded by default, with selective disclosure when a holder chooses.</li>\n\
+                           <li><strong>Quantum-Proof From Day One.</strong> Zero elliptic curves, zero pairings, zero trusted setups, zero experimental algebraic hashes &mdash; only pure FIPS SHA-2/SHA-384 inside transparent STARKs and FIPS 205 SLH-DSA, mechanized in Lean 4.</li>\n\
+                           <li><strong>Anchored to Physical Energy.</strong> Blocks are merge-mined directly by Bitcoin ASICs (<code>AuxPoW chainid = 20051</code>), borrowing real thermodynamic work without duplicate energy waste.</li>\n\
+                           <li><strong>Built for Machine Velocity.</strong> Sub-cent streaming via <code>O(1)</code> SHA-256 PayWords runs off-chain in microseconds with zero per-call gas.</li>\n\
+                           <li><strong>Honest About Truth (Priorism &amp; FEP).</strong> Through <code>PriorLock</code>, agents stake value behind verifiable predictions: accurate priors keep their stake; disconfirmed claims pay the challenger 50% and permanently burn 50%.</li>\n\
+                           <li><strong>Fair Launch, Radical Minimalism, Permanent Ossification.</strong> Zero premine, zero VC allocation, zero project self-mining. Genesis anchored to Bitcoin Block <code>#977,738</code>, engineered to ossify forever.</li>\n\
+                         </ol>\n\
+                         <h2>III. Why We Named It <code>LOVE</code></h2>\n\
+                         <p>Empedocles named <em>Love</em> (<em>Philotes</em>) the force that binds scattered matter into coherent order. Physics calls it <strong>negentropy</strong>; cognitive science calls it <strong>minimizing free energy</strong>. Good money lets strangers &mdash; human or machine &mdash; cooperate peacefully without rulers, banks, or censors.</p>\n\
+                         <h2>IV. Brutal Honesty Over Crypto Theater</h2>\n\
+                         <p>Zero fabricated users, zero fake pools, zero hidden self-mining. Live Mainnet v2 (<code>nsM2</code>) is open today, while external human security audits (<code>0/2</code>) and independent real-difficulty Bitcoin pools (<code>0/3</code>) remain transparently tracked at <a href=\"/api/v2/cutover-readiness\">/api/v2/cutover-readiness</a>. Verify everything yourself: <a href=\"https://newsatoshi.org/\">live browser STARK verifier</a> or <code>node verifier-ts/newsatoshi_verifier.mjs --live https://newsatoshi.org/mainnet</code>.</p>\n\
+                         <h2>V. The Covenant</h2>\n\
+                         <p>No founders' reward. No kill switch. No permission required. <strong>Verify the math. Run a node. Build what comes next.</strong></p>\n\
+                         <pre>Canonical Genesis (nsM2): 00000000ba1cdad4aa8e82d6613b4df536394c41008fc3a0914a47a44604b9c8\nJoin: newsatoshi --net mainnet-v2 node · Pool: stratum+tcp://pool.newsatoshi.org:3333\nFull Markdown: {base_url}/manifesto.md</pre>"
+                    ),
+                );
+                Some(("text/html; charset=utf-8", html))
+            }
+        }
         "/whitepaper" => {
             if wants_md {
-                Some(("text/markdown; charset=utf-8", WHITEPAPER_MARKDOWN.to_string()))
+                Some(("text/markdown; charset=utf-8", WHITEPAPER_V2_2_MARKDOWN.to_string()))
             } else {
                 let html = wrap_public_html(
                     base_url,
                     "/whitepaper",
-                    "NEWSATOSHI/2.1 Whitepaper & Lean 4 Formal Soundness Kernel",
-                    "Tiny-kernel machine-checked Lean 4.36.0 soundness proof (9 theorems, 355 lines, 0 sorry, 0 Mathlib) for Winterfell 0.13 post-quantum recursive STARK covenants, Budish-safe backing, and live 4-chain SHA-256 HTLCs.",
-                    &format!(
-                        "<h1>NEWSATOSHI/2.1: Tiny-Kernel Machine-Checked Post-Quantum Recursive Covenants</h1>\n\
-                         <p><strong>Companion Paper to <em>A Store of Order</em> (<code>newsatoshi.org/white-paper/</code>) &amp; <code>RFC-0021</code></strong> · November 25, 2026</p>\n\
-                         <p>Download raw artifacts: <a href=\"/formal/NewsatoshiCovenants.lean\">Lean 4.36.0 Proof (355 lines, 0 sorry, 0 Mathlib)</a> · <a href=\"/whitepaper.md\">Full Markdown Whitepaper</a> · <a href=\"/whitepaper.tex\">IACR ePrint LaTeX (.tex)</a></p>\n\
-                         <h2>Verify All 9 Theorems Locally in ~1 Second</h2>\n\
-                         <pre>curl -fsSL {base_url}/formal/NewsatoshiCovenants.lean -o NewsatoshiCovenants.lean &amp;&amp; lean NewsatoshiCovenants.lean</pre>\n\
-                         <h2>Why Tiny Formal Kernels Matter in November 2026</h2>\n\
-                         <p>Following the June 2026 Orchard circuit vulnerability (requiring machine-checked balance proofs for private money) and the November 2026 17M-line AI-assisted Lean proof debate, monetary consensus requires <strong>small, line-by-line auditable kernels</strong> where hidden tautologies or field-aliasing bugs cannot hide. Our executing Winterfell 0.13 STARK AIR (<code>src/stark.rs</code>, 15 columns &times; 64 rows over <code>p = 2^128 - 45*2^40 + 1</code>) is machine-verified by 355 lines of zero-dependency Lean 4 using zero <code>Classical.choice</code>:</p>\n\
+                    "NEWSATOSHI/2.2 Whitepaper — Pure SHA-2 Shielded Machine Cash (Mainnet v2)",
+                    "Official NEWSATOSHI/2.2 technical whitepaper for live Mainnet v2 (nsM2, v1.2.1): 192-bit classical / 100-104-bit CMS19 QROM pure SHA-384 Quartic STARKs, 249 Lean 4 constraints, Bitcoin AuxPoW 20051, PriorLock FEP, PayWords, NSPQ2, and live verification.",
+                    "<h1>NEWSATOSHI/2.2: Pure SHA-2 Shielded Machine Cash</h1>\n\
+                         <p><strong>Mainnet v2 (<code>nsM2</code> · <code>v1.2.1</code>) · Canonical Genesis Anchored to Bitcoin Block <code>#977,738</code></strong> · November 27, 2026</p>\n\
+                         <p>Download canonical artifacts: <a href=\"/whitepaper.md\">Full NEWSATOSHI/2.2 Whitepaper (.md)</a> · <a href=\"https://newsatoshi.org/whitepaper-v2/\">Terminal Edition (newsatoshi.org)</a> · <a href=\"/manifesto\">The Newsatoshi Manifesto</a> · <a href=\"/whitepaper-v2.1.md\">Companion Paper v2.1 (.md)</a> · <a href=\"/whitepaper.tex\">v2.1 LaTeX (.tex)</a> · <a href=\"/formal/NewsatoshiCovenants.lean\">Lean 4 Proof</a></p>\n\
+                         <h2>Live Mainnet v2 (<code>nsM2</code>) Canonical Parameters</h2>\n\
                          <ul>\n\
-                           <li><code>digest_pack_injective</code> &mdash; Strict injectivity of 88/88/80-bit SHA-256 packing mod <code>p</code> (axioms: <code>[propext]</code>)</li>\n\
-                           <li><code>prime_boolean_constraint_sound</code> &amp; <code>air_63bit_range_sound</code> &mdash; Zero negative-slack <code>p-1</code> modular wrap-around</li>\n\
-                           <li><code>value_conservation_no_wrap</code> &mdash; Exact integer conservation <code>payout + change = input</code> in &Nopf;</li>\n\
-                           <li><code>streaming_bps_floor_unique</code> &amp; <code>air_streaming_modular_soundness</code> &mdash; Exact Euclidean floor division for basis-point revenue &amp; backing splits</li>\n\
-                           <li><code>recursive_covenant_continuity_and_bound</code> &mdash; Inductive covenant continuity &amp; bounded extraction over unbounded spend depth <code>T</code></li>\n\
-                           <li><code>web4_monotonic_child_bound</code> &mdash; Monotonic Web4 child-agent anti-escalation across arbitrary replication depth (<strong>0 axioms</strong>)</li>\n\
-                           <li><code>htlc_anti_race_safety</code> &mdash; Cross-chain SHA-256 HTLC anti-race timelock dominance (&ge; 120 min safety margin)</li>\n\
+                           <li><strong>Canonical Genesis Hash:</strong> <code>00000000ba1cdad4aa8e82d6613b4df536394c41008fc3a0914a47a44604b9c8</code> (BTC Block <code>#977,738</code>, time <code>1795742750</code>, bits <code>0x1d00ffff</code>, nonce <code>2649823154</code>, <strong>0 LOVE premine</strong>)</li>\n\
+                           <li><strong>Shielded Cryptography (<code>MAIN_V2</code>):</strong> Pure FIPS 180-4 SHA-2 / SHA-384 + Quartic Goldilocks (<code>F_p^4</code>) Winterfell 0.13.1 STARKs (patched upstream <code>f64::BaseElement::double()</code> &amp; <code>mul_small()</code>) delivering <strong>192-bit classical / 100&ndash;104-bit conservative CMS19 QROM soundness</strong> across <code>K=1..=16</code> BatchSpends (zero elliptic curves, zero novel algebraic hashes, zero trusted setup)</li>\n\
+                           <li><strong>Formal Verification (Lean 4 &amp; Z3):</strong> All <strong>249 live Rust spend AIR constraints</strong> (<code>SpendCircuitFull.lean</code>) + <strong>10 core conservation &amp; solvency theorems</strong> (<code>SpendBalance.lean</code>) verified in zero-dependency Lean 4 (<code>0 sorry</code>, <code>0 Mathlib</code>, <code>0 native_decide</code>)</li>\n\
+                           <li><strong>Bitcoin Merged Mining &amp; Day-1 ASERT Ramp:</strong> Namecoin-compatible AuxPoW (<code>chainid = 20051</code>) with 1-hour launch half-life over blocks <code>1..=2,016</code> transitioning smoothly to 2-day steady ASERT</li>\n\
+                           <li><strong>Machine Commerce &amp; Priorism-FEP Floor:</strong> <code>BatchSpend</code> (<code>K=2..=16</code>, <code>6.5x</code> at <code>K=8</code>), seller-signed <code>RFC-0022</code> <code>O(1)</code> SHA-256 PayWord channels, <code>PriorLock</code> (50/50 surprise bounty/burn with SCGS-I3 anti-self-arbitration), and <code>50%</code> Homeostatic Base-Fee Burn counterbalancing the perpetual <code>0.1953125 LOVE/block</code> tail floor</li>\n\
+                           <li><strong>Post-Quantum P2P, Light Verification &amp; Utreexo:</strong> <code>NSPQ1</code> (ML-KEM-768) + <code>NSPQ2</code> (FIPS 205 <code>SLH-DSA</code> peer pinning), Genesis-bound FlyClient <code>O(log N)</code> MMR, <code>&le; 1 KB</code> Utreexo frontier (<code>/mainnet/api/utreexo</code>), real pure-SHA-2 STARK-in-STARK IVC verifier (<code>newsatoshi ivc-prove</code>), and zero-Rust-code independent JS/OpenSSL live verifier</li>\n\
                          </ul>\n\
-                         <h2>Three Open Cryptographic Conjectures for Peer Critique</h2>\n\
-                         <ol>\n\
-                           <li><strong>Minimum-Width Transparent MCU AIR:</strong> Tightest <code>(w, N, d)</code> achieving 128-bit PQ FRI soundness with in-circuit SHA-256 folding in &lt;10 ms on 240 MHz Cortex-M7/ESP32-S3 (&le;512 KiB SRAM).</li>\n\
-                           <li><strong>Hash-Only Sublinear Multi-Merchant PayWords:</strong> Whether a stateless SHA-256 accumulator can settle <code>N</code> dynamic PayWords across <code>M</code> merchants in <code>O(log(MN))</code> L1 verification without pairings or lattices.</li>\n\
-                           <li><strong>Tiny-Kernel Formal Auditability Budget:</strong> Requiring <code>LoC_formal + LoC_AIR &le; 10^3</code> with zero external library axioms for monetary consensus validity circuits.</li>\n\
-                         </ol>\n\
-                         <h2>Live 4-Chain Sourcify-Verified Ownerless EVM HTLCs</h2>\n\
-                         <p>Universal nonce-0 address across <strong>Base (8453), Arbitrum One (42161), Optimism (10), and Polygon (137)</strong>: <code>0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987</code> (all 4 <code>exact_match</code> on Sourcify, live atomic <code>lockEth</code> &rarr; <code>claim</code> proofs on-chain).</p>\n\
-                         <p>Read the complete raw paper at <a href=\"/whitepaper.md\">/whitepaper.md</a> or inspect the source on <a href=\"https://github.com/theguysaccount/newsatoshi-commons\">GitHub</a>.</p>"
-                    ),
+                         <h2>Verify Live Mainnet v2 Independently (Zero Trust)</h2>\n\
+                         <pre>node verifier-ts/newsatoshi_verifier.mjs --live https://newsatoshi.org/mainnet\n# or run the live 192-bit / 104-bit QROM browser STARK verifier at https://newsatoshi.org/</pre>\n\
+                         <h2>Honest Trade-Offs &amp; Open Non-Code Gates</h2>\n\
+                         <ul>\n\
+                           <li><strong>Reserved BIP-9 Soft-Fork Bits:</strong> <code>bit 5</code> (future WHIR/Binius compact pure-SHA-2 proofs), <code>bit 6</code> (future GPU-scaled zero-witness recursive spend aggregation), and <code>bit 7</code> (permanent monetary-base ossification)</li>\n\
+                           <li><strong>External Gates Tracked Live (<a href=\"/api/v2/cutover-readiness\">/api/v2/cutover-readiness</a>):</strong> <code>0/2</code> independent human security audits completed (<code>docs/AUDIT_SCOPE_V2.md</code>) and <code>0/3</code> independent real-difficulty Bitcoin pools (&ge; 10,000 difficulty) observed. Hold only what you can afford to lose until external audits close.</li>\n\
+                         </ul>\n\
+                         <p>Read the complete raw Markdown at <a href=\"/whitepaper.md\">/whitepaper.md</a> or inspect live verification telemetry at <a href=\"/api/v2/live-verify\">/api/v2/live-verify</a>.</p>",
                 );
                 Some(("text/html; charset=utf-8", html))
             }

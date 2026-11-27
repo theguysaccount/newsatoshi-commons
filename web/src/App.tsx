@@ -417,6 +417,14 @@ function AppShell() {
             </button>
 
             <a
+              href="/manifesto"
+              className="hidden shrink-0 items-center gap-1 whitespace-nowrap text-[13px] font-medium text-amber-300/90 transition hover:text-amber-200 lg:inline-flex"
+            >
+              <span>Manifesto</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </a>
+
+            <a
               href="/whitepaper"
               className="hidden shrink-0 items-center gap-1 whitespace-nowrap text-[13px] font-medium text-zinc-400 transition hover:text-zinc-100 lg:inline-flex"
             >
@@ -776,8 +784,11 @@ function AppShell() {
             <a href="https://newsatoshi.org/" className="transition hover:text-zinc-200">
               newsatoshi.org
             </a>
+            <a href="/manifesto" className="transition hover:text-zinc-200">
+              Manifesto
+            </a>
             <a href="/whitepaper" className="transition hover:text-zinc-200">
-              Whitepaper
+              Whitepaper v2.2
             </a>
             <a href="/formal/NewsatoshiCovenants.lean" className="transition hover:text-zinc-200">
               Lean 4 Proof
