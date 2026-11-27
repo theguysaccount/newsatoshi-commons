@@ -10,6 +10,7 @@ use crate::backing::{fetch_live_backing_summary, BackingProofSummary, CANONICAL_
 use crate::crypto::{sha256, sha256_concat};
 use crate::crypto_tools::inspect_evm_contract;
 use crate::hardware::{ExternalDeedPacket, ExternalTelemetryPacket};
+use crate::ops_hub::{try_handle_ops_request, OpsHubManager};
 use crate::rpc::{AnchorReceipt, JsonRpcAnchorClient, PROTOCOL_VERSION};
 use crate::seed::{
     L1LockRecord, SeedSnapshot, SeedStatusClient, DEFAULT_MAINNET_SEED_STATUS_URL,
@@ -104,6 +105,7 @@ struct AppState {
     admin_token_digest: Option<[u8; 32]>,
     verify_only: bool,
     external_public_keys: Option<ExternalPublicKeysConfig>,
+    ops_hub: OpsHubManager,
     started_at: Instant,
 }
 
@@ -218,6 +220,7 @@ pub fn spawn_server(config: ServerConfig) -> Result<RunningServer, String> {
         .filter(|s| !s.is_empty())
         .map(|u| SeedStatusClient::new(u, Duration::from_secs(5)));
     let verify_only = engine.verify_only || config.verify_only;
+    let ops_hub = OpsHubManager::init(&config.state_file);
     let state = Arc::new(AppState {
         engine: Mutex::new(engine),
         state_file: config.state_file,
@@ -229,6 +232,7 @@ pub fn spawn_server(config: ServerConfig) -> Result<RunningServer, String> {
         admin_token_digest,
         verify_only,
         external_public_keys: config.external_public_keys,
+        ops_hub,
         started_at: Instant::now(),
     });
 
@@ -314,6 +318,7 @@ pub fn run_server_blocking(config: ServerConfig) -> Result<(), String> {
         .filter(|s| !s.is_empty())
         .map(|u| SeedStatusClient::new(u, Duration::from_secs(5)));
     let verify_only = engine.verify_only || config.verify_only;
+    let ops_hub = OpsHubManager::init(&config.state_file);
     let state = Arc::new(AppState {
         engine: Mutex::new(engine),
         state_file: config.state_file,
@@ -325,6 +330,7 @@ pub fn run_server_blocking(config: ServerConfig) -> Result<(), String> {
         admin_token_digest,
         verify_only,
         external_public_keys: config.external_public_keys,
+        ops_hub,
         started_at: Instant::now(),
     });
 
@@ -637,7 +643,7 @@ fn respond_unauthorized(req: Request) {
     );
 }
 
-fn handle_request(mut req: Request, state: &AppState) {
+fn handle_request(req: Request, state: &AppState) {
     let method = req.method().clone();
     let raw_url = req.url().to_string();
     let path = raw_url.split('?').next().unwrap_or(&raw_url).to_string();
@@ -646,6 +652,17 @@ fn handle_request(mut req: Request, state: &AppState) {
         respond_empty(req, 204);
         return;
     }
+
+    let mut req = match try_handle_ops_request(
+        req,
+        &path,
+        &state.ops_hub,
+        || state.get_seed_snapshot(false),
+        || state.get_backing_summary(false),
+    ) {
+        Some(r) => r,
+        None => return,
+    };
 
     if method == Method::Head {
         let head_ct = match path.as_str() {

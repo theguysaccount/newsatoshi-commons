@@ -7,6 +7,7 @@ pub mod crypto_tools;
 pub mod cutover;
 pub mod hardware;
 pub mod launchpad;
+pub mod ops_hub;
 pub mod p2p;
 pub mod rpc;
 pub mod seed;
