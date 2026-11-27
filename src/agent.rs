@@ -455,7 +455,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                     "/l2",
                     "Newsatoshi Layer-2 Expansion & Perfection Layers — PayWords, nsUSD & Shielded STARK Rollups",
                     "Hourglass Layer-2 Perfection Architecture above Mainnet v2 (nsM2): O(1) SHA-256 PayWords, RFC-0028 sovereign nsUSD CDP/oracle engine, Winterfell STARK shielded rollup batching, and unilateral Merkle L1 escape hatches.",
-                    "<h1>Newsatoshi Layer-2 Expansion &amp; Perfection Layers (<code>v0.28.3</code>)</h1>\n\
+                    "<h1>Newsatoshi Layer-2 Expansion &amp; Perfection Layers (<code>v0.28.4</code>)</h1>\n\
                      <p><strong>Hourglass Architecture:</strong> Layer 1 (<code>newsatoshi-rfc0021</code>, Mainnet v2 <code>nsM2</code>) stays minimal, pure FIPS SHA-2, and ossified. Layer 2 (<code>newsatoshi-commons</code>) delivers machine-speed throughput, private USD stability (<code>nsUSD</code>), and zero-custody escape hatches.</p>\n\
                      <p>Live APIs: <a href=\"/l2.md\">Full Markdown Spec (/l2.md)</a> &middot; <a href=\"/api/v2/l2/status\">GET /api/v2/l2/status</a> &middot; <a href=\"/api/v2/nsusd/state\">GET /api/v2/nsusd/state</a> &middot; <a href=\"/formal/NsUsdAndL2Perfection.lean\">Lean 4 Proof (11 Theorems, 0 sorry)</a> &middot; <a href=\"/nsusd\">nsUSD Spec (/nsusd)</a> &middot; <a href=\"/whitepaper.pdf\">Whitepaper v2.2 PDF</a></p>\n\
                      <h2>Layer 2A &mdash; Microsecond Streaming (<code>O(1)</code> SHA-256 PayWords)</h2>\n\

@@ -188,12 +188,12 @@ pub fn evaluate_v2_cutover_readiness(seed: &SeedSnapshot) -> Value {
             "genesis_nonce": 2_649_823_154u32,
             "live_seed_status_url": "https://newsatoshi-seed-v2.fly.dev/status",
             "live_p2p_seeds": ["newsatoshi-seed-v2.fly.dev:8445", "pool.newsatoshi.org:8445"],
-            "note": "Canonical Mainnet v2 (nsM2, v1.2.4) is live, anchored to Bitcoin Block #977,738 with zero premine and backed by an open fair-mined LOVE Public Security Bug Bounty (/bounty)."
+            "note": "Canonical Mainnet v2 (nsM2, v1.2.5) is live, anchored to Bitcoin Block #977,738 with zero premine and backed by an open fair-mined LOVE Public Security Bug Bounty (/bounty)."
         },
         "gates": {
             "engineering_and_formal_proofs": {
                 "passed": gate_engineering,
-                "l1_release_tag": "v1.2.4",
+                "l1_release_tag": "v1.2.5",
                 "live_browser_stark_verifier": "MAIN_V2_QUARTIC_SHA384_192b_104b_QROM_WASM",
                 "live_utreexo_api": "https://newsatoshi.org/mainnet/api/utreexo",
                 "independent_js_live_verifier_cli": "node verifier-ts/newsatoshi_verifier.mjs --live https://newsatoshi.org/mainnet",

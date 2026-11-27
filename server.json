@@ -3,7 +3,7 @@
   "name": "org.newsatoshi.commons/newsatoshi-commons",
   "title": "Newsatoshi Commons — Private x402, nsUSD & Multi-Chain Crypto MCP",
   "description": "35 zero-auth tools: private x402/PayWords kit, nsUSD, L2 STARK rollup, EVM audit & BTC/Base swaps.",
-  "version": "0.28.3",
+  "version": "0.28.4",
   "websiteUrl": "https://commons.newsatoshi.org",
   "repository": {
     "url": "https://github.com/theguysaccount/newsatoshi-commons",

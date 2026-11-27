@@ -63,6 +63,29 @@ interface L2BenchmarkResult {
   };
 }
 
+interface PaywallKitResult {
+  ok: boolean;
+  framework: string;
+  filename: string;
+  install_cmd: string;
+  price_usd: string;
+  micro_usd_ticks: number;
+  code: string;
+  error?: string;
+}
+
+interface BaseEscrowVerifyResult {
+  ok: boolean;
+  verified_onchain?: boolean;
+  block_number?: number;
+  verified_usdc_formatted?: string;
+  deposit_path?: string;
+  basescan_url?: string;
+  receipt_commitment_sha256?: string;
+  nsusd_b_asset_id?: number;
+  error?: string;
+}
+
 interface OverviewPageProps {
   seed: SeedStatusResponse | null;
   backing: BackingProofSummary | null;
@@ -82,7 +105,7 @@ const SNIPPETS: Record<
 > = {
   mcp: {
     label: 'MCP Server',
-    caption: '33 zero-auth L2 gateway & crypto tools (nsUSD CDP/stress, L2 STARK rollup benchmark, EVM audit, BTC mempool, BOLT-11, Native LOVE PayWords)',
+    caption: '35 zero-auth L2 gateway & crypto tools (60s private x402 paywall kit, Base USDC escrow verifier, nsUSD stress, L2 STARK rollup, EVM audit, BTC mempool, BOLT-11)',
     code: `{
   "mcpServers": {
     "newsatoshi": {
@@ -171,8 +194,72 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
   const [stressResult, setStressResult] = useState<NsUsdStressResult | null>(null);
   const [l2Busy, setL2Busy] = useState(false);
   const [l2Result, setL2Result] = useState<L2BenchmarkResult | null>(null);
+  const [kitFw, setKitFw] = useState<'express' | 'nextjs' | 'fastapi' | 'axum'>('express');
+  const [kitUsd, setKitUsd] = useState('0.005');
+  const [kitRoute, setKitRoute] = useState('/api/inference');
+  const [kitBusy, setKitBusy] = useState(false);
+  const [kitResult, setKitResult] = useState<PaywallKitResult | null>(null);
+  const [escrowTx, setEscrowTx] = useState(
+    '0xd3c521e3dcdd1465f6f51384a5c721c0c445c3d384282ae0c67b2b07195029ba'
+  );
+  const [escrowBusy, setEscrowBusy] = useState(false);
+  const [escrowResult, setEscrowResult] = useState<BaseEscrowVerifyResult | null>(null);
   const ms = seed?.mainnet_live ? seed.mainnet_status : null;
   const activeSnippet = SNIPPETS[snippetTab];
+
+  const generatePaywallKit = async (fwOverride?: 'express' | 'nextjs' | 'fastapi' | 'axum') => {
+    const fw = fwOverride ?? kitFw;
+    if (fwOverride) setKitFw(fwOverride);
+    setKitBusy(true);
+    try {
+      const resp = await fetch('/api/v2/x402/paywall-kit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          framework: fw,
+          price_usd: Number.parseFloat(kitUsd) || 0.005,
+          route_path: kitRoute.trim() || '/api/inference',
+        }),
+      });
+      const data = (await resp.json()) as PaywallKitResult;
+      setKitResult(data);
+      onNotice(
+        data.ok ? 'success' : 'error',
+        data.ok
+          ? `Generated ${data.framework} private x402 + PayWords middleware ($${data.price_usd}/call)`
+          : data.error || 'Paywall kit generation failed'
+      );
+    } catch (err) {
+      onNotice('error', err instanceof Error ? err.message : 'Paywall kit request failed');
+    } finally {
+      setKitBusy(false);
+    }
+  };
+
+  const verifyBaseEscrow = async (txOverride?: string) => {
+    const hash = (txOverride ?? escrowTx).trim();
+    if (txOverride) setEscrowTx(txOverride);
+    setEscrowBusy(true);
+    try {
+      const resp = await fetch('/api/v2/nsusd/verify-base-escrow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tx_hash: hash }),
+      });
+      const data = (await resp.json()) as BaseEscrowVerifyResult;
+      setEscrowResult(data);
+      onNotice(
+        data.ok ? 'success' : 'error',
+        data.ok
+          ? `Verified $${data.verified_usdc_formatted} USDC on Base block #${data.block_number}`
+          : data.error || 'Base escrow verification failed'
+      );
+    } catch (err) {
+      onNotice('error', err instanceof Error ? err.message : 'Base RPC request failed');
+    } finally {
+      setEscrowBusy(false);
+    }
+  };
 
   const runNsUsdStress = async () => {
     setStressBusy(true);
@@ -227,7 +314,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
         <div className="lg:col-span-7">
           <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-white/[0.09] bg-white/[0.025] px-3 py-1 text-[11px] font-medium tracking-wide text-zinc-400">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            <span className="font-mono uppercase text-zinc-200">Mainnet v2 · L1 v1.2.1</span>
+            <span className="font-mono uppercase text-zinc-200">Mainnet v2 · L1 v1.2.5</span>
             <span className="text-zinc-600">·</span>
             <span>Native LOVE &amp; nsUSD Gateway</span>
           </div>
@@ -240,9 +327,10 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
           <p className="mt-5 max-w-xl text-[15px] leading-[1.7] text-zinc-400 sm:text-[16px]">
             <span className="font-mono text-[14px] text-zinc-200">Newsatoshi (LOVE)</span> is
             sovereign Layer-1 cash — default shielded privacy via pure FIPS SHA-2/SHA-384 STARKs,
-            mechanized in Lean 4, and merge-mined by Bitcoin ASICs (<span className="font-mono text-[13px] text-zinc-300">chainid 20051</span>).
+            mechanized in Lean 4 (all 249 constraints, 114,688 periodic cells &amp; BatchSpend K=2..16),
+            and merge-mined by Bitcoin ASICs (<span className="font-mono text-[13px] text-zinc-300">chainid 20051</span>).
             Above the waist, this gateway delivers stable USD settlement (<span className="font-mono text-[13px] text-sky-300">nsUSD</span>),
-            L2 STARK rollup perfection layers, 33 zero-auth MCP tools, sub-millisecond PayWords, and trustless BTC/Lightning/EVM HTLC bridges.
+            a 60-second private x402 paywall kit, 35 zero-auth MCP tools, sub-millisecond PayWords, and trustless BTC/Lightning/EVM HTLC bridges.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -421,20 +509,20 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
               <ArrowUpRight className="h-3.5 w-3.5 text-zinc-600 transition group-hover:text-zinc-300" />
             </div>
             <div className="mt-2.5 font-mono text-2xl font-medium tracking-tight text-zinc-100">
-              104b QROM · 249 Lean
+              104b QROM · Lean 4 IFF
             </div>
             <div className="mt-1.5 text-xs text-zinc-500">
-              Quartic FRI · 249 Lean AIR + IVC · 6.45× K=8 batch
+              249 AIR + 114,688 cells + BatchSpend K=2..16 (0 sorry)
             </div>
           </a>
 
           <div className="p-5 sm:border-l sm:border-t sm:border-white/[0.07] sm:p-6 lg:border-l-0 lg:border-t-0">
             <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-[0.08em] text-zinc-500">
               <span>L2 Agent Gateway</span>
-              <span className="font-mono text-[10px] text-emerald-400">LOVE Primary</span>
+              <span className="font-mono text-[10px] text-emerald-400">MCP Registry 0.28.4</span>
             </div>
             <div className="mt-2.5 font-mono text-2xl font-medium tracking-tight text-zinc-100">
-              33 Live Tools
+              35 Live Tools
             </div>
             <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-zinc-500">
               <span className="truncate font-mono text-[11px]">commons.newsatoshi.org/mcp</span>
@@ -621,6 +709,193 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
               </div>
             )}
           </div>
+
+          {/* Card C: 60-Second Drop-In Private x402 / nsUSD Paywall Middleware Generator */}
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.03] p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.08em] text-emerald-300">
+                  <Zap className="h-4 w-4" />
+                  <span>60-Second Developer Utility · MCP #34</span>
+                </div>
+                <h3 className="mt-2 text-lg font-medium text-zinc-100">
+                  Drop-In Private x402 + O(1) PayWords Middleware
+                </h3>
+              </div>
+              <span className="shrink-0 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] text-emerald-200">
+                0 Per-Call Gas
+              </span>
+            </div>
+
+            <p className="text-[13px] leading-relaxed text-zinc-400">
+              Monetize any API route in stable USD (<code className="font-mono text-zinc-200">nsUSD</code>) over private{' '}
+              <strong className="text-zinc-200">O(1) SHA-256 PayWords</strong> with automatic Base USDC{' '}
+              <code className="font-mono text-zinc-200">x402 v2</code> fallback — zero custodian lock-in.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {(['express', 'nextjs', 'fastapi', 'axum'] as const).map((fw) => (
+                <button
+                  key={fw}
+                  type="button"
+                  onClick={() => void generatePaywallKit(fw)}
+                  className={`rounded-full px-3 py-1 font-mono text-[11px] transition cursor-pointer ${
+                    kitFw === fw
+                      ? 'bg-emerald-400 font-semibold text-zinc-950'
+                      : 'border border-white/[0.1] bg-white/[0.03] text-zinc-300 hover:bg-white/[0.08]'
+                  }`}
+                >
+                  {fw}
+                </button>
+              ))}
+              <input
+                type="text"
+                value={kitUsd}
+                onChange={(e) => setKitUsd(e.target.value)}
+                aria-label="Price in USD"
+                className="w-20 rounded-lg border border-white/[0.1] bg-[#090c12] px-2.5 py-1 font-mono text-[11px] text-zinc-200"
+                placeholder="0.005"
+              />
+              <input
+                type="text"
+                value={kitRoute}
+                onChange={(e) => setKitRoute(e.target.value)}
+                aria-label="Route path"
+                className="w-36 rounded-lg border border-white/[0.1] bg-[#090c12] px-2.5 py-1 font-mono text-[11px] text-zinc-200"
+                placeholder="/api/inference"
+              />
+              <button
+                type="button"
+                onClick={() => void generatePaywallKit()}
+                disabled={kitBusy}
+                className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-emerald-300 cursor-pointer disabled:opacity-60"
+              >
+                {kitBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                <span>Generate</span>
+              </button>
+            </div>
+
+            {kitResult?.ok && (
+              <div className="rounded-xl border border-emerald-500/25 bg-[#090c12] p-3.5 space-y-2">
+                <div className="flex items-center justify-between gap-2 font-mono text-[11px] text-emerald-300">
+                  <span>
+                    {kitResult.filename} · ${kitResult.price_usd}/call ({kitResult.micro_usd_ticks} ticks)
+                  </span>
+                  <CopyButton value={kitResult.code} />
+                </div>
+                <pre className="max-h-52 overflow-auto font-mono text-[10.5px] leading-relaxed text-zinc-300">
+                  {kitResult.code}
+                </pre>
+              </div>
+            )}
+          </div>
+
+          {/* Card D: Live Base Mainnet Vault & nsUSD-B Escrow Verifier */}
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.03] p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.08em] text-amber-300">
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>Live Base Mainnet Reserves · MCP #35</span>
+                </div>
+                <h3 className="mt-2 text-lg font-medium text-zinc-100">
+                  Verify Real Base USDC Vault Escrow &amp; HTLC Proofs
+                </h3>
+              </div>
+              <span className="shrink-0 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-0.5 font-mono text-[10px] text-amber-200">
+                {backing ? `$${backing.total_usdc_formatted} USDC` : 'Live RPC'}
+              </span>
+            </div>
+
+            <p className="text-[13px] leading-relaxed text-zinc-400">
+              Ownerless <code className="font-mono text-zinc-200">NewsatoshiBackingVault</code> currently holds{' '}
+              <strong className="text-zinc-200">
+                {backing ? `${backing.total_usdc_formatted} USDC + ${backing.total_eth_formatted} ETH` : 'live on-chain reserves'}
+              </strong>
+              . Verify any Base USDC deposit tx live against Base RPC into an auditable Tier-1B{' '}
+              <code className="font-mono text-zinc-200">nsUSD-B</code> receipt, or inspect our live Base SHA-256 HTLC{' '}
+              <a
+                href="https://basescan.org/tx/0xd90a9d873516ab92594ef71ada381ecc4b5852e9e70bd1652d60b0058e630f16"
+                target="_blank"
+                rel="noreferrer"
+                className="text-amber-300 underline hover:text-white"
+              >
+                lock
+              </a>{' '}
+              →{' '}
+              <a
+                href="https://basescan.org/tx/0xdece20236b816eed13c358b923cf6a8a9e527b8ad72512ecd463c319b8d2d048"
+                target="_blank"
+                rel="noreferrer"
+                className="text-amber-300 underline hover:text-white"
+              >
+                claim
+              </a>{' '}
+              proof.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  void verifyBaseEscrow('0xd3c521e3dcdd1465f6f51384a5c721c0c445c3d384282ae0c67b2b07195029ba')
+                }
+                className="rounded-full border border-white/[0.1] bg-white/[0.03] px-2.5 py-1 font-mono text-[10.5px] text-zinc-300 hover:bg-white/[0.08] cursor-pointer"
+              >
+                $14.52 Direct Tx
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  void verifyBaseEscrow('0x21a8e80c95a4a7e6f4f459ea368764a74fe2c4a8a2d2d24a8a9f94c3b5dd7a2e')
+                }
+                className="rounded-full border border-white/[0.1] bg-white/[0.03] px-2.5 py-1 font-mono text-[10.5px] text-zinc-300 hover:bg-white/[0.08] cursor-pointer"
+              >
+                $0.10 RFC-0028 Tx
+              </button>
+              <input
+                type="text"
+                value={escrowTx}
+                onChange={(e) => setEscrowTx(e.target.value)}
+                aria-label="Base USDC deposit transaction hash"
+                className="min-w-[180px] flex-1 rounded-lg border border-white/[0.1] bg-[#090c12] px-2.5 py-1 font-mono text-[11px] text-zinc-200"
+              />
+              <button
+                type="button"
+                onClick={() => void verifyBaseEscrow()}
+                disabled={escrowBusy}
+                className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-amber-300 cursor-pointer disabled:opacity-60"
+              >
+                {escrowBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+                <span>Verify RPC</span>
+              </button>
+            </div>
+
+            {escrowResult && (
+              <div className="rounded-xl border border-amber-500/25 bg-[#090c12] p-3.5 font-mono text-[11px] space-y-1 text-zinc-300">
+                {escrowResult.ok ? (
+                  <>
+                    <div className="flex items-center justify-between text-emerald-300">
+                      <span>BASE MAINNET USDC VERIFIED</span>
+                      <span>${escrowResult.verified_usdc_formatted} USDC</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-zinc-400">Block / Path</span>
+                      <span>
+                        #{escrowResult.block_number} · {escrowResult.deposit_path}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-zinc-400">nsUSD-B Receipt SHA-256</span>
+                      <span>{truncateHash(escrowResult.receipt_commitment_sha256 || '', 10, 8)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-rose-300">{escrowResult.error || 'Verification failed'}</div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
@@ -655,7 +930,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] text-emerald-200 hover:bg-emerald-500/20"
               >
-                <span>newsatoshi-rfc0021 · v1.2.1</span>
+                <span>newsatoshi-rfc0021 · v1.2.5</span>
                 <ArrowUpRight className="h-3 w-3" />
               </a>
             </div>
@@ -718,7 +993,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 rounded-full border border-white/[0.1] bg-white/[0.04] px-2.5 py-0.5 font-mono text-[10px] text-zinc-300 hover:text-white"
               >
-                <span>newsatoshi-commons · v0.28.0</span>
+                <span>newsatoshi-commons · v0.28.4</span>
                 <ArrowUpRight className="h-3 w-3" />
               </a>
             </div>
@@ -752,8 +1027,10 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
                 <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" />
                 <span>
                   <strong className="text-zinc-100">A2A Commerce &amp; Identity Ready:</strong>{' '}
-                  33 zero-auth MCP tools, <code className="font-mono text-xs">ERC-8004</code> dual
-                  identity, RFC-0028 <code className="font-mono text-xs">nsUSD</code> stability, and L2 STARK rollups.
+                  35 zero-auth MCP tools (Official MCP Registry <code className="font-mono text-xs">0.28.4</code>),{' '}
+                  <code className="font-mono text-xs">ERC-8004</code> dual identity, 60s private{' '}
+                  <code className="font-mono text-xs">x402</code> paywall kit, RFC-0028{' '}
+                  <code className="font-mono text-xs">nsUSD</code> stability, and L2 STARK rollups.
                 </span>
               </li>
               <li className="flex items-start gap-2.5">

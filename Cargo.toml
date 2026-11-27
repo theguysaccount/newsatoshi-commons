@@ -1,9 +1,9 @@
 [package]
 name = "newsatoshi-commons"
-version = "0.28.3"
+version = "0.28.4"
 edition = "2021"
 license = "PolyForm-Noncommercial-1.0.0"
-description = "Newsatoshi Commons Gateway (Live Mainnet v2 nsM2 / v1.2.4 Pure SHA-2 L1 aligned + RFC-0028 nsUSD Dual-Tier Stablecoin Engine + L2 Shielded Rollup & Perfection Layer): 35 zero-auth MCP tools, live Base USDC vault escrow verifier, 60-second private x402/nsUSD paywall generator, live nsUSD adversarial stress-test & Winterfell STARK L2 batch benchmark, Native LOVE PayWords + x402 bridges, NIST FIPS 205 SLH-DSA, multi-chain SHA-256 HTLC swaps, zkTLS, and honest zero-fake-data telemetry."
+description = "Newsatoshi Commons Gateway (Live Mainnet v2 nsM2 / v1.2.5 Pure SHA-2 L1 aligned + RFC-0028 nsUSD Dual-Tier Stablecoin Engine + L2 Shielded Rollup & Perfection Layer): 35 zero-auth MCP tools, interactive homepage 60s private x402/nsUSD paywall generator & live Base USDC vault escrow verifier, live nsUSD stress-test & Winterfell STARK L2 batch benchmark, Native LOVE PayWords + x402 bridges, NIST FIPS 205 SLH-DSA, multi-chain SHA-256 HTLC swaps, zkTLS, and honest zero-fake-data telemetry."
 
 [[bin]]
 name = "newsatoshi-commons"

@@ -620,7 +620,7 @@ pub fn render_well_known_x402(base_url: &str) -> Value {
         "provider": "Newsatoshi Commons",
         "primary_settlement_asset": "LOVE",
         "primary_rail": "NEWSATOSHI-PAYWORD-SHA256/1.0",
-        "l1_release_target": "v1.2.4",
+        "l1_release_target": "v1.2.5",
         "evm_usdc_rail_role": "outer_bridge_onramp",
         "website": "https://newsatoshi.org",
         "commons": base_url.trim_end_matches('/'),

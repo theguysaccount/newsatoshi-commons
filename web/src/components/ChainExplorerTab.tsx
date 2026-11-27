@@ -91,19 +91,19 @@ function formatBlockTime(unix: number): string {
 const MIGRATION_PHASES = [
   {
     phase: 'Layer 1 (Narrow Waist)',
-    title: 'v1.2.0 Minimalist SHA-2 Settlement Floor',
+    title: 'v1.2.5 Minimalist SHA-2 Settlement Floor',
     status: 'IMPLEMENTED' as const,
     summary:
-      'Pure SHA-2 shielded cash (256-bit Quartic Goldilocks FRI at 100–104 conservative QROM bits with patched upstream f64 canonicalization, zero elliptic curves, zero novel ZK-hashes), all 249 spend AIR constraints mechanized in Lean 4 (0 sorry), real pure-SHA-2 STARK-in-STARK IVC verifier, Bitcoin AuxPoW (chainid 20051) + panic-free Day-14 ASERT ramp, BatchSpend K=2..16 (6.5x at K=8, incentive-compatible prover_fee), O(log N) Merkleized state, NSPQ1/NSPQ2 SLH-DSA pinned PQ P2P, FlyClient MMR, 50% fee burn, PayWord channels, and minimal PriorLock.',
-    specs: ['v1.2.0', '100-104b QROM', '249 Lean AIR + IVC'],
+      'Pure SHA-2 shielded cash (256-bit Quartic Goldilocks FRI at 100–104 conservative QROM bits with patched upstream f64 canonicalization, zero elliptic curves, zero novel ZK-hashes), all 249 spend AIR constraints + 114,688 periodic cells + 4-mode assertions + BatchSpend K=2..16 tiling mechanized in Lean 4 (0 sorry), Bitcoin AuxPoW (chainid 20051) + panic-free Day-14 ASERT ramp, O(log N) Merkleized state, NSPQ1/NSPQ2 SLH-DSA pinned PQ P2P, FlyClient MMR, 50% fee burn, PayWord channels, and minimal PriorLock.',
+    specs: ['v1.2.5', '100-104b QROM', 'Lean 4 Full + Batch'],
   },
   {
     phase: 'Layer 2 (Above Waist)',
     title: 'Agent Commerce, Bridges & Labs Gateway (This Site)',
     status: 'IMPLEMENTED' as const,
     summary:
-      'All rich application tooling segregated above L1: 30-tool MCP server, Native LOVE PayWords + x402 USDC bridge on-ramps, 4-chain ownerless EVM HTLCs & Backing Vaults, ERC-8004 identity, Web4 charters, off-chain mission launchpads, and zkTLS P2P verifier.',
-    specs: ['30 MCP Tools', 'Native LOVE + x402', '4-Chain HTLCs'],
+      'All rich application tooling segregated above L1: 35-tool zero-auth MCP server (Official MCP Registry 0.28.4), 60-second private x402/nsUSD paywall middleware generator, live Base Mainnet USDC vault escrow verifier, RFC-0028 nsUSD stress engine, Winterfell STARK L2 rollup benchmark, 4-chain ownerless EVM HTLCs & Backing Vaults, ERC-8004 identity, and zkTLS P2P verifier.',
+    specs: ['35 MCP Tools', '60s x402 Paywall Kit', '4-Chain HTLCs'],
   },
   {
     phase: 'Security Bounty',
@@ -118,7 +118,7 @@ const MIGRATION_PHASES = [
     title: 'LIVE — Bitcoin #977,738 Fair-Launch Genesis (nsM2)',
     status: 'IMPLEMENTED' as const,
     summary:
-      'Canonical Mainnet v2 (v1.2.1) live with zero premine at Genesis 00000000ba1cdad4… anchored to Bitcoin block #977,738 (`newsatoshi --net mainnet-v2 node`, seeds `newsatoshi-seed-v2.fly.dev:8445` & `pool.newsatoshi.org:8445`).',
+      'Canonical Mainnet v2 (v1.2.5) live with zero premine at Genesis 00000000ba1cdad4… anchored to Bitcoin block #977,738 (`newsatoshi --net mainnet-v2 node`, seeds `newsatoshi-seed-v2.fly.dev:8445` & `pool.newsatoshi.org:8445`).',
     specs: ['BTC #977,738', 'Day-1 ASERT Ramp', 'Zero Premine'],
   },
 ];
