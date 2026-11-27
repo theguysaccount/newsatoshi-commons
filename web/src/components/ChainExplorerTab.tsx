@@ -32,11 +32,11 @@ function formatBlockTime(unix: number): string {
 const MIGRATION_PHASES = [
   {
     phase: 'Layer 1 (Narrow Waist)',
-    title: 'v1.1.0-hardened Minimalist SHA-2 Settlement Floor',
+    title: 'v1.2.0-mainnet-rc1 Minimalist SHA-2 Settlement Floor',
     status: 'IMPLEMENTED' as const,
     summary:
-      'Pure SHA-2 shielded cash (256-bit Quartic Goldilocks FRI at 100–104 conservative QROM bits, zero elliptic curves, zero novel ZK-hashes), all 249 spend AIR constraints mechanized in Lean 4 (0 sorry), real pure-SHA-2 STARK-in-STARK IVC verifier, Bitcoin AuxPoW (chainid 20051) + Day-1 ASERT ramp, BatchSpend K=2..16 (6.45x at K=8), FlyClient MMR, 50% fee burn, PayWord channels, and minimal PriorLock.',
-    specs: ['v1.1.0-hardened', '100-104b QROM', '249 Lean AIR + IVC'],
+      'Pure SHA-2 shielded cash (256-bit Quartic Goldilocks FRI at 100–104 conservative QROM bits with patched upstream f64 canonicalization, zero elliptic curves, zero novel ZK-hashes), all 249 spend AIR constraints mechanized in Lean 4 (0 sorry), real pure-SHA-2 STARK-in-STARK IVC verifier, Bitcoin AuxPoW (chainid 20051) + panic-free Day-14 ASERT ramp, BatchSpend K=2..16 (6.5x at K=8, incentive-compatible prover_fee), O(log N) Merkleized state, NSPQ1/NSPQ2 SLH-DSA pinned PQ P2P, FlyClient MMR, 50% fee burn, PayWord channels, and minimal PriorLock.',
+    specs: ['v1.2.0-mainnet-rc1', '100-104b QROM', '249 Lean AIR + IVC'],
   },
   {
     phase: 'Layer 2 (Above Waist)',

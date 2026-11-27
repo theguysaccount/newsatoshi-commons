@@ -2192,7 +2192,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
     assert_eq!(cutover["ready_for_v2_activation"], false);
     assert_eq!(cutover["genesis_policy"]["nov10_canary_retired"], true);
     assert_eq!(cutover["gates"]["external_security_audits"]["completed"], 0);
-    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["l1_release_tag"], "v1.1.0-hardened");
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["l1_release_tag"], "v1.2.0-mainnet-rc1");
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["lean4_theorems"], 10);
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["lean4_full_circuit_constraints"], 249);
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["lean4_native_decide_count"], 0);
@@ -2201,7 +2201,11 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["stark_in_stark_ivc_verifier"]["implemented"], true);
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["prior_lock_fep"], true);
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["homeostatic_fee_burn_bps"], 5000);
-    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["batch_spend_split_coinbase"], true);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["batch_spend_incentive_compatible_prover_fee"], true);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["day14_asert_steady_anchor_verified"], true);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["merkleized_locks_and_conds_o_log_n"], true);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["winterfell_f64_canonicalization_patched"], true);
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["authenticated_nspq2_slh_dsa_p2p"], true);
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["work_proportional_flyclient_mmr"], true);
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["opportunistic_pq_mlkem_p2p"], true);
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["independent_second_verifier_client"], true);
@@ -2807,7 +2811,7 @@ fn http_api_web4_charters_erc8004_services_bounties_and_paid_402_tool() {
     assert_eq!(x402_idx["version"], 2);
     assert_eq!(x402_idx["primary_settlement_asset"], "LOVE");
     assert_eq!(x402_idx["evm_usdc_rail_role"], "outer_bridge_onramp");
-    assert_eq!(x402_idx["l1_release_target"], "v1.1.0-hardened");
+    assert_eq!(x402_idx["l1_release_target"], "v1.2.0-mainnet-rc1");
     assert_eq!(x402_idx["resources"].as_array().unwrap().len(), 4);
 
     let r_x402_unpaid = agent

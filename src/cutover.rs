@@ -2,7 +2,7 @@
 //!
 //! Zero fabricated sign-offs, zero fake mining pools: reports exact live on-chain
 //! telemetry and explicit blocking gates required before launching Newsatoshi Mainnet v2
-//! (`v1.1.0-hardened` Priorism-FEP Pure SHA-2 L1):
+//! (`v1.2.0-mainnet-rc1` Pure SHA-2 L1 Release Candidate 1):
 //!
 //! 1. At least 2 independent external security audits signed off (Winterfell segment masking,
 //!    spend.rs, batch_spend.rs, prior.rs, light.rs, pq_transport.rs — see docs/AUDIT_SCOPE_V2.md).
@@ -43,7 +43,7 @@ pub fn evaluate_v2_cutover_readiness(seed: &SeedSnapshot) -> Value {
 
     let gate_audits = external_audits_completed >= REQUIRED_EXTERNAL_AUDITS;
     let gate_pools = independent_real_difficulty_pools >= REQUIRED_INDEPENDENT_AUXPOW_POOLS;
-    let gate_engineering = true; // v1.1.0-hardened: Quartic F_{p^4} SHA-384 FRI (100-104b conservative QROM), full 249-constraint Lean 4 SpendCircuitFull.lean + 10 SpendBalance.lean (0 sorry), real STARK-in-STARK IVC verifier (204 SHA-256 + 10 Quartic FRI), PriorLock FEP, 50% Burn, BatchSpend K=2..16 (6.45x), FlyClient U512 MMR
+    let gate_engineering = true; // v1.2.0-mainnet-rc1: Quartic F_{p^4} SHA-384 FRI (100-104b conservative QROM), patched upstream Winterfell f64 double/mul_small, panic-free Day-14 ASERT transition, incentive-compatible BatchSpend prover_fee, O(log N) Merkleized locks/conds (legacy jobs disabled on nsM2), NSPQ1/NSPQ2 SLH-DSA pinned PQ P2P + anti-slowloris, full 249-constraint Lean 4 SpendCircuitFull.lean + 10 SpendBalance.lean (0 sorry), real STARK-in-STARK IVC verifier with in-circuit PoW
     let ready = gate_audits && gate_pools && gate_engineering;
 
     let mut blockers = Vec::new();
@@ -70,7 +70,7 @@ pub fn evaluate_v2_cutover_readiness(seed: &SeedSnapshot) -> Value {
         "gates": {
             "engineering_and_formal_proofs": {
                 "passed": gate_engineering,
-                "l1_release_tag": "v1.1.0-hardened",
+                "l1_release_tag": "v1.2.0-mainnet-rc1",
                 "architecture": "minimalist_priorism_fep_pure_sha2_l1",
                 "alt_l1_bloat_removed": [
                     "rollup.rs",
@@ -79,16 +79,21 @@ pub fn evaluate_v2_cutover_readiness(seed: &SeedSnapshot) -> Value {
                     "bond.rs",
                     "covenant_stark.rs"
                 ],
+                "legacy_jobs_disabled_mainnet_v2": true,
+                "merkleized_locks_and_conds_o_log_n": true,
+                "day14_asert_steady_anchor_verified": true,
+                "winterfell_f64_canonicalization_patched": true,
                 "prior_lock_fep": true,
                 "homeostatic_fee_burn_bps": 5000,
                 "batch_spend_compression_k_range": "2..=16",
-                "batch_spend_compression_k8_ratio": 6.45,
-                "batch_spend_k8_proof_bytes_sha384": 745533,
-                "batch_spend_split_coinbase": true,
+                "batch_spend_compression_k8_ratio": 6.51,
+                "batch_spend_k8_proof_bytes_sha384": 741672,
+                "batch_spend_incentive_compatible_prover_fee": true,
                 "work_proportional_flyclient_mmr": true,
                 "flyclient_mmr_committed_in_genesis": true,
                 "opportunistic_pq_mlkem_p2p": true,
-                "pq_p2p_threat_model": "Opportunistic ML-KEM-768 (NSPQ1) prevents passive harvest-now-decrypt-later eavesdropping only; does not prevent active MITM without explicit peer key pinning.",
+                "authenticated_nspq2_slh_dsa_p2p": true,
+                "pq_p2p_threat_model": "Auto-negotiates opportunistic ML-KEM-768 (NSPQ1, passive HNDL protection) or FIPS 205 SLH-DSA peer-pinned NSPQ2 (--peer HOST:PORT@<vk>, blocks active MITM), hardened with 64 KB chunked slowloris defense.",
                 "lean4_theorems": 10,
                 "lean4_full_circuit_constraints": 249,
                 "lean4_full_circuit_terms": 2950,

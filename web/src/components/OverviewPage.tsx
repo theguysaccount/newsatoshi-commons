@@ -133,7 +133,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
         <div className="lg:col-span-7">
           <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-white/[0.09] bg-white/[0.025] px-3 py-1 text-[11px] font-medium tracking-wide text-zinc-400">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            <span className="font-mono uppercase text-zinc-200">L1 v1.1.0-hardened</span>
+            <span className="font-mono uppercase text-zinc-200">L1 v1.2.0-mainnet-rc1</span>
             <span className="text-zinc-600">·</span>
             <span>Hourglass Architecture · L2 Agent &amp; Bridge Gateway</span>
           </div>
@@ -171,12 +171,12 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
             </button>
 
             <a
-              href="https://github.com/theguysaccount/newsatoshi-rfc0021/releases/tag/v1.1.0-hardened"
+              href="https://github.com/theguysaccount/newsatoshi-rfc0021/releases/tag/v1.2.0-mainnet-rc1"
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 px-3 py-2.5 text-[13px] font-medium text-zinc-400 transition hover:text-zinc-100"
             >
-              <span>L1 v1.1.0-hardened</span>
+              <span>L1 v1.2.0-mainnet-rc1</span>
               <ArrowUpRight className="h-3.5 w-3.5" />
             </a>
           </div>
@@ -299,7 +299,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] text-emerald-200 hover:bg-emerald-500/20"
               >
-                <span>newsatoshi-rfc0021 · v1.1.0-hardened</span>
+                <span>newsatoshi-rfc0021 · v1.2.0-mainnet-rc1</span>
                 <ArrowUpRight className="h-3 w-3" />
               </a>
             </div>
@@ -362,7 +362,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 rounded-full border border-white/[0.1] bg-white/[0.04] px-2.5 py-0.5 font-mono text-[10px] text-zinc-300 hover:text-white"
               >
-                <span>newsatoshi-commons · v0.23.0</span>
+                <span>newsatoshi-commons · v0.24.0</span>
                 <ArrowUpRight className="h-3 w-3" />
               </a>
             </div>
