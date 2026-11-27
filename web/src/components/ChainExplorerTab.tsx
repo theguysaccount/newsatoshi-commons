@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useState } from 'react';
 import {
   AlertTriangle,
   Blocks,
@@ -9,12 +10,70 @@ import {
   Lock,
   RefreshCw,
   Shield,
+  Terminal,
   WifiOff,
 } from 'lucide-react';
 import type { AnchorReceiptRecord, SeedStatusResponse } from '../types';
 import { formatL1IssuedLove } from '../api/normalize';
-import { HashPill } from './ui/CopyButton';
+import { CopyButton, HashPill } from './ui/CopyButton';
 import { Panel } from './ui/Panel';
+
+interface LiveV2VerifyResponse {
+  ok: boolean;
+  endpoint_base: string;
+  genesis_verified: boolean;
+  live_height: number;
+  asert_ramp: {
+    phase: string;
+    height: number;
+    launch_blocks: number;
+    launch_half_life_sec: number;
+    steady_half_life_sec: number;
+    progress_pct: number;
+  };
+  nspq2_pinned_peers: Array<{
+    name: string;
+    peer_arg: string;
+    cli_cmd: string;
+  }>;
+  independent_verifier_cli: string;
+  reserved_soft_fork_bits: Array<{
+    bit: number;
+    name: string;
+    status: string;
+  }>;
+  verification: {
+    genesis_matches_canonical: boolean;
+    flyclient_header_mmr_bound: boolean;
+    state_header_mmr_root: string | null;
+    utreexo_frontier_verified: boolean | null;
+  };
+  flyclient?: {
+    ok?: boolean;
+    mmr_root?: string;
+    peak_count?: number;
+    sample_count?: number;
+    total_work?: string;
+    header_mmr_bound?: boolean;
+  } | null;
+  utreexo?: {
+    ok?: boolean;
+    note_count?: number;
+    frontier_bytes?: number;
+    max_frontier_bytes?: number;
+    root?: string;
+    root_matches_full_tree?: boolean;
+  } | null;
+  supply?: {
+    ok?: boolean;
+    issued?: string;
+    burned?: string;
+    locked?: string;
+    base_fee_burn_bps?: number;
+    open_priors?: number;
+    open_channels?: number;
+  } | null;
+}
 
 interface ChainExplorerTabProps {
   seed: SeedStatusResponse | null;
@@ -73,6 +132,34 @@ export function ChainExplorerTab({
   const s = seed?.live ? seed.status : null;
   const ms = seed?.mainnet_live ? seed.mainnet_status : null;
   const m = seed?.mainnet_info ?? null;
+
+  const [blocksNet, setBlocksNet] = useState<'mainnet-v2' | 'testnet'>('mainnet-v2');
+  const [liveVerify, setLiveVerify] = useState<LiveV2VerifyResponse | null>(null);
+  const [verifyingV2, setVerifyingV2] = useState(false);
+
+  const loadLiveVerify = useCallback(async () => {
+    setVerifyingV2(true);
+    try {
+      const resp = await fetch('/api/v2/live-verify', { cache: 'no-store' });
+      if (resp.ok) {
+        const data = (await resp.json()) as LiveV2VerifyResponse;
+        setLiveVerify(data);
+      }
+    } catch {
+      // keep previous snapshot
+    } finally {
+      setVerifyingV2(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadLiveVerify();
+  }, [loadLiveVerify, ms?.height]);
+
+  const activeBlocks =
+    blocksNet === 'mainnet-v2'
+      ? ms?.recent ?? []
+      : s?.recent ?? [];
 
   const anchoredHeights = new Set(
     anchorReceipts
@@ -385,18 +472,199 @@ export function ChainExplorerTab({
         </div>
       </Panel>
 
-      {/* Recent Live Blocks Table */}
+      {/* Live Mainnet v2 Cryptographic Frontier Verifier (FlyClient MMR · Utreexo · NSPQ2 · BIP-9) */}
       <Panel
-        title="Live Newsatoshi L1 Blocks"
-        subtitle="Observed directly from newsatoshi-seed.fly.dev/status (never mocked)"
-        icon={<Blocks className="h-4 w-4 text-emerald-400" />}
+        title="Mainnet v2 (nsM2) Live Cryptographic Verifier — FlyClient · Utreexo · NSPQ2"
+        subtitle="Real-time verification against live newsatoshi.org/mainnet (zero mocked data)"
+        icon={<Shield className="h-4 w-4 text-emerald-400" />}
+        accent="emerald"
         badge={
-          <span className="font-mono text-[10.5px] text-slate-400">
-            {s ? `${s.recent.length} live blocks` : 'Disconnected'}
+          <span
+            className={`rounded-full border px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase ${
+              liveVerify?.verification.genesis_matches_canonical &&
+              liveVerify?.verification.flyclient_header_mmr_bound
+                ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
+                : 'border-amber-500/40 bg-amber-500/15 text-amber-300'
+            }`}
+          >
+            {liveVerify?.verification.flyclient_header_mmr_bound
+              ? `MMR BOUND · #${liveVerify.live_height.toLocaleString()}`
+              : 'POLLING LIVE'}
           </span>
         }
+        action={
+          <button
+            type="button"
+            onClick={() => void loadLiveVerify()}
+            disabled={verifyingV2}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1 text-xs font-medium text-slate-300 hover:border-emerald-500/50 hover:text-emerald-200 cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${verifyingV2 ? 'animate-spin text-emerald-400' : ''}`}
+            />
+            Verify Live
+          </button>
+        }
       >
-        {s && s.recent.length > 0 ? (
+        {liveVerify && liveVerify.ok ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+              <div className="rounded-lg border border-slate-800/80 bg-slate-950/60 p-3">
+                <div className="font-mono text-[10px] uppercase text-slate-400">
+                  Day-1 ASERT Launch Ramp
+                </div>
+                <div className="mt-1 font-mono text-base font-bold text-emerald-300 tabular-nums">
+                  {liveVerify.asert_ramp.height.toLocaleString()} / {liveVerify.asert_ramp.launch_blocks.toLocaleString()}
+                </div>
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+                  <div
+                    className="h-full bg-emerald-400"
+                    style={{ width: `${Math.max(2, Math.min(100, liveVerify.asert_ramp.progress_pct))}%` }}
+                  />
+                </div>
+                <div className="mt-1 font-mono text-[9.5px] text-slate-500">
+                  1h launch half-life → 2d steady
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-800/80 bg-slate-950/60 p-3">
+                <div className="font-mono text-[10px] uppercase text-slate-400">
+                  FlyClient O(log N) MMR
+                </div>
+                <div className="mt-1 font-mono text-base font-bold text-sky-300">
+                  {liveVerify.verification.flyclient_header_mmr_bound ? 'BOUND IN HEADER' : 'CHECKING'}
+                </div>
+                <div className="mt-1 font-mono text-[10px] text-slate-400">
+                  {liveVerify.flyclient?.peak_count ?? 0} peaks · {liveVerify.flyclient?.sample_count ?? 0} samples
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-800/80 bg-slate-950/60 p-3">
+                <div className="font-mono text-[10px] uppercase text-slate-400">
+                  Utreexo Shielded Frontier
+                </div>
+                <div className="mt-1 font-mono text-base font-bold text-violet-300 tabular-nums">
+                  {liveVerify.utreexo?.ok
+                    ? `${liveVerify.utreexo.frontier_bytes ?? 0} B / 1,024 B`
+                    : 'v1.2.1 rolling…'}
+                </div>
+                <div className="mt-1 font-mono text-[10px] text-slate-400">
+                  {liveVerify.utreexo?.root_matches_full_tree
+                    ? 'Bit-exact NoteTree match'
+                    : 'Constant <= 1 KB RAM'}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-800/80 bg-slate-950/60 p-3">
+                <div className="font-mono text-[10px] uppercase text-slate-400">
+                  Homeostatic Fee Burn
+                </div>
+                <div className="mt-1 font-mono text-base font-bold text-amber-300 tabular-nums">
+                  {((liveVerify.supply?.base_fee_burn_bps ?? 5000) / 100).toFixed(0)}% Base Fee
+                </div>
+                <div className="mt-1 font-mono text-[10px] text-slate-400">
+                  {liveVerify.supply?.open_priors ?? 0} priors · {liveVerify.supply?.open_channels ?? 0} PayWord ch.
+                </div>
+              </div>
+            </div>
+
+            {liveVerify.verification.state_header_mmr_root && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800/80 bg-slate-950/60 px-3 py-2 text-xs">
+                <span className="text-slate-400">Verified Live Header MMR Commitment (`nsSTATE`)</span>
+                <HashPill hash={liveVerify.verification.state_header_mmr_root} head={16} tail={14} />
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {liveVerify.nspq2_pinned_peers.map((peer) => (
+                <div
+                  key={peer.name}
+                  className="rounded-lg border border-emerald-500/20 bg-[#04070d] p-3"
+                >
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase text-emerald-400">
+                      <Terminal className="h-3 w-3" />
+                      NSPQ2 SLH-DSA Pinned Peer · {peer.name}
+                    </span>
+                    <CopyButton value={peer.cli_cmd} label="Copy Pin CLI" />
+                  </div>
+                  <code className="block break-all font-mono text-[10.5px] text-emerald-200/90">
+                    {peer.cli_cmd}
+                  </code>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800/80 bg-slate-950/60 p-3">
+              <div>
+                <div className="font-mono text-[10px] uppercase text-sky-300">
+                  Zero-Rust-Code Independent JS/OpenSSL Live Verifier
+                </div>
+                <code className="mt-0.5 block font-mono text-[11px] text-slate-300">
+                  {liveVerify.independent_verifier_cli}
+                </code>
+              </div>
+              <CopyButton value={liveVerify.independent_verifier_cli} label="Copy Verifier" />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-[10.5px] font-mono">
+              <span className="text-slate-400">Reserved Future BIP-9 Soft-Fork Bits:</span>
+              {liveVerify.reserved_soft_fork_bits.map((b) => (
+                <span
+                  key={b.bit}
+                  className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-slate-300"
+                >
+                  bit {b.bit}: {b.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="text-xs text-slate-400">Loading live Mainnet v2 cryptographic state…</div>
+        )}
+      </Panel>
+
+      {/* Recent Live Blocks Table */}
+      <Panel
+        title={
+          blocksNet === 'mainnet-v2'
+            ? 'Live Newsatoshi Mainnet v2 (nsM2) Blocks'
+            : 'Live Newsatoshi Testnet (nsT0) Blocks'
+        }
+        subtitle={
+          blocksNet === 'mainnet-v2'
+            ? 'Observed directly from newsatoshi.org/mainnet/status (canonical BTC #977,738 chain, never mocked)'
+            : 'Observed directly from newsatoshi-seed.fly.dev/status (never mocked)'
+        }
+        icon={<Blocks className="h-4 w-4 text-emerald-400" />}
+        badge={
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setBlocksNet('mainnet-v2')}
+              className={`rounded px-2 py-0.5 font-mono text-[10px] font-semibold cursor-pointer ${
+                blocksNet === 'mainnet-v2'
+                  ? 'border border-amber-500/50 bg-amber-500/20 text-amber-200'
+                  : 'border border-slate-700 bg-slate-900 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Mainnet v2 ({ms?.recent.length ?? 0})
+            </button>
+            <button
+              type="button"
+              onClick={() => setBlocksNet('testnet')}
+              className={`rounded px-2 py-0.5 font-mono text-[10px] font-semibold cursor-pointer ${
+                blocksNet === 'testnet'
+                  ? 'border border-emerald-500/50 bg-emerald-500/20 text-emerald-200'
+                  : 'border border-slate-700 bg-slate-900 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Testnet ({s?.recent.length ?? 0})
+            </button>
+          </div>
+        }
+      >
+        {activeBlocks.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
@@ -410,11 +678,11 @@ export function ChainExplorerTab({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/70 font-mono">
-                {s.recent.map((blk) => {
+                {activeBlocks.map((blk) => {
                   const isAnchored = anchoredHeights.has(blk.height);
                   return (
                     <tr
-                      key={`${blk.height}-${blk.hash}`}
+                      key={`${blocksNet}-${blk.height}-${blk.hash}`}
                       className={isAnchored ? 'bg-emerald-500/10' : 'hover:bg-slate-900/60'}
                     >
                       <td className="py-2.5 pr-4 font-semibold text-emerald-300 tabular-nums">

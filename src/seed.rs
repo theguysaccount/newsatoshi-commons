@@ -27,7 +27,7 @@ pub struct SeedRecentBlock {
     pub merge_mined: bool,
 }
 
-/// Live JSON status returned by a Newsatoshi v0.1.0 seed node (`/status`).
+/// Live JSON status returned by a Newsatoshi L1 seed node (`/status`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SeedStatus {
     pub network: String,
@@ -78,7 +78,7 @@ fn default_auxpow_chainid() -> u32 {
     AUXPOW_CHAIN_ID
 }
 
-/// Live on-chain hash-lock record returned by `GET /api/lock?hash=<64hex>` on Newsatoshi v0.1.0.
+/// Live on-chain hash-lock record returned by `GET /api/lock?hash=<64hex>` on Newsatoshi L1.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct L1LockRecord {
     #[serde(default)]
@@ -113,7 +113,7 @@ struct L1LockListResponse {
     locks: Vec<L1LockRecord>,
 }
 
-/// Verified Newsatoshi v0.1.0 mainnet genesis metadata (dynamically refreshed when live mainnet status responds).
+/// Verified Newsatoshi Mainnet v2 (nsM2, v1.2.1) genesis metadata (dynamically refreshed when live mainnet status responds).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MainnetInfo {
     pub network: String,

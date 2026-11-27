@@ -1409,6 +1409,14 @@ fn handle_request(mut req: Request, state: &AppState) {
             let snapshot = state.get_seed_snapshot(force);
             respond_json(req, 200, &crate::cutover::evaluate_v2_cutover_readiness(&snapshot));
         }
+        (Method::Get, "/api/v2/live-verify") => {
+            let url = state
+                .mainnet_seed_client
+                .as_ref()
+                .map(|c| c.endpoint_url.as_str())
+                .unwrap_or(crate::seed::DEFAULT_MAINNET_SEED_STATUS_URL);
+            respond_json(req, 200, &crate::cutover::fetch_live_v2_verification(url));
+        }
         (Method::Get, "/api/p2p/offers") => {
             // Honest zero initial state: never seed fake market makers or fake liquidity!
             respond_json(

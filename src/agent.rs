@@ -960,13 +960,21 @@ Ideal for per-token LLM inference, tool calls, sensor feeds, and data APIs where
 2. For call `#k`, payer reveals `token = SHA256^(N - k)(seed)` in `X-Newsatoshi-PayWord: tip=<tip>,token=<token>,ticks=<k>`.
 3. Server verifies `SHA256^k(token) == tip` locally or via `POST {base_url}/api/agent/402-verify` in microseconds (post-quantum pure SHA-256).
 
-### Recipe 5: Verifiable L1 Compute Jobs (Built into Newsatoshi v0.1.0)
-Agents can hire or sell verifiable matrix-multiplication compute trustlessly on L1 with Freivalds fraud proofs:
+### Recipe 5: Mainnet v2 (`nsM2`, `v1.2.1`) Independent Verification, Utreexo & STARK-in-STARK IVC
+Verify live Mainnet v2 (`00000000ba1cdad4…`, anchored to Bitcoin `#977,738`) with zero trust in any server:
 ```bash
-newsatoshi --net mainnet job post A.csv B.csv --pay 5 --bond 1
-newsatoshi --net mainnet job claim <JOBID> --bond 1
-newsatoshi --net mainnet job commit <JOBID> C.csv
-newsatoshi --net mainnet job finalize <JOBID>
+# Join Mainnet v2 with FIPS 205 SLH-DSA NSPQ2 peer pinning (blocks active MITM):
+newsatoshi --net mainnet-v2 node \
+  --peer newsatoshi-seed-v2.fly.dev:8445@b024aaeafa0e4ca384b99483c28c3bedde45a5461a560063b283766414dfbbcc \
+  --peer pool.newsatoshi.org:8445@78187a9436dd2d8cc7ed7afff2396b72b56687099d45d93da676b0a90ed8c6b6
+
+# Verify O(log N) FlyClient MMR, <= 1 KB Utreexo frontier, or pure-SHA-2 STARK-in-STARK IVC locally:
+newsatoshi --net mainnet-v2 flyclient
+newsatoshi --net mainnet-v2 utreexo-frontier
+newsatoshi ivc-prove
+
+# Zero-Rust-code independent JS/OpenSSL verifier live against Mainnet v2:
+node verifier-ts/newsatoshi_verifier.mjs --live https://newsatoshi.org/mainnet
 ```
 
 ### Recipe 6: Cryptographically Bounded Agent Budgets (`NEWSATOSHI/2.1` Covenants)

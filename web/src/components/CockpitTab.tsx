@@ -810,7 +810,7 @@ export function CockpitTab({
                 <div className="rounded border border-emerald-500/25 bg-[#04070d] p-2">
                   <div className="mb-1 flex items-center justify-between">
                     <span className="font-mono text-[10px] uppercase text-emerald-400">
-                      newsatoshi v0.1.0 L1 Lock CLI
+                      newsatoshi v1.2.1 L1 Lock CLI
                     </span>
                     <CopyButton value={latestAnchor.cli_lock_command} label="Copy CLI" />
                   </div>

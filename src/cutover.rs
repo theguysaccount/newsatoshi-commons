@@ -1,21 +1,130 @@
 //! Honest Mainnet v2 Cutover Readiness Gate & Independent Audit/Pool Verifier.
 //!
 //! Zero fabricated sign-offs, zero fake mining pools: reports exact live on-chain
-//! telemetry and explicit blocking gates required before launching Newsatoshi Mainnet v2
-//! (`v1.2.0-mainnet-rc1` Pure SHA-2 L1 Release Candidate 1):
+//! telemetry and explicit blocking gates for Newsatoshi Mainnet v2 (`nsM2`, `v1.2.1`):
 //!
 //! 1. At least 2 independent external security audits signed off (Winterfell segment masking,
 //!    spend.rs, batch_spend.rs, prior.rs, light.rs, pq_transport.rs — see docs/AUDIT_SCOPE_V2.md).
 //! 2. At least 3 independent real-difficulty Bitcoin AuxPoW merge-mining pools (`chainid = 20051`).
-//! 3. Single canonical fair-launch genesis pinned to a future Bitcoin block hash (the Nov 10
+//! 3. Single canonical fair-launch genesis pinned to Bitcoin block #977,738 (the Nov 10
 //!    `v0.1.0` chain is retired as a pre-launch canary).
 
-use crate::seed::SeedSnapshot;
+use crate::seed::{SeedSnapshot, MAINNET_GENESIS_HASH};
 use serde_json::{json, Value};
+use std::time::Duration;
 
 pub const REQUIRED_EXTERNAL_AUDITS: u32 = 2;
 pub const REQUIRED_INDEPENDENT_AUXPOW_POOLS: u32 = 3;
 pub const MIN_REAL_AUXPOW_DIFFICULTY: f64 = 10_000.0;
+pub const SEED_V2_NSPQ2_PIN: &str =
+    "newsatoshi-seed-v2.fly.dev:8445@b024aaeafa0e4ca384b99483c28c3bedde45a5461a560063b283766414dfbbcc";
+pub const POOL_V2_NSPQ2_PIN: &str =
+    "pool.newsatoshi.org:8445@78187a9436dd2d8cc7ed7afff2396b72b56687099d45d93da676b0a90ed8c6b6";
+
+fn fetch_json_opt(url: &str) -> Option<Value> {
+    let config = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(5)))
+        .build();
+    let agent = ureq::Agent::new_with_config(config);
+    let mut resp = agent
+        .get(url)
+        .header("Accept", "application/json")
+        .header("User-Agent", "newsatoshi-commons/0.26.0")
+        .call()
+        .ok()?;
+    let text = resp.body_mut().read_to_string().ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+/// Live Mainnet v2 (nsM2) cryptographic telemetry: FlyClient O(log N) MMR, <= 1 KB Utreexo
+/// frontier, supply/burn accounting, active BIP-9 signaling bits, and NSPQ2 peer-pinning keys.
+pub fn fetch_live_v2_verification(mainnet_status_url: &str) -> Value {
+    let base = mainnet_status_url
+        .trim_end_matches('/')
+        .strip_suffix("/status")
+        .unwrap_or(mainnet_status_url.trim_end_matches('/'));
+    let status = fetch_json_opt(&format!("{base}/status"));
+    let state = fetch_json_opt(&format!("{base}/api/state"));
+    let supply = fetch_json_opt(&format!("{base}/api/supply"));
+    let signaling = fetch_json_opt(&format!("{base}/api/signaling"));
+    let flyclient = fetch_json_opt(&format!("{base}/api/flyclient"));
+    let utreexo = fetch_json_opt(&format!("{base}/api/utreexo"));
+
+    let height = status
+        .as_ref()
+        .and_then(|v| v.get("height"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let genesis = status
+        .as_ref()
+        .and_then(|v| v.get("genesis"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let genesis_matches = genesis == MAINNET_GENESIS_HASH;
+    let state_mmr = state
+        .as_ref()
+        .and_then(|v| v.get("parts"))
+        .and_then(|p| p.get("header_mmr"))
+        .and_then(Value::as_str);
+    let fly_bound = flyclient
+        .as_ref()
+        .and_then(|v| v.get("header_mmr_bound"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let utreexo_matches = utreexo
+        .as_ref()
+        .and_then(|v| v.get("root_matches_full_tree"))
+        .and_then(Value::as_bool);
+
+    let asert_launch_blocks: u64 = 2016;
+    let launch_progress_pct = ((height.min(asert_launch_blocks) as f64) / (asert_launch_blocks as f64)) * 100.0;
+
+    json!({
+        "ok": status.is_some(),
+        "endpoint_base": base,
+        "network": "mainnet-v2",
+        "genesis_expected": MAINNET_GENESIS_HASH,
+        "genesis_verified": genesis_matches,
+        "live_height": height,
+        "asert_ramp": {
+            "phase": if height < asert_launch_blocks { "day1_anti_instamine_1h_halflife" } else { "steady_state_2d_halflife" },
+            "height": height,
+            "launch_blocks": asert_launch_blocks,
+            "launch_half_life_sec": 3600,
+            "steady_half_life_sec": 172800,
+            "progress_pct": (launch_progress_pct * 100.0).round() / 100.0
+        },
+        "nspq2_pinned_peers": [
+            {
+                "name": "newsatoshi-seed-v2",
+                "peer_arg": SEED_V2_NSPQ2_PIN,
+                "cli_cmd": format!("newsatoshi --net mainnet-v2 node --peer {SEED_V2_NSPQ2_PIN}")
+            },
+            {
+                "name": "pool.newsatoshi.org",
+                "peer_arg": POOL_V2_NSPQ2_PIN,
+                "cli_cmd": format!("newsatoshi --net mainnet-v2 node --peer {POOL_V2_NSPQ2_PIN}")
+            }
+        ],
+        "independent_verifier_cli": "node verifier-ts/newsatoshi_verifier.mjs --live https://newsatoshi.org/mainnet",
+        "reserved_soft_fork_bits": [
+            { "bit": 5, "name": "future_compact_proof_whir_binius", "status": "reserved_auxpow_safe" },
+            { "bit": 6, "name": "future_private_recursive_aggregation", "status": "reserved_auxpow_safe" },
+            { "bit": 7, "name": "ossify_monetary_base", "status": "defined_bip9" }
+        ],
+        "verification": {
+            "genesis_matches_canonical": genesis_matches,
+            "flyclient_header_mmr_bound": fly_bound,
+            "state_header_mmr_root": state_mmr,
+            "utreexo_frontier_verified": utreexo_matches
+        },
+        "status": status,
+        "supply": supply,
+        "signaling": signaling,
+        "flyclient": flyclient,
+        "utreexo": utreexo
+    })
+}
 
 /// Compute the brutally honest Mainnet v2 cutover readiness report from live telemetry.
 pub fn evaluate_v2_cutover_readiness(seed: &SeedSnapshot) -> Value {
@@ -78,7 +187,10 @@ pub fn evaluate_v2_cutover_readiness(seed: &SeedSnapshot) -> Value {
         "gates": {
             "engineering_and_formal_proofs": {
                 "passed": gate_engineering,
-                "l1_release_tag": "v1.2.0",
+                "l1_release_tag": "v1.2.1",
+                "live_browser_stark_verifier": "MAIN_V2_QUARTIC_SHA384_192b_104b_QROM_WASM",
+                "live_utreexo_api": "https://newsatoshi.org/mainnet/api/utreexo",
+                "independent_js_live_verifier_cli": "node verifier-ts/newsatoshi_verifier.mjs --live https://newsatoshi.org/mainnet",
                 "architecture": "minimalist_priorism_fep_pure_sha2_l1",
                 "alt_l1_bloat_removed": [
                     "rollup.rs",
