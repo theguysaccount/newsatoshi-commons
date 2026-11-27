@@ -7,7 +7,6 @@ legal/
 media/
 bridges/
 auxpow-stratum/
-sdk/
 .git/
 *.key.json
 .DS_Store
