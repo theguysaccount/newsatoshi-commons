@@ -480,7 +480,8 @@ pub fn fetch_live_backing_summary(
             continue;
         }
 
-        let try_chain = |url: &str| -> Result<((u128, u64, u64), u128, u128), String> {
+        type ChainReserveProbe = ((u128, u64, u64), u128, u128);
+        let try_chain = |url: &str| -> Result<ChainReserveProbe, String> {
             let nat = eth_call_reserve_summary(&agent, url, "0x0000000000000000000000000000000000000000")?;
             let (usdc_tracked, _, _) = eth_call_reserve_summary(&agent, url, spec.usdc_address)?;
             let usdc_erc20 = eth_call_erc20_balance_of(&agent, url, spec.usdc_address, CANONICAL_BACKING_VAULT)

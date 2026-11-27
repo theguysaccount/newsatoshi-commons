@@ -649,7 +649,7 @@ fn decode_word_address(hex_str: &str, word_idx: usize) -> String {
     if clean.len() < start + 64 {
         return "0x0000000000000000000000000000000000000000".to_string();
     }
-    format!("0x{}", &clean[start + 24..start + 64].to_ascii_lowercase())
+    format!("0x{}", clean[start + 24..start + 64].to_ascii_lowercase())
 }
 
 fn decode_abi_string(hex_str: &str) -> String {
@@ -699,8 +699,8 @@ pub fn decode_base_payword_channel_words(result_hex: &str, channel_id_hex: &str)
     }
     let recipient = decode_word_address(clean, 1);
     let token = decode_word_address(clean, 2);
-    let initial_root = format!("0x{}", &clean[3 * 64..4 * 64].to_ascii_lowercase());
-    let current_root = format!("0x{}", &clean[4 * 64..5 * 64].to_ascii_lowercase());
+    let initial_root = format!("0x{}", clean[3 * 64..4 * 64].to_ascii_lowercase());
+    let current_root = format!("0x{}", clean[4 * 64..5 * 64].to_ascii_lowercase());
     let unit_amount = decode_word_u128(clean, 5);
     let max_steps = decode_word_u128(clean, 6) as u64;
     let claimed_steps = decode_word_u128(clean, 7) as u64;
