@@ -54,7 +54,7 @@ pub fn evaluate_v2_cutover_readiness(seed: &SeedSnapshot) -> Value {
     }
     if !gate_pools {
         blockers.push(format!(
-            "Independent Bitcoin AuxPoW pools at real difficulty (>={MIN_REAL_AUXPOW_DIFFICULTY:.0}): {independent_real_difficulty_pools}/{REQUIRED_INDEPENDENT_AUXPOW_POOLS} observed (retired Nov 10 v0.1.0 canary height={live_height}, difficulty={live_difficulty:.2} — see auxpow-stratum/MULTI_POOL_ONBOARDING.md)"
+            "Independent Bitcoin AuxPoW pools at real difficulty (>={MIN_REAL_AUXPOW_DIFFICULTY:.0}): {independent_real_difficulty_pools}/{REQUIRED_INDEPENDENT_AUXPOW_POOLS} observed (live Mainnet v2 height={live_height}, difficulty={live_difficulty:.2} — see auxpow-stratum/MULTI_POOL_ONBOARDING.md)"
         ));
     }
 
