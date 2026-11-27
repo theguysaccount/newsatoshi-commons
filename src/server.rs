@@ -708,6 +708,7 @@ fn handle_request(req: Request, state: &AppState) {
             | "/api/v2/nsusd/quote"
             | "/api/v2/nsusd/state"
             | "/api/v2/l2/status"
+            | "/api/v2/x402/paywall-kit"
             | "/api/web4/charters"
             | "/api/web4/services"
             | "/api/web4/bounties"
@@ -839,9 +840,17 @@ fn handle_request(req: Request, state: &AppState) {
                         "vault_address": backing.canonical_vault_address,
                         "total_eth": backing.total_eth_formatted,
                         "total_usdc": backing.total_usdc_formatted,
-                        "deposits": backing.total_vault_deposits
+                        "deposits": backing.total_vault_deposits,
+                        "verified_base_proofs": {
+                            "direct_usdc_deposit_tx": crate::backing::LIVE_BASE_DIRECT_USDC_TX,
+                            "rfc0028_nsusd_deposit_tx": crate::backing::LIVE_BASE_NSUSD_DEPOSIT_TX,
+                            "base_htlc_lock_tx": crate::backing::LIVE_BASE_HTLC_LOCK_TX,
+                            "base_htlc_claim_tx": crate::backing::LIVE_BASE_HTLC_CLAIM_TX
+                        }
                     },
-                    "stress_test_endpoint": "POST /api/v2/nsusd/simulate-stress"
+                    "stress_test_endpoint": "POST /api/v2/nsusd/simulate-stress",
+                    "verify_base_escrow_endpoint": "POST /api/v2/nsusd/verify-base-escrow",
+                    "paywall_kit_endpoint": "POST /api/v2/x402/paywall-kit"
                 }),
             );
         }
@@ -851,6 +860,82 @@ fn handle_request(req: Request, state: &AppState) {
             let crash_pct = parsed.get("crash_pct").and_then(|v| v.as_u64()).unwrap_or(50);
             let report = crate::nsusd::run_adversarial_stress_suite(crash_pct);
             respond_json(req, 200, &report);
+        }
+        (Method::Post, "/api/v2/nsusd/verify-base-escrow") => {
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let parsed: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+            let tx_hash = parsed
+                .get("tx_hash")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            if tx_hash.is_empty() {
+                respond_json(
+                    req,
+                    400,
+                    &json!({
+                        "ok": false,
+                        "error": "missing required 'tx_hash' (Base Mainnet 0x... USDC deposit tx hash)",
+                        "example_tx_hash": crate::backing::LIVE_BASE_DIRECT_USDC_TX
+                    }),
+                );
+            } else {
+                match crate::backing::verify_base_usdc_escrow_tx(tx_hash) {
+                    Ok(receipt) => respond_json(req, 200, &receipt),
+                    Err(e) => respond_json(req, 422, &json!({ "ok": false, "error": e })),
+                }
+            }
+        }
+        (Method::Get, "/api/v2/x402/paywall-kit") => {
+            let base_url = infer_base_url(&req);
+            let framework = query_param(&raw_url, "framework").unwrap_or_else(|| "express".to_string());
+            let price_usd = query_param(&raw_url, "price_usd")
+                .and_then(|v| v.parse::<f64>().ok())
+                .unwrap_or(0.005);
+            let route_path = query_param(&raw_url, "route_path")
+                .unwrap_or_else(|| "/api/paid-endpoint".to_string());
+            let pay_to = query_param(&raw_url, "pay_to_evm");
+            let seller_ns1 = query_param(&raw_url, "seller_ns1");
+            match crate::x402::build_private_x402_paywall_kit(
+                &framework,
+                price_usd,
+                &route_path,
+                pay_to.as_deref(),
+                seller_ns1.as_deref(),
+                &base_url,
+            ) {
+                Ok(kit) => respond_json(req, 200, &kit),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/v2/x402/paywall-kit") => {
+            let base_url = infer_base_url(&req);
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let parsed: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+            let framework = parsed
+                .get("framework")
+                .and_then(|v| v.as_str())
+                .unwrap_or("express");
+            let price_usd = parsed
+                .get("price_usd")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.005);
+            let route_path = parsed
+                .get("route_path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("/api/paid-endpoint");
+            let pay_to = parsed.get("pay_to_evm").and_then(|v| v.as_str());
+            let seller_ns1 = parsed.get("seller_ns1").and_then(|v| v.as_str());
+            match crate::x402::build_private_x402_paywall_kit(
+                framework,
+                price_usd,
+                route_path,
+                pay_to,
+                seller_ns1,
+                &base_url,
+            ) {
+                Ok(kit) => respond_json(req, 200, &kit),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
         }
         (Method::Get, "/api/v2/l2/status") => {
             let seed = state.get_seed_snapshot(false);

@@ -455,7 +455,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                     "/l2",
                     "Newsatoshi Layer-2 Expansion & Perfection Layers — PayWords, nsUSD & Shielded STARK Rollups",
                     "Hourglass Layer-2 Perfection Architecture above Mainnet v2 (nsM2): O(1) SHA-256 PayWords, RFC-0028 sovereign nsUSD CDP/oracle engine, Winterfell STARK shielded rollup batching, and unilateral Merkle L1 escape hatches.",
-                    "<h1>Newsatoshi Layer-2 Expansion &amp; Perfection Layers (<code>v0.28.0</code>)</h1>\n\
+                    "<h1>Newsatoshi Layer-2 Expansion &amp; Perfection Layers (<code>v0.28.3</code>)</h1>\n\
                      <p><strong>Hourglass Architecture:</strong> Layer 1 (<code>newsatoshi-rfc0021</code>, Mainnet v2 <code>nsM2</code>) stays minimal, pure FIPS SHA-2, and ossified. Layer 2 (<code>newsatoshi-commons</code>) delivers machine-speed throughput, private USD stability (<code>nsUSD</code>), and zero-custody escape hatches.</p>\n\
                      <p>Live APIs: <a href=\"/l2.md\">Full Markdown Spec (/l2.md)</a> &middot; <a href=\"/api/v2/l2/status\">GET /api/v2/l2/status</a> &middot; <a href=\"/api/v2/nsusd/state\">GET /api/v2/nsusd/state</a> &middot; <a href=\"/formal/NsUsdAndL2Perfection.lean\">Lean 4 Proof (11 Theorems, 0 sorry)</a> &middot; <a href=\"/nsusd\">nsUSD Spec (/nsusd)</a> &middot; <a href=\"/whitepaper.pdf\">Whitepaper v2.2 PDF</a></p>\n\
                      <h2>Layer 2A &mdash; Microsecond Streaming (<code>O(1)</code> SHA-256 PayWords)</h2>\n\
@@ -498,8 +498,29 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                        <li><strong><code>PriorLock</code> Bonded Median Oracle (RFC-0021):</strong> Price reporters bond real <code>LOVE</code> behind BTC/USD quotes; manipulated prices are slashed <code>50%</code> to the challenger and <code>50%</code> permanently burned, with automatic stale-feed circuit breakers.</li>\n\
                        <li><strong>Hard <code>$1.00</code> Redemption Floor + Hourglass L2 Rollup Settlement:</strong> Permissionless collateral redemption holds the peg via arbitrage, operating directly above ossified Mainnet v2 L1 via native SHA-256 HTLCs, <code>PriorLock</code> bonds, and L2 shielded Merkle roots with zero L1 consensus fork required.</li>\n\
                      </ul>\n\
+                     <h2>60-Second Drop-In Private <code>x402</code> / <code>nsUSD</code> Paywall Generator</h2>\n\
+                     <p>Accept private, zero-gas, unfreezable USD-quoted micropayments (<code>O(1)</code> SHA-256 PayWords) with automatic Base USDC <code>x402 v2</code> fallback in Express, Next.js, FastAPI, or Rust Axum:</p>\n\
+                     <div style=\"border:1px solid #2b3547;border-radius:8px;padding:12px;margin:12px 0;background:#0d131f;\">\n\
+                       <label>Framework: <select id=\"ns-fw\"><option value=\"express\">Express (Node.js)</option><option value=\"nextjs\">Next.js App Router</option><option value=\"fastapi\">FastAPI (Python)</option><option value=\"axum\">Axum (Rust)</option></select></label> &nbsp;\n\
+                       <label>Price USD: <input id=\"ns-usd\" type=\"text\" value=\"0.005\" style=\"width:72px\"/></label> &nbsp;\n\
+                       <label>Route: <input id=\"ns-route\" type=\"text\" value=\"/api/inference\" style=\"width:150px\"/></label> &nbsp;\n\
+                       <button type=\"button\" onclick=\"nsGenKit()\">Generate Middleware</button>\n\
+                       <button type=\"button\" onclick=\"nsCopyKit()\">Copy Code</button>\n\
+                       <pre id=\"ns-kit-out\" style=\"max-height:320px;overflow:auto;margin-top:10px;\">Click &quot;Generate Middleware&quot; or call POST /api/v2/x402/paywall-kit</pre>\n\
+                     </div>\n\
+                     <h2>Verify Real Base Mainnet <code>nsUSD-B</code> Vault Escrow On-Chain</h2>\n\
+                     <div style=\"border:1px solid #2b3547;border-radius:8px;padding:12px;margin:12px 0;background:#0d131f;\">\n\
+                       <label>Base USDC Deposit Tx: <input id=\"ns-tx\" type=\"text\" value=\"0xd3c521e3dcdd1465f6f51384a5c721c0c445c3d384282ae0c67b2b07195029ba\" style=\"width:460px\"/></label> &nbsp;\n\
+                       <button type=\"button\" onclick=\"nsVerifyEscrow()\">Verify On Base RPC</button>\n\
+                       <pre id=\"ns-escrow-out\" style=\"max-height:240px;overflow:auto;margin-top:10px;\">Verifies live Base Mainnet USDC Transfer logs into immutable NewsatoshiBackingVault (0x37Ed94525DBE408fA72cDd156409875666679265)</pre>\n\
+                     </div>\n\
+                     <script>\n\
+                     async function nsGenKit(){const o=document.getElementById('ns-kit-out');o.textContent='Generating...';const r=await fetch('/api/v2/x402/paywall-kit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({framework:document.getElementById('ns-fw').value,price_usd:parseFloat(document.getElementById('ns-usd').value)||0.005,route_path:document.getElementById('ns-route').value||'/api/inference'})});const d=await r.json();o.textContent=d.ok?('// '+d.filename+'\\n// '+d.install_cmd+'\\n\\n'+d.code):JSON.stringify(d,null,2);}\n\
+                     function nsCopyKit(){navigator.clipboard&&navigator.clipboard.writeText(document.getElementById('ns-kit-out').textContent);}\n\
+                     async function nsVerifyEscrow(){const o=document.getElementById('ns-escrow-out');o.textContent='Querying live Base Mainnet RPC...';const r=await fetch('/api/v2/nsusd/verify-base-escrow',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tx_hash:document.getElementById('ns-tx').value.trim()})});o.textContent=JSON.stringify(await r.json(),null,2);}\n\
+                     </script>\n\
                      <h2>Try the Live Engine &amp; Adversarial Stress Test</h2>\n\
-                     <pre>curl -sS https://commons.newsatoshi.org/api/v2/nsusd/state\ncurl -sS -X POST https://commons.newsatoshi.org/api/v2/nsusd/simulate-stress -H 'Content-Type: application/json' -d '{\"crash_pct\":50}'</pre>",
+                     <pre>curl -sS https://commons.newsatoshi.org/api/v2/nsusd/state\ncurl -sS -X POST https://commons.newsatoshi.org/api/v2/nsusd/simulate-stress -H 'Content-Type: application/json' -d '{\"crash_pct\":50}'\ncurl -sS -X POST https://commons.newsatoshi.org/api/v2/nsusd/verify-base-escrow -H 'Content-Type: application/json' -d '{\"tx_hash\":\"0xd3c521e3dcdd1465f6f51384a5c721c0c445c3d384282ae0c67b2b07195029ba\"}'\ncurl -sS 'https://commons.newsatoshi.org/api/v2/x402/paywall-kit?framework=express&amp;price_usd=0.005'</pre>",
                 );
                 Some(("text/html; charset=utf-8", html))
             }
@@ -615,7 +636,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                      - All REST responses include `X-API-Version: 2026-11` and `RateLimit-Policy: 120;w=60`.\n\
                      - Breaking changes are introduced under a new versioned path or header with at least 90 days of advance notice via `Deprecation` and `Sunset` HTTP response headers.\n\n\
                      ## Core Endpoints\n\
-                     - `POST {base_url}/mcp` — Streamable HTTP MCP JSON-RPC 2.0 server (**19 live tools**, including 5 zero-API-key EVM/BTC/BOLT-11/Uniswap V3 tools).\n\
+                     - `POST {base_url}/mcp` — Streamable HTTP MCP JSON-RPC 2.0 server (**35 live tools**, including 60-second private `x402`/`nsUSD` paywall middleware generator, live Base USDC vault escrow verifier, RFC-0028 `nsUSD` engine, L2 STARK rollup benchmark, and 5 zero-API-key EVM/BTC/BOLT-11/Uniswap V3 tools).\n\
                      - `npx -y github:theguysaccount/newsatoshi-commons` — Zero-dependency stdio MCP bridge & CLI for Claude Desktop, Cursor, Codex, Cline & shell agents.\n\
                      - `GET {base_url}/.well-known/x402` — 4 live Native `LOVE` (zero-gas `<1ms` SHA-256 PayWord / `PriorLock`) + `x402 v2` outer bridge on-ramp (`$0.001` Base/Arb/Polygon USDC) endpoints (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).\n\
                      - `GET {base_url}/api/health` — Node version, verify-only posture, and uptime.\n\
@@ -851,7 +872,9 @@ pub fn render_mcp_server_card_json(base_url: &str) -> Value {
             "newsatoshi_compile_bonded_p2p_offer",
             "newsatoshi_get_nsusd_state",
             "newsatoshi_simulate_nsusd_stress",
-            "newsatoshi_benchmark_l2_perfection_batch"
+            "newsatoshi_benchmark_l2_perfection_batch",
+            "newsatoshi_generate_private_x402_middleware",
+            "newsatoshi_verify_base_nsusd_escrow"
         ],
         "resources": [
             "newsatoshi://llms.txt",
@@ -931,7 +954,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 - Commons Treasury Balance: `{bal} LOVE` (`nonce={nonce}`, `parcels={parcels}`, `kwh={kwh}`, `starks={starks}`)
 
 ## Agent Interfaces (Zero Auth Required for All Reads, Compilers & Verifiers)
-- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **33 live tools** (including `nsUSD` Dual-Tier stablecoin engine + stress suite, L2 Perfection Layer STARK batch benchmark, 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.1` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
+- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **35 live tools** (including 60-second private `x402`/`nsUSD` paywall middleware generator, live Base USDC vault escrow verifier, `nsUSD` Dual-Tier stablecoin engine + stress suite, L2 Perfection Layer STARK batch benchmark, 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.4` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
 - **Zero-Install Stdio MCP Bridge & CLI (Node 18+, Zero Dependencies):** `npx -y github:theguysaccount/newsatoshi-commons` (`inspect`, `btc-fees`, `decode-bolt11`, `quote-base`, `verify-tx`, `payword-demo`, or stdio MCP `serve`).
 - [Native LOVE PayWord & x402 v2 Discovery]({base_url}/.well-known/x402): 4 live monetized endpoints settling primarily in **native `LOVE`** (`<1ms` zero-gas SHA-256 PayWords / `PriorLock`), with Base/Arbitrum/Polygon USDC (`x402 v2`, `$0.001`) supported as outer bridge on-ramps (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).
 - [MCP Server Card]({base_url}/.well-known/mcp/server-card.json) & [MCP Registry Manifest]({base_url}/server.json): Standard MCP discovery cards (`org.newsatoshi.commons/newsatoshi-commons`).
@@ -956,7 +979,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 ## Source & Releases
 - Repository: https://github.com/theguysaccount/newsatoshi-commons
 - Installable Agent Skill: `skills/newsatoshi-agent-payments/SKILL.md`
-- Minimalist Layer-1 Narrow Waist (`v1.2.0`: Private, SHA-2-only, >=100-bit QROM, Bitcoin AuxPoW merge-mined settlement floor): https://github.com/theguysaccount/newsatoshi-rfc0021
+- Minimalist Layer-1 Narrow Waist (`v1.2.4`: Private, SHA-2-only, >=100-bit QROM, Bitcoin AuxPoW merge-mined settlement floor): https://github.com/theguysaccount/newsatoshi-rfc0021
 ",
         proto = state.protocol_version,
         backing_vault = CANONICAL_BACKING_VAULT,
@@ -995,7 +1018,7 @@ Add to Claude Desktop, Cursor, Codex, Antigravity, or any Streamable HTTP MCP ho
   }}
 }}
 ```
-Available MCP tools (33 live tools — zero API keys required):
+Available MCP tools (35 live tools — zero API keys required):
 - `crypto_inspect_evm_contract` — Live multi-chain EVM smart contract security audit (bytecode, EIP-1967 proxy/admin slots, `owner()` admin risk, ERC-20 metadata, Sourcify v2 exact-match verification across Ethereum, Base, Arbitrum, Optimism & Polygon)
 - `crypto_bitcoin_mempool_oracle` — Live Bitcoin chain tip, recommended sat/vB fee tiers (`fastest`, `30m`, `60m`, `economy`), and mempool backlog
 - `crypto_decode_bolt11_invoice` — Pure-Rust BOLT-11 Lightning invoice decoder (network, sats/msats, payment hash, expiry, description)
@@ -1029,6 +1052,8 @@ Available MCP tools (33 live tools — zero API keys required):
 - `newsatoshi_get_nsusd_state` — Live honest RFC-0028 `nsUSD` Dual-Tier stablecoin engine state (Sovereign BTC CDP `asset_id=1` + isolated Bridged `nsUSD-B` `asset_id=2` + `PriorLock` oracle status)
 - `newsatoshi_simulate_nsusd_stress` — Run the 4-scenario isolated adversarial `nsUSD` stress-test suite (flash-crash liquidation, `$1.00` bank-run redemption, `+40%` oracle spoof 50/50 slash, stale circuit-breaker halt)
 - `newsatoshi_benchmark_l2_perfection_batch` — Run a live measured L2 PayWord + `nsUSD` batch + Winterfell 0.13 STARK conservation proof + verified unilateral Merkle L1 Escape Hatch benchmark
+- `newsatoshi_generate_private_x402_middleware` — Generate copy-paste-ready Express, Next.js, FastAPI, or Rust Axum HTTP 402 middleware accepting private zero-gas `O(1)` SHA-256 PayWords (`nsUSD` USD-quoted) + Base USDC `x402 v2` fallback
+- `newsatoshi_verify_base_nsusd_escrow` — Verify any real Base Mainnet USDC deposit tx hash live via Base JSON-RPC against the immutable `NewsatoshiBackingVault` (`0x37Ed94525DBE408fA72cDd156409875666679265`) into an auditable RFC-0028 Tier-1B `nsUSD-B` 1:1 receipt
 
 Stdio MCP Bridge (for stdio-only hosts such as Claude Desktop, Cursor, Cline, or shell scripts):
 ```json
@@ -2120,6 +2145,32 @@ pub fn mcp_tools_list() -> Value {
                         "tx_count": { "type": "integer", "minimum": 10, "maximum": 50000, "default": 2000, "description": "Number of off-chain PayWord + nsUSD transfers to batch (10..=50000, default 2000)" }
                     }
                 }
+            },
+            {
+                "name": "newsatoshi_generate_private_x402_middleware",
+                "description": "Generate copy-paste-ready HTTP 402 paywall middleware for Express, Next.js App Router, FastAPI, or Rust Axum that quotes prices in stable USD, accepts private zero-gas O(1) SHA-256 PayWords (nsUSD/LOVE, zero corporate freeze switch), and falls back cleanly to standard x402 v2 Base USDC.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["framework"],
+                    "properties": {
+                        "framework": { "type": "string", "enum": ["express", "nextjs", "fastapi", "axum"], "description": "Target web framework" },
+                        "price_usd": { "type": "number", "default": 0.005, "description": "USD price per API call (e.g. 0.005 for half a cent)" },
+                        "route_path": { "type": "string", "default": "/api/paid-endpoint", "description": "HTTP route path to gate" },
+                        "pay_to_evm": { "type": "string", "description": "Optional EVM address for Base USDC x402 v2 fallback" },
+                        "seller_ns1": { "type": "string", "description": "Optional Newsatoshi shielded ns1.../nsd1... address for private settlement" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_verify_base_nsusd_escrow",
+                "description": "Verify a real Base Mainnet USDC deposit transaction hash live against Base JSON-RPC logs to confirm 1:1 backing into the immutable, ownerless NewsatoshiBackingVault (0x37Ed94525DBE408fA72cDd156409875666679265) and emit an auditable RFC-0028 Tier-1B nsUSD-B receipt.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["tx_hash"],
+                    "properties": {
+                        "tx_hash": { "type": "string", "description": "Base Mainnet 0x-prefixed 32-byte transaction hash (e.g. 0xd3c521e3dcdd1465f6f51384a5c721c0c445c3d384282ae0c67b2b07195029ba)" }
+                    }
+                }
             }
         ]
     })
@@ -2722,6 +2773,21 @@ pub fn handle_mcp_jsonrpc(
                     let eng = crate::nsusd::NsUsdEngine::new();
                     crate::l2_rollup::run_live_l2_batch_benchmark(count, seed_snapshot, eng.solvency_root())
                 }
+                "newsatoshi_generate_private_x402_middleware" => {
+                    let fw = args.get("framework").and_then(|v| v.as_str()).unwrap_or("express");
+                    let price = args.get("price_usd").and_then(|v| v.as_f64()).unwrap_or(0.005);
+                    let route = args.get("route_path").and_then(|v| v.as_str()).unwrap_or("/api/paid-endpoint");
+                    let pay_to = args.get("pay_to_evm").and_then(|v| v.as_str());
+                    let seller = args.get("seller_ns1").and_then(|v| v.as_str());
+                    crate::x402::build_private_x402_paywall_kit(fw, price, route, pay_to, seller, base_url)
+                }
+                "newsatoshi_verify_base_nsusd_escrow" => {
+                    let tx_hash = args
+                        .get("tx_hash")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| "missing required 'tx_hash'".to_string());
+                    tx_hash.and_then(crate::backing::verify_base_usdc_escrow_tx)
+                }
                 other => Err(format!("unknown MCP tool '{other}'")),
             };
 
@@ -2827,6 +2893,6 @@ mod tests {
             &client,
             None,
         );
-        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 33);
+        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 35);
     }
 }

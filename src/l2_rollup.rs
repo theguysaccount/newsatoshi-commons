@@ -327,7 +327,7 @@ pub fn run_live_l2_batch_benchmark(
 }
 
 pub fn render_l2_architecture_markdown() -> &'static str {
-    "# Newsatoshi Layer-2 Expansion & Perfection Layers (`v0.28.0`)
+    "# Newsatoshi Layer-2 Expansion & Perfection Layers (`v0.28.3`)
 
 **Hourglass Principle:** Layer 1 (`newsatoshi-rfc0021`, Mainnet v2 `nsM2`) stays radically small, pure FIPS SHA-2, and ossified. Layer 2 (`newsatoshi-commons`) delivers machine-speed throughput, private USD stability (`nsUSD`), and zero-custody escape hatches.
 

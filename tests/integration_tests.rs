@@ -2038,7 +2038,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 33);
+    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 35);
 
     // Live nsUSD Dual-Tier Engine + Adversarial Stress Test + L2 Perfection Layer STARK Benchmark
     let nsusd_state: Value = serde_json::from_str(
@@ -2236,7 +2236,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 33);
+    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 35);
 
     // Honest v2 cutover readiness gate & Bonded P2P Desk smoke tests
     let cutover: Value = serde_json::from_str(
@@ -2252,7 +2252,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
     assert_eq!(cutover["ready_for_v2_activation"], false);
     assert_eq!(cutover["genesis_policy"]["nov10_canary_retired"], true);
     assert_eq!(cutover["gates"]["external_security_audits"]["completed"], 0);
-    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["l1_release_tag"], "v1.2.1");
+    assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["l1_release_tag"], "v1.2.4");
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["lean4_theorems"], 10);
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["lean4_full_circuit_constraints"], 249);
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["lean4_native_decide_count"], 0);
@@ -2871,7 +2871,7 @@ fn http_api_web4_charters_erc8004_services_bounties_and_paid_402_tool() {
     assert_eq!(x402_idx["version"], 2);
     assert_eq!(x402_idx["primary_settlement_asset"], "LOVE");
     assert_eq!(x402_idx["evm_usdc_rail_role"], "outer_bridge_onramp");
-    assert_eq!(x402_idx["l1_release_target"], "v1.2.0");
+    assert_eq!(x402_idx["l1_release_target"], "v1.2.4");
     assert_eq!(x402_idx["resources"].as_array().unwrap().len(), 4);
 
     let r_x402_unpaid = agent
