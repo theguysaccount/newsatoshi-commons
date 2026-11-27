@@ -138,8 +138,9 @@ lean /tmp/NewsatoshiCovenants.lean
   },
   cli: {
     label: 'Install CLI',
-    caption: 'Verified SHA-256 release binaries for macOS & Linux (commons, swap, hw-signer)',
-    code: `curl -fsSL https://commons.newsatoshi.org/install.sh | sh
+    caption: 'Downloads GitHub Release binaries for macOS & Linux (commons, swap, hw-signer; inspect install.sh or build from source)',
+    code: `curl -fsSL https://commons.newsatoshi.org/install.sh -o /tmp/ns-install.sh
+less /tmp/ns-install.sh && sh /tmp/ns-install.sh
 
 # Verify live mainnet & compile a trustless SHA-256 atomic swap
 newsatoshi-swap keygen`,
@@ -221,7 +222,11 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
           route_path: kitRoute.trim() || '/api/inference',
         }),
       });
-      const data = (await resp.json()) as PaywallKitResult;
+      const data = (await resp.json().catch(() => null)) as PaywallKitResult | null;
+      if (!resp.ok || !data) {
+        onNotice('error', data?.error || `Paywall kit request failed (HTTP ${resp.status})`);
+        return;
+      }
       setKitResult(data);
       onNotice(
         data.ok ? 'success' : 'error',
@@ -246,7 +251,13 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tx_hash: hash }),
       });
-      const data = (await resp.json()) as BaseEscrowVerifyResult;
+      const data = (await resp.json().catch(() => null)) as BaseEscrowVerifyResult | null;
+      if (!resp.ok || !data) {
+        const msg = data?.error || `Base escrow verification failed (HTTP ${resp.status})`;
+        setEscrowResult({ ok: false, error: msg });
+        onNotice('error', msg);
+        return;
+      }
       setEscrowResult(data);
       onNotice(
         data.ok ? 'success' : 'error',
@@ -269,7 +280,11 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ crash_pct: 50 }),
       });
-      const data = (await resp.json()) as NsUsdStressResult;
+      const data = (await resp.json().catch(() => null)) as NsUsdStressResult | null;
+      if (!resp.ok || !data || !data.scenarios) {
+        onNotice('error', `nsUSD stress test failed (HTTP ${resp.status})`);
+        return;
+      }
       setStressResult(data);
       onNotice(
         data.all_invariants_passed ? 'success' : 'error',
@@ -292,13 +307,19 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tx_count: 2000 }),
       });
-      const data = (await resp.json()) as L2BenchmarkResult;
+      const data = (await resp.json().catch(() => null)) as L2BenchmarkResult | null;
+      if (!resp.ok || !data || !data.ok || !data.winterfell_stark_batch_proof) {
+        onNotice('error', `L2 benchmark failed (HTTP ${resp.status})`);
+        return;
+      }
       setL2Result(data);
+      const verified = Boolean(data.winterfell_stark_batch_proof.verified);
+      const tps = Number(data.measured_offchain_tps ?? 0).toLocaleString();
       onNotice(
-        data.ok && data.winterfell_stark_batch_proof?.verified ? 'success' : 'error',
-        data.ok
-          ? `L2 Perfection Batch: ${data.measured_offchain_tps.toLocaleString()} off-chain TPS + Winterfell STARK verified in ${data.winterfell_stark_batch_proof.verify_ms}ms`
-          : 'L2 benchmark failed'
+        verified ? 'success' : 'error',
+        verified
+          ? `L2 Sandbox Batch: ${tps} off-chain TPS + Winterfell STARK verified in ${data.winterfell_stark_batch_proof.verify_ms}ms`
+          : `L2 Sandbox Batch: ${tps} off-chain TPS, but Winterfell STARK verification FAILED`
       );
     } catch (err) {
       onNotice('error', err instanceof Error ? err.message : 'L2 benchmark request failed');
@@ -467,8 +488,16 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
           >
             <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-[0.08em] text-zinc-500">
               <span>Mainnet v2 (nsM2)</span>
-              <span className="inline-flex items-center gap-1.5 font-mono text-[10px] text-emerald-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <span
+                className={`inline-flex items-center gap-1.5 font-mono text-[10px] ${
+                  ms ? 'text-emerald-300' : 'text-amber-300'
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    ms ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'
+                  }`}
+                />
                 {ms ? 'Live' : 'Syncing'}
               </span>
             </div>
@@ -603,7 +632,11 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
 
             {stressResult && (
               <div className="rounded-xl border border-sky-500/25 bg-[#090c12] p-4 font-mono text-[11px] space-y-1.5 text-zinc-300">
-                <div className="flex items-center justify-between text-emerald-300">
+                <div
+                  className={`flex items-center justify-between ${
+                    stressResult.all_invariants_passed ? 'text-emerald-300' : 'text-rose-300'
+                  }`}
+                >
                   <span>ALL 4 ADVERSARIAL INVARIANTS</span>
                   <span>{stressResult.all_invariants_passed ? 'PASS (4/4)' : 'FAIL'}</span>
                 </div>
@@ -623,7 +656,9 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400">3. +40% PriorLock Oracle Spoof</span>
                   <span>
-                    SLASHED ({stressResult.scenarios['3_priorlock_oracle_spoof_slash'].receipt.deviation_bps} bps · 50% burn)
+                    {stressResult.scenarios['3_priorlock_oracle_spoof_slash'].exact_50_50_bounty_burn
+                      ? `SLASHED (${stressResult.scenarios['3_priorlock_oracle_spoof_slash'].receipt.deviation_bps} bps · 50% burn)`
+                      : 'SLASH CHECK FAILED'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -654,7 +689,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
             </div>
 
             <p className="text-[13px] leading-relaxed text-zinc-400">
-              Execute <strong className="text-zinc-200">2,000 real SHA-256 PayWord + nsUSD transfers</strong> live on the server,
+              Execute <strong className="text-zinc-200">2,000 live-measured sandbox SHA-256 PayWord + nsUSD transfers</strong> on the server,
               generate &amp; verify a real <strong className="text-zinc-200">Winterfell 0.13 STARK conservation proof</strong>,
               verify a unilateral <strong className="text-zinc-200">SHA-256 Merkle L1 Escape Hatch</strong>, and anchor to the live Mainnet v2 tip.
             </p>
@@ -667,7 +702,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
                 className="inline-flex items-center gap-2 rounded-full bg-violet-400 px-4 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-violet-300 cursor-pointer disabled:opacity-60"
               >
                 {l2Busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
-                <span>Run 2,000-tx L2 STARK Batch</span>
+                <span>Run 2,000-tx L2 STARK Sandbox</span>
               </button>
               <a
                 href="/api/v2/l2/status"
@@ -681,16 +716,22 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
 
             {l2Result && (
               <div className="rounded-xl border border-violet-500/25 bg-[#090c12] p-4 font-mono text-[11px] space-y-1.5 text-zinc-300">
-                <div className="flex items-center justify-between text-emerald-300">
-                  <span>LIVE MEASURED L2 THROUGHPUT</span>
-                  <span>{l2Result.measured_offchain_tps.toLocaleString()} TPS ({l2Result.payword_execution_us} µs)</span>
+                <div
+                  className={`flex items-center justify-between ${
+                    l2Result.winterfell_stark_batch_proof?.verified ? 'text-emerald-300' : 'text-rose-300'
+                  }`}
+                >
+                  <span>LIVE MEASURED SANDBOX THROUGHPUT</span>
+                  <span>
+                    {Number(l2Result.measured_offchain_tps ?? 0).toLocaleString()} TPS ({l2Result.payword_execution_us ?? 0} µs)
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400">Winterfell 0.13 STARK Proof</span>
                   <span>
-                    {l2Result.winterfell_stark_batch_proof.verified ? 'VERIFIED' : 'FAIL'} ·{' '}
-                    {(l2Result.winterfell_stark_batch_proof.proof_bytes / 1024).toFixed(1)} KB ·{' '}
-                    {l2Result.winterfell_stark_batch_proof.verify_ms} ms
+                    {l2Result.winterfell_stark_batch_proof?.verified ? 'VERIFIED' : 'FAIL'} ·{' '}
+                    {((l2Result.winterfell_stark_batch_proof?.proof_bytes ?? 0) / 1024).toFixed(1)} KB ·{' '}
+                    {l2Result.winterfell_stark_batch_proof?.verify_ms ?? 0} ms
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -965,8 +1006,8 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
                   <strong className="text-zinc-100">Bitcoin AuxPoW + 100–104b QROM:</strong> borrows
                   Bitcoin SHA-256 ASIC security (<code className="font-mono text-xs">chainid 20051</code>),
                   proves Quartic <code className="font-mono text-xs">F_p4</code> SHA-384 STARKs past 100
-                  conservative QROM bits, compresses K=8 spends <strong className="text-zinc-100">6.45×</strong> (745 KB in 1.43 s),
-                  mechanizes all 249 AIR constraints in Lean 4, and includes a real STARK-in-STARK IVC verifier.
+                  conservative QROM bits, compresses K=8 spends <strong className="text-zinc-100">6.51×</strong> (~741 KB in ~1.28 s),
+                  mechanizes all 249 AIR constraints + BatchSpend K=2..16 tiling in Lean 4, and includes an experimental 1-query STARK-in-STARK IVC R&amp;D prototype (production light clients use FlyClient MMR).
                 </span>
               </li>
               <li className="flex items-start gap-2.5">
