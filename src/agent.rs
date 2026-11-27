@@ -201,6 +201,7 @@ pub const INSTALL_SCRIPT_SH: &str = include_str!("../scripts/install.sh");
 /// Embedded NEWSATOSHI/2.1 companion whitepaper (Markdown & IACR ePrint LaTeX) + Lean 4 formal kernel.
 pub const WHITEPAPER_MARKDOWN: &str = include_str!("../docs/NEWSATOSHI-2.1-WHITEPAPER.md");
 pub const WHITEPAPER_V2_2_MARKDOWN: &str = include_str!("../docs/NEWSATOSHI-2.2-WHITEPAPER.md");
+pub const WHITEPAPER_V2_2_PDF: &[u8] = include_bytes!("../docs/newsatoshi-v2.2.pdf");
 pub const MANIFESTO_MARKDOWN: &str = include_str!("../docs/MANIFESTO.md");
 pub const WHITEPAPER_LATEX: &str = include_str!("../docs/newsatoshi_2_1_whitepaper.tex");
 pub const LEAN_FORMAL_PROOF: &str = include_str!("../formal/NewsatoshiCovenants.lean");
@@ -485,7 +486,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                     "Official NEWSATOSHI/2.2 technical whitepaper for live Mainnet v2 (nsM2, v1.2.1): 192-bit classical / 100-104-bit CMS19 QROM pure SHA-384 Quartic STARKs, 249 Lean 4 constraints, Bitcoin AuxPoW 20051, PriorLock FEP, PayWords, NSPQ2, and live verification.",
                     "<h1>NEWSATOSHI/2.2: Pure SHA-2 Shielded Machine Cash</h1>\n\
                          <p><strong>Mainnet v2 (<code>nsM2</code> · <code>v1.2.1</code>) · Canonical Genesis Anchored to Bitcoin Block <code>#977,738</code></strong> · November 27, 2026</p>\n\
-                         <p>Download canonical artifacts: <a href=\"/whitepaper.md\">Full NEWSATOSHI/2.2 Whitepaper (.md)</a> · <a href=\"https://newsatoshi.org/whitepaper-v2/\">Terminal Edition (newsatoshi.org)</a> · <a href=\"/manifesto\">The Newsatoshi Manifesto</a> · <a href=\"/whitepaper-v2.1.md\">Companion Paper v2.1 (.md)</a> · <a href=\"/whitepaper.tex\">v2.1 LaTeX (.tex)</a> · <a href=\"/formal/NewsatoshiCovenants.lean\">Lean 4 Proof</a></p>\n\
+                         <p>Download canonical artifacts: <a href=\"/whitepaper.pdf\"><strong>Satoshi-Format Whitepaper PDF (8 pages)</strong></a> · <a href=\"/whitepaper.md\">Full NEWSATOSHI/2.2 Markdown (.md)</a> · <a href=\"https://newsatoshi.org/whitepaper-v2/\">Terminal Edition</a> · <a href=\"/manifesto\">The Newsatoshi Manifesto</a> · <a href=\"https://newsatoshi.org/hyperscale/\">Hyperscale Architecture</a> · <a href=\"/formal/NewsatoshiCovenants.lean\">Lean 4 Proof</a></p>\n\
                          <h2>Live Mainnet v2 (<code>nsM2</code>) Canonical Parameters</h2>\n\
                          <ul>\n\
                            <li><strong>Canonical Genesis Hash:</strong> <code>00000000ba1cdad4aa8e82d6613b4df536394c41008fc3a0914a47a44604b9c8</code> (BTC Block <code>#977,738</code>, time <code>1795742750</code>, bits <code>0x1d00ffff</code>, nonce <code>2649823154</code>, <strong>0 LOVE premine</strong>)</li>\n\

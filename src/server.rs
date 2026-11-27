@@ -657,6 +657,7 @@ fn handle_request(mut req: Request, state: &AppState) {
                 }
             }
             "/og-image.svg" => Some("image/svg+xml"),
+            "/whitepaper.pdf" => Some("application/pdf"),
             "/install.sh" => Some("text/x-shellscript; charset=utf-8"),
             "/robots.txt"
             | "/.well-known/mcp-registry-auth"
@@ -727,6 +728,22 @@ fn handle_request(mut req: Request, state: &AppState) {
                 "text/x-shellscript; charset=utf-8",
                 INSTALL_SCRIPT_SH.to_string(),
             );
+        }
+        (Method::Get, "/whitepaper.pdf") => {
+            let mut resp = Response::from_data(crate::agent::WHITEPAPER_V2_2_PDF.to_vec())
+                .with_status_code(StatusCode(200))
+                .with_header(Header::from_bytes("Content-Type", "application/pdf").unwrap())
+                .with_header(
+                    Header::from_bytes(
+                        "Content-Disposition",
+                        "inline; filename=\"newsatoshi-v2.2.pdf\"",
+                    )
+                    .unwrap(),
+                );
+            for h in cors_headers() {
+                resp = resp.with_header(h);
+            }
+            let _ = req.respond(resp);
         }
         (Method::Get, "/whitepaper.md") => {
             respond_text(
