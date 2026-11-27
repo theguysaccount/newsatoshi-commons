@@ -331,6 +331,79 @@ class Newsatoshi402PythonSdkTests(unittest.TestCase):
         self.assertEqual(len(claim_hex), 64)
         self.assertNotEqual(post_hex, claim_hex)
 
+    def test_v030_base_usdc_payword_channel_gate_and_calldata(self):
+        wallet = ns402.generate_payword_chain(100, 1_000)
+        recipient = "0x1744535521EB420be9700475400455a4Ad0EBEa2"
+        payer = "0x1111111111111111111111111111111111111111"
+        channel_id = "0x" + "ab" * 32
+        expiry = int(ns402.time.time()) + 86_400
+
+        open_cd = ns402.encode_base_open_channel_calldata(
+            recipient=recipient,
+            root_hex=wallet.tip_hex,
+            unit_amount=1_000,
+            max_steps=100,
+            expiry_unix=expiry,
+        )
+        self.assertTrue(open_cd.startswith("0xfbbd272c"))
+        self.assertEqual(len(open_cd), 10 + 6 * 64)
+
+        inject_cd = ns402.encode_fair_curve_inject_revenue_calldata(5_000)
+        self.assertEqual(inject_cd, "0xe224ef38" + f"{5000:064x}")
+
+        fake_words = (
+            "0x"
+            + payer[2:].rjust(64, "0")
+            + recipient[2:].lower().rjust(64, "0")
+            + ns402.BASE_USDC_ADDRESS[2:].lower().rjust(64, "0")
+            + wallet.tip_hex
+            + wallet.tip_hex
+            + f"{1000:064x}"
+            + f"{100:064x}"
+            + f"{0:064x}"
+            + f"{expiry:064x}"
+            + f"{0:064x}"
+        )
+        decoded = ns402.decode_base_payword_channel_words(fake_words, channel_id)
+        self.assertTrue(decoded["found"])
+        self.assertEqual(decoded["remaining_amount"], 100_000)
+
+        gate = ns402.BasePayWordGate(
+            recipient=recipient,
+            unit_amount=1_000,
+            channel_fetcher=lambda _cid: decoded,
+        )
+        self.assertFalse(gate.verify_headers({})["ok"])
+
+        last = None
+        for i in range(1, 26):
+            last = wallet.next_payment(1)
+            res = gate.verify_headers(
+                {
+                    "X-PayWord-Channel": channel_id,
+                    "X-PayWord-Index": str(last["ticks"]),
+                    "X-PayWord-Preimage": "0x" + last["token_hex"],
+                }
+            )
+            self.assertTrue(res["ok"])
+            self.assertEqual(res["delta_steps"], 1)
+            self.assertEqual(res["unclaimed_steps"], i)
+
+        # Replay rejected
+        replay = gate.verify_headers(
+            {
+                "X-PayWord-Channel": channel_id,
+                "X-PayWord-Index": str(last["ticks"]),
+                "X-PayWord-Preimage": "0x" + last["token_hex"],
+            }
+        )
+        self.assertFalse(replay["ok"])
+
+        batch = gate.export_settlement_batch(channel_id)
+        self.assertEqual(batch["steps_to_claim"], 25)
+        self.assertEqual(batch["payout_raw"], 25_000)
+        self.assertTrue(batch["calldata"].startswith("0xe0ab9c6b"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -10,6 +10,8 @@
 use serde_json::{json, Value};
 
 pub const BASE_USDC_ADDRESS: &str = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+pub const SDK_JS_SOURCE: &str = include_str!("../sdk/js/newsatoshi-402.mjs");
+pub const SDK_PY_SOURCE: &str = include_str!("../sdk/python/newsatoshi_402.py");
 pub const BASE_PAYWORD_CHANNEL_ADDRESS: &str = "0x971BA814Df91c20DcA3aDd870C2B55d643965C50";
 pub const BASE_FAIR_CURVE_FACTORY_ADDRESS: &str = "0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933";
 pub const BASE_DEMO_CURVE_POOL_ADDRESS: &str = "0xC3098ba25E39Effa63dE94EbACE6381781ad4cEd";
@@ -537,6 +539,378 @@ fn round8(v: f64) -> f64 {
     (v * 100_000_000.0).round() / 100_000_000.0
 }
 
+// =============================================================================
+// Live Base Mainnet JSON-RPC Readers (Zero Fake Data — Real On-Chain State)
+// =============================================================================
+
+const BASE_RPC_URLS: &[&str] = &[
+    "https://mainnet.base.org",
+    "https://base-rpc.publicnode.com",
+];
+
+static BASE_CURVES_CACHE: std::sync::OnceLock<std::sync::Mutex<Option<(std::time::Instant, Value)>>> =
+    std::sync::OnceLock::new();
+
+fn base_rpc_post(payload: &Value) -> Result<Value, String> {
+    let body_str = serde_json::to_string(payload).map_err(|e| format!("json encode error: {e}"))?;
+    let mut last_err = String::new();
+    for url in BASE_RPC_URLS {
+        let cfg = ureq::Agent::config_builder()
+            .timeout_global(Some(std::time::Duration::from_secs(7)))
+            .build();
+        let agent: ureq::Agent = cfg.into();
+        match agent
+            .post(*url)
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .send(body_str.as_str())
+        {
+            Ok(mut resp) => match resp.body_mut().read_to_string() {
+                Ok(text) => match serde_json::from_str::<Value>(&text) {
+                    Ok(v) => return Ok(v),
+                    Err(e) => last_err = format!("{url} json parse error: {e}"),
+                },
+                Err(e) => last_err = format!("{url} body read error: {e}"),
+            },
+            Err(e) => last_err = format!("{url} rpc error: {e}"),
+        }
+    }
+    Err(format!("Base Mainnet RPC unavailable: {last_err}"))
+}
+
+fn eth_call_single(to: &str, data: &str) -> Result<String, String> {
+    let payload = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "eth_call",
+        "params": [{ "to": to, "data": data }, "latest"]
+    });
+    let resp = base_rpc_post(&payload)?;
+    if let Some(err) = resp.get("error") {
+        return Err(format!("eth_call error: {err}"));
+    }
+    resp.get("result")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| "missing eth_call result".to_string())
+}
+
+fn eth_call_batch(calls: &[(&str, &str)]) -> Result<Vec<String>, String> {
+    if calls.is_empty() {
+        return Ok(Vec::new());
+    }
+    let batch: Vec<Value> = calls
+        .iter()
+        .enumerate()
+        .map(|(i, (to, data))| {
+            json!({
+                "jsonrpc": "2.0",
+                "id": i + 1,
+                "method": "eth_call",
+                "params": [{ "to": to, "data": data }, "latest"]
+            })
+        })
+        .collect();
+    let resp = base_rpc_post(&Value::Array(batch))?;
+    let arr = resp
+        .as_array()
+        .ok_or_else(|| "Base RPC batch response was not an array".to_string())?;
+    let mut out = vec![String::new(); calls.len()];
+    for item in arr {
+        if let Some(id) = item.get("id").and_then(|v| v.as_u64()) {
+            let idx = (id as usize).saturating_sub(1);
+            if idx < out.len() {
+                if let Some(res) = item.get("result").and_then(|v| v.as_str()) {
+                    out[idx] = res.to_string();
+                }
+            }
+        }
+    }
+    Ok(out)
+}
+
+fn strip_hex(s: &str) -> &str {
+    s.trim().strip_prefix("0x").or_else(|| s.trim().strip_prefix("0X")).unwrap_or(s.trim())
+}
+
+fn decode_word_u128(hex_str: &str, word_idx: usize) -> u128 {
+    let clean = strip_hex(hex_str);
+    let start = word_idx * 64;
+    if clean.len() < start + 64 {
+        return 0;
+    }
+    let slice = &clean[start + 32..start + 64]; // lower 128 bits
+    u128::from_str_radix(slice, 16).unwrap_or(0)
+}
+
+fn decode_word_address(hex_str: &str, word_idx: usize) -> String {
+    let clean = strip_hex(hex_str);
+    let start = word_idx * 64;
+    if clean.len() < start + 64 {
+        return "0x0000000000000000000000000000000000000000".to_string();
+    }
+    format!("0x{}", &clean[start + 24..start + 64].to_ascii_lowercase())
+}
+
+fn decode_abi_string(hex_str: &str) -> String {
+    let clean = strip_hex(hex_str);
+    if clean.len() < 128 {
+        return String::new();
+    }
+    let offset = usize::from_str_radix(&clean[48..64], 16).unwrap_or(32) * 2;
+    if clean.len() < offset + 64 {
+        return String::new();
+    }
+    let byte_len = usize::from_str_radix(&clean[offset + 48..offset + 64], 16).unwrap_or(0).min(256);
+    let data_start = offset + 64;
+    let data_end = data_start + byte_len * 2;
+    if clean.len() < data_end {
+        return String::new();
+    }
+    hex::decode(&clean[data_start..data_end])
+        .ok()
+        .and_then(|b| String::from_utf8(b).ok())
+        .unwrap_or_default()
+}
+
+/// Decode the 10-word ABI tuple returned by `NewsatoshiPayWordChannel.channels(bytes32)`.
+pub fn decode_base_payword_channel_words(result_hex: &str, channel_id_hex: &str) -> Value {
+    let clean_id = strip_hex(channel_id_hex).to_ascii_lowercase();
+    let cid = format!("0x{clean_id}");
+    let clean = strip_hex(result_hex);
+    if clean.len() < 640 {
+        return json!({
+            "ok": true,
+            "found": false,
+            "channel_id": cid,
+            "contract": BASE_PAYWORD_CHANNEL_ADDRESS,
+            "reason": "short or empty RPC result"
+        });
+    }
+    let payer = decode_word_address(clean, 0);
+    if payer == "0x0000000000000000000000000000000000000000" {
+        return json!({
+            "ok": true,
+            "found": false,
+            "channel_id": cid,
+            "contract": BASE_PAYWORD_CHANNEL_ADDRESS,
+            "reason": "channel not found on Base Mainnet"
+        });
+    }
+    let recipient = decode_word_address(clean, 1);
+    let token = decode_word_address(clean, 2);
+    let initial_root = format!("0x{}", &clean[3 * 64..4 * 64].to_ascii_lowercase());
+    let current_root = format!("0x{}", &clean[4 * 64..5 * 64].to_ascii_lowercase());
+    let unit_amount = decode_word_u128(clean, 5);
+    let max_steps = decode_word_u128(clean, 6) as u64;
+    let claimed_steps = decode_word_u128(clean, 7) as u64;
+    let expiry = decode_word_u128(clean, 8) as u64;
+    let closed = decode_word_u128(clean, 9) != 0;
+    let remaining_steps = if closed { 0 } else { max_steps.saturating_sub(claimed_steps) };
+    let remaining_raw = (remaining_steps as u128).saturating_mul(unit_amount);
+    let claimed_raw = (claimed_steps as u128).saturating_mul(unit_amount);
+    let is_usdc = token.eq_ignore_ascii_case(BASE_USDC_ADDRESS);
+
+    json!({
+        "ok": true,
+        "found": true,
+        "chain": "base (eip155:8453)",
+        "contract": BASE_PAYWORD_CHANNEL_ADDRESS,
+        "channel_id": cid,
+        "payer": payer,
+        "recipient": recipient,
+        "token": token,
+        "token_symbol": if is_usdc { "USDC" } else if token == "0x0000000000000000000000000000000000000000" { "ETH" } else { "ERC20" },
+        "initial_root": initial_root,
+        "current_root": current_root,
+        "unit_amount_raw": unit_amount.to_string(),
+        "unit_amount_usdc": if is_usdc { Some(round6((unit_amount as f64) / 1e6)) } else { None },
+        "max_steps": max_steps,
+        "claimed_steps": claimed_steps,
+        "remaining_steps": remaining_steps,
+        "claimed_amount_raw": claimed_raw.to_string(),
+        "claimed_amount_usdc": if is_usdc { Some(round6((claimed_raw as f64) / 1e6)) } else { None },
+        "remaining_amount_raw": remaining_raw.to_string(),
+        "remaining_amount_usdc": if is_usdc { Some(round6((remaining_raw as f64) / 1e6)) } else { None },
+        "expiry_unix": expiry,
+        "closed": closed,
+        "basescan_contract_url": format!("https://basescan.org/address/{BASE_PAYWORD_CHANNEL_ADDRESS}")
+    })
+}
+
+/// Inspect any live `NewsatoshiPayWordChannel` (`0x971BA814Df91c20DcA3aDd870C2B55d643965C50`) on Base Mainnet.
+pub fn inspect_live_base_payword_channel(channel_id_hex: &str) -> Result<Value, String> {
+    let clean = strip_hex(channel_id_hex).to_ascii_lowercase();
+    if clean.len() != 64 || !clean.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err("channel_id must be a 32-byte (64 hex character) bytes32 hash".into());
+    }
+    let calldata = format!("0x7a7ebd7b{clean}");
+    let raw = eth_call_single(BASE_PAYWORD_CHANNEL_ADDRESS, &calldata)?;
+    Ok(decode_base_payword_channel_words(&raw, &clean))
+}
+
+/// Read all live Fair Bonding Curves deployed via `NewsatoshiFairCurveFactory`
+/// (`0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933`) directly from Base Mainnet RPC (15s TTL cache).
+pub fn fetch_live_base_fair_curves(force_refresh: bool) -> Result<Value, String> {
+    let cache = BASE_CURVES_CACHE.get_or_init(|| std::sync::Mutex::new(None));
+    if !force_refresh {
+        if let Ok(guard) = cache.lock() {
+            if let Some((ts, ref cached)) = *guard {
+                if ts.elapsed() < std::time::Duration::from_secs(15) {
+                    return Ok(cached.clone());
+                }
+            }
+        }
+    }
+
+    let count_hex = eth_call_single(BASE_FAIR_CURVE_FACTORY_ADDRESS, "0xf525cb68")?;
+    let total_count = decode_word_u128(&count_hex, 0) as usize;
+    let fetch_count = total_count.min(25);
+
+    let mut pool_addrs: Vec<String> = Vec::with_capacity(fetch_count);
+    if fetch_count > 0 {
+        let mut idx_calls: Vec<(String, String)> = Vec::with_capacity(fetch_count);
+        // Fetch newest pools first so freshly launched curves appear at the top
+        for offset in 0..fetch_count {
+            let idx = total_count - 1 - offset;
+            idx_calls.push((
+                BASE_FAIR_CURVE_FACTORY_ADDRESS.to_string(),
+                format!("0x41d1de97{:064x}", idx),
+            ));
+        }
+        let call_refs: Vec<(&str, &str)> = idx_calls.iter().map(|(a, d)| (a.as_str(), d.as_str())).collect();
+        let results = eth_call_batch(&call_refs)?;
+        for res in results {
+            let addr = decode_word_address(&res, 0);
+            if addr != "0x0000000000000000000000000000000000000000" {
+                pool_addrs.push(addr);
+            }
+        }
+    }
+
+    // Batch 1: read all 12 state getters across all discovered pools in 1 RPC round-trip
+    const POOL_SELECTORS: [&str; 12] = [
+        "0xfc0c546a", // 0: token()
+        "0xf4325d67", // 1: reserveToken()
+        "0x4b38474d", // 2: feeSink()
+        "0x2ffdaf89", // 3: swapFeeBps()
+        "0x80c08a5d", // 4: virtualReserve()
+        "0x277b2f97", // 5: virtualSupply()
+        "0xbefdcf9b", // 6: curveReserve()
+        "0x9e466cab", // 7: accRevPerToken()
+        "0xb93600e6", // 8: totalRevenueInjected()
+        "0x50515d2b", // 9: totalRevenueClaimed()
+        "0x398482d8", // 10: spotPrice()
+        "0x77a4d559", // 11: metadataUri()
+    ];
+
+    let mut pool_calls: Vec<(&str, &str)> = Vec::with_capacity(pool_addrs.len() * POOL_SELECTORS.len());
+    for addr in &pool_addrs {
+        for sel in &POOL_SELECTORS {
+            pool_calls.push((addr.as_str(), *sel));
+        }
+    }
+    let pool_res = eth_call_batch(&pool_calls)?;
+
+    let mut token_addrs: Vec<String> = Vec::with_capacity(pool_addrs.len());
+    for i in 0..pool_addrs.len() {
+        let base = i * POOL_SELECTORS.len();
+        token_addrs.push(decode_word_address(&pool_res[base], 0));
+    }
+
+    // Batch 2: read name(), symbol(), totalSupply() for every pool's FairCurveToken in 1 RPC round-trip
+    const TOKEN_SELECTORS: [&str; 3] = [
+        "0x06fdde03", // 0: name()
+        "0x95d89b41", // 1: symbol()
+        "0x18160ddd", // 2: totalSupply()
+    ];
+    let mut tok_calls: Vec<(&str, &str)> = Vec::with_capacity(token_addrs.len() * TOKEN_SELECTORS.len());
+    for tok in &token_addrs {
+        for sel in &TOKEN_SELECTORS {
+            tok_calls.push((tok.as_str(), *sel));
+        }
+    }
+    let tok_res = eth_call_batch(&tok_calls)?;
+
+    let mut curves = Vec::with_capacity(pool_addrs.len());
+    for i in 0..pool_addrs.len() {
+        let pb = i * POOL_SELECTORS.len();
+        let tb = i * TOKEN_SELECTORS.len();
+        let pool_addr = &pool_addrs[i];
+        let token_addr = &token_addrs[i];
+        let reserve_token = decode_word_address(&pool_res[pb + 1], 0);
+        let fee_sink = decode_word_address(&pool_res[pb + 2], 0);
+        let swap_fee_bps = decode_word_u128(&pool_res[pb + 3], 0) as u64;
+        let virtual_reserve_raw = decode_word_u128(&pool_res[pb + 4], 0);
+        let virtual_supply_wei = decode_word_u128(&pool_res[pb + 5], 0);
+        let curve_reserve_raw = decode_word_u128(&pool_res[pb + 6], 0);
+        let acc_rev_per_token = decode_word_u128(&pool_res[pb + 7], 0);
+        let total_rev_injected_raw = decode_word_u128(&pool_res[pb + 8], 0);
+        let total_rev_claimed_raw = decode_word_u128(&pool_res[pb + 9], 0);
+        let spot_price_raw = decode_word_u128(&pool_res[pb + 10], 0);
+        let metadata_uri = decode_abi_string(&pool_res[pb + 11]);
+
+        let name = decode_abi_string(&tok_res[tb]);
+        let symbol = decode_abi_string(&tok_res[tb + 1]);
+        let total_supply_wei = decode_word_u128(&tok_res[tb + 2], 0);
+
+        let is_usdc = reserve_token.eq_ignore_ascii_case(BASE_USDC_ADDRESS);
+        let reserve_div = if is_usdc { 1e6 } else { 1e18 };
+
+        curves.push(json!({
+            "pool_index": total_count - 1 - i,
+            "pool_address": pool_addr,
+            "token_address": token_addr,
+            "name": name,
+            "symbol": symbol,
+            "reserve_token": reserve_token,
+            "reserve_symbol": if is_usdc { "USDC" } else { "ERC20" },
+            "fee_sink": fee_sink,
+            "holder_dividend_fee_mode": fee_sink == "0x0000000000000000000000000000000000000000",
+            "swap_fee_bps": swap_fee_bps,
+            "virtual_reserve_raw": virtual_reserve_raw.to_string(),
+            "virtual_reserve_usdc": round6((virtual_reserve_raw as f64) / reserve_div),
+            "virtual_supply_wei": virtual_supply_wei.to_string(),
+            "virtual_supply_tokens": round2((virtual_supply_wei as f64) / 1e18),
+            "curve_reserve_raw": curve_reserve_raw.to_string(),
+            "curve_reserve_usdc": round6((curve_reserve_raw as f64) / reserve_div),
+            "total_supply_wei": total_supply_wei.to_string(),
+            "total_supply_tokens": round4((total_supply_wei as f64) / 1e18),
+            "spot_price_raw": spot_price_raw.to_string(),
+            "spot_price_usdc": round8((spot_price_raw as f64) / reserve_div),
+            "acc_rev_per_token": acc_rev_per_token.to_string(),
+            "total_revenue_injected_raw": total_rev_injected_raw.to_string(),
+            "total_revenue_injected_usdc": round6((total_rev_injected_raw as f64) / reserve_div),
+            "total_revenue_claimed_raw": total_rev_claimed_raw.to_string(),
+            "total_revenue_claimed_usdc": round6((total_rev_claimed_raw as f64) / reserve_div),
+            "unclaimed_revenue_usdc": round6((total_rev_injected_raw.saturating_sub(total_rev_claimed_raw) as f64) / reserve_div),
+            "metadata_uri": metadata_uri,
+            "basescan_pool_url": format!("https://basescan.org/address/{pool_addr}"),
+            "basescan_token_url": format!("https://basescan.org/token/{token_addr}")
+        }));
+    }
+
+    let now_unix = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let out = json!({
+        "ok": true,
+        "chain": "base (eip155:8453)",
+        "factory_address": BASE_FAIR_CURVE_FACTORY_ADDRESS,
+        "sourcify_exact_match": format!("https://repo.sourcify.dev/8453/{BASE_FAIR_CURVE_FACTORY_ADDRESS}"),
+        "total_pool_count": total_count,
+        "fetched_at_unix": now_unix,
+        "curves": curves
+    });
+
+    if let Ok(mut guard) = cache.lock() {
+        *guard = Some((std::time::Instant::now(), out.clone()));
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -577,5 +951,37 @@ mod tests {
         assert_eq!(sim["simulation"]["invariant_v_plus_r_times_y_ge_k0"], true);
         assert_eq!(sim["simulation"]["solvency_gross_sell_le_reserve"], true);
         assert!(sim["simulation"]["effective_usdc_backing_pct"].as_f64().unwrap() > 140.0);
+
+        // Verify ABI string decoding & 10-word PayWordChannel decoding
+        let abi_str = format!(
+            "0x{:064x}{:064x}{}",
+            32u64,
+            5u64,
+            "4e53504159000000000000000000000000000000000000000000000000000000"
+        );
+        assert_eq!(decode_abi_string(&abi_str), "NSPAY");
+
+        let cid = "ab".repeat(32);
+        let words = format!(
+            "0x{:0>64}{:0>64}{:0>64}{}{}{:064x}{:064x}{:064x}{:064x}{:064x}",
+            "1111111111111111111111111111111111111111",
+            "1744535521eb420be9700475400455a4ad0ebea2",
+            "833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+            "cc".repeat(32),
+            "dd".repeat(32),
+            1_000u128,
+            100u128,
+            7u128,
+            1_900_000_000u128,
+            0u128,
+        );
+        let decoded = decode_base_payword_channel_words(&words, &cid);
+        assert_eq!(decoded["found"], true);
+        assert_eq!(decoded["token_symbol"], "USDC");
+        assert_eq!(decoded["remaining_steps"], 93);
+        assert_eq!(decoded["remaining_amount_raw"], "93000");
+        assert_eq!(decoded["closed"], false);
+        assert!(SDK_JS_SOURCE.contains("createBasePayWordGate"));
+        assert!(SDK_PY_SOURCE.contains("class BasePayWordGate"));
     }
 }

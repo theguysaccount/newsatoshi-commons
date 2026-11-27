@@ -1,7 +1,7 @@
 {
   "name": "@newsatoshi/402",
-  "version": "0.21.0",
-  "description": "Zero-dependency post-quantum HTTP 402 PayWord middleware, stdio MCP bridge, zero-API-key EVM/BTC/BOLT-11/Uniswap V3 tools, and Streamable HTTP MCP client for Newsatoshi (LOVE).",
+  "version": "0.30.0",
+  "description": "Zero-dependency post-quantum HTTP 402 PayWord middleware (L1 LOVE + Live Base Mainnet USDC PayWordChannel & FairCurvePool), stdio MCP bridge, zero-API-key EVM/BTC/BOLT-11/Uniswap V3 tools, and Streamable HTTP MCP client for Newsatoshi.",
   "type": "module",
   "main": "./newsatoshi-402.mjs",
   "exports": {
@@ -26,7 +26,7 @@
     "bitcoin",
     "htlc"
   ],
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "homepage": "https://commons.newsatoshi.org/developers",
   "repository": {
     "type": "git",

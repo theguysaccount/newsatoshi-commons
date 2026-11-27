@@ -3,6 +3,7 @@ import { ArrowRight, ArrowUpRight, Check, ExternalLink, Layers, Loader2, Play, S
 import type { BackingProofSummary, PrimaryView, ProtocolSubTab, SeedStatusResponse } from '../types';
 import { formatL1IssuedLove } from '../api/normalize';
 import type { SwapHubSection } from './SwapsMiningTab';
+import { BaseLiveConsole } from './BaseLiveConsole';
 import { CopyButton, truncateHash } from './ui/CopyButton';
 
 interface NsUsdStressResult {
@@ -175,7 +176,7 @@ const SNIPPETS: Record<
 > = {
   mcp: {
     label: 'MCP Server',
-    caption: '35 zero-auth L2 gateway & crypto tools (60s private x402 paywall kit, Base USDC escrow verifier, nsUSD stress, L2 STARK rollup, EVM audit, BTC mempool, BOLT-11)',
+    caption: '40 zero-auth L2 gateway & crypto tools (live Base USDC PayWords & Fair Curves indexer, 60s private x402 paywall kit, Base USDC escrow verifier, nsUSD stress, L2 STARK rollup, EVM audit, BTC mempool, BOLT-11)',
     code: `{
   "mcpServers": {
     "newsatoshi": {
@@ -1370,6 +1371,9 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
         </div>
       </section>
 
+      {/* 2B. Live On-Chain Base Mainnet Fair Curve Launchpad & PayWord Channel Console (1-Click EIP-1193) */}
+      <BaseLiveConsole onToast={onNotice} />
+
       {/* 3. The Hourglass Architecture — Strict Separation of Core Settlement vs. Ecosystem Labs */}
       <section className="border-t border-white/[0.07] pt-16">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
@@ -1464,7 +1468,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 rounded-full border border-white/[0.1] bg-white/[0.04] px-2.5 py-0.5 font-mono text-[10px] text-zinc-300 hover:text-white"
               >
-                <span>newsatoshi-commons · v0.28.4</span>
+                <span>newsatoshi-commons · v0.30.0</span>
                 <ArrowUpRight className="h-3 w-3" />
               </a>
             </div>
@@ -1498,7 +1502,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
                 <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" />
                 <span>
                   <strong className="text-zinc-100">A2A Commerce &amp; Identity Ready:</strong>{' '}
-                  35 zero-auth MCP tools (Official MCP Registry <code className="font-mono text-xs">0.28.4</code>),{' '}
+                  40 zero-auth MCP tools (Official MCP Registry <code className="font-mono text-xs">0.30.0</code>),{' '}
                   <code className="font-mono text-xs">ERC-8004</code> dual identity, 60s private{' '}
                   <code className="font-mono text-xs">x402</code> paywall kit, RFC-0028{' '}
                   <code className="font-mono text-xs">nsUSD</code> stability, and L2 STARK rollups.

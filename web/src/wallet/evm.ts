@@ -618,3 +618,188 @@ export async function sha256HexUtf8(text: string): Promise<string> {
       .join('')
   );
 }
+
+// ── Live Base Mainnet FairCurveFactory & PayWordChannel Encoders (v0.30.0) ────
+
+export const BASE_PAYWORD_CHANNEL_ADDRESS = '0x971BA814Df91c20DcA3aDd870C2B55d643965C50';
+export const BASE_FAIR_CURVE_FACTORY_ADDRESS = '0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933';
+export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+
+function encodeAbiStringWord(str: string): { hex: string; byteLen: number } {
+  const utf8 = new TextEncoder().encode(str);
+  const hexBytes = Array.from(utf8)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  const paddedHexLen = Math.ceil(hexBytes.length / 64) * 64;
+  const fullHex = padUint(utf8.length) + hexBytes.padEnd(paddedHexLen, '0');
+  return { hex: fullHex, byteLen: fullHex.length / 2 };
+}
+
+/** ABI-encode `NewsatoshiFairCurveFactory.createCurve(string,string,address,uint256,uint256,uint16,address,string)` (`0xc116e2f6`). */
+export function encodeCreateFairCurve(params: {
+  name: string;
+  symbol: string;
+  reserveToken?: string;
+  virtualReserveRaw: bigint;
+  virtualSupplyWei: bigint;
+  swapFeeBps: number;
+  feeSink?: string;
+  metadataUri?: string;
+}): string {
+  const nameEnc = encodeAbiStringWord(params.name.trim());
+  const symEnc = encodeAbiStringWord(params.symbol.trim());
+  const uriEnc = encodeAbiStringWord((params.metadataUri ?? 'https://newsatoshi.org/launchpad/').trim());
+
+  const headBytes = 8 * 32; // 256 bytes
+  const off0 = headBytes;
+  const off1 = off0 + nameEnc.byteLen;
+  const off7 = off1 + symEnc.byteLen;
+
+  return (
+    '0xc116e2f6' +
+    padUint(off0) +
+    padUint(off1) +
+    padAddress(params.reserveToken ?? BASE_USDC_ADDRESS) +
+    padUint(params.virtualReserveRaw) +
+    padUint(params.virtualSupplyWei) +
+    padUint(params.swapFeeBps) +
+    padAddress(params.feeSink ?? ZERO_ADDRESS) +
+    padUint(off7) +
+    nameEnc.hex +
+    symEnc.hex +
+    uriEnc.hex
+  );
+}
+
+/** ABI-encode `FairCurvePool.buy(uint256 reserveIn, uint256 minTokensOut)` (`0xd6febde8`). */
+export function encodeFairCurveBuy(reserveInRaw: bigint, minTokensOutWei = 0n): string {
+  return `0xd6febde8${padUint(reserveInRaw)}${padUint(minTokensOutWei)}`;
+}
+
+/** ABI-encode `FairCurvePool.sell(uint256 tokensIn, uint256 minReserveOut)` (`0xd79875eb`). */
+export function encodeFairCurveSell(tokensInWei: bigint, minReserveOutRaw = 0n): string {
+  return `0xd79875eb${padUint(tokensInWei)}${padUint(minReserveOutRaw)}`;
+}
+
+/** ABI-encode `FairCurvePool.injectRevenue(uint256 amount)` (`0xe224ef38`). */
+export function encodeFairCurveInjectRevenue(amountRaw: bigint): string {
+  return `0xe224ef38${padUint(amountRaw)}`;
+}
+
+/** ABI-encode `FairCurvePool.claimRevenue()` (`0x564f4f76`). */
+export function encodeFairCurveClaimRevenue(): string {
+  return '0x564f4f76';
+}
+
+/** ABI-encode `FairCurvePool.claimableRevenue(address)` (`0xeacb482b`). */
+export function encodeFairCurveClaimable(account: string): string {
+  return `0xeacb482b${padAddress(account)}`;
+}
+
+/** ABI-encode `NewsatoshiPayWordChannel.openChannel(address,address,bytes32,uint256,uint32,uint64)` (`0xfbbd272c`). */
+export function encodePayWordOpenChannel(params: {
+  recipient: string;
+  token?: string;
+  rootHex: string;
+  unitAmountRaw: bigint;
+  maxSteps: number;
+  expiryUnix: number;
+}): string {
+  return (
+    '0xfbbd272c' +
+    padAddress(params.recipient) +
+    padAddress(params.token ?? BASE_USDC_ADDRESS) +
+    padBytes32(params.rootHex) +
+    padUint(params.unitAmountRaw) +
+    padUint(params.maxSteps) +
+    padUint(params.expiryUnix)
+  );
+}
+
+/** ABI-encode `NewsatoshiPayWordChannel.claim(bytes32 channelId, uint32 steps, bytes32 preimage)` (`0xe0ab9c6b`). */
+export function encodePayWordClaim(channelIdHex: string, steps: number, preimageHex: string): string {
+  return `0xe0ab9c6b${padBytes32(channelIdHex)}${padUint(steps)}${padBytes32(preimageHex)}`;
+}
+
+/** ABI-encode `NewsatoshiPayWordChannel.closeAndRefund(bytes32 channelId)` (`0xa1fa8cf8`). */
+export function encodePayWordCloseAndRefund(channelIdHex: string): string {
+  return `0xa1fa8cf8${padBytes32(channelIdHex)}`;
+}
+
+/** ABI-encode `NewsatoshiPayWordChannel.computeChannelId(...)` (`0x5271855d`). */
+export function encodePayWordComputeChannelId(params: {
+  payer: string;
+  recipient: string;
+  token?: string;
+  rootHex: string;
+  unitAmountRaw: bigint;
+  maxSteps: number;
+  expiryUnix: number;
+}): string {
+  return (
+    '0x5271855d' +
+    padAddress(params.payer) +
+    padAddress(params.recipient) +
+    padAddress(params.token ?? BASE_USDC_ADDRESS) +
+    padBytes32(params.rootHex) +
+    padUint(params.unitAmountRaw) +
+    padUint(params.maxSteps) +
+    padUint(params.expiryUnix)
+  );
+}
+
+/** Read a holder's claimable USDC dividends on a FairCurvePool via Base RPC. */
+export async function readFairCurveClaimable(poolAddress: string, account: string): Promise<bigint> {
+  const resHex = await rpcCall('base', 'eth_call', [
+    { to: poolAddress, data: encodeFairCurveClaimable(account) },
+    'latest',
+  ]);
+  const clean = strip0x(resHex);
+  return clean.length >= 64 ? BigInt(`0x${clean.slice(0, 64)}`) : 0n;
+}
+
+/** Read exact Base Mainnet `computeChannelId` from `NewsatoshiPayWordChannel`. */
+export async function readPayWordChannelId(params: {
+  payer: string;
+  recipient: string;
+  token?: string;
+  rootHex: string;
+  unitAmountRaw: bigint;
+  maxSteps: number;
+  expiryUnix: number;
+}): Promise<string> {
+  const resHex = await rpcCall('base', 'eth_call', [
+    { to: BASE_PAYWORD_CHANNEL_ADDRESS, data: encodePayWordComputeChannelId(params) },
+    'latest',
+  ]);
+  const clean = strip0x(resHex);
+  if (clean.length < 64) throw new Error('Failed to compute Base channelId');
+  return `0x${clean.slice(0, 64)}`;
+}
+
+/** Generate a real CSPRNG SHA-256 PayWord hash chain strictly in the browser via WebCrypto. */
+export async function generateBrowserPayWordChain(maxSteps: number): Promise<{
+  seedHex: string;
+  rootHex: string;
+  chain: string[];
+}> {
+  const steps = Math.max(1, Math.min(2048, Math.floor(maxSteps)));
+  const seed = new Uint8Array(32);
+  window.crypto.getRandomValues(seed);
+  const toHex = (u8: Uint8Array) =>
+    '0x' + Array.from(u8).map((b) => b.toString(16).padStart(2, '0')).join('');
+  const chain: string[] = new Array(steps + 1);
+  let cur: Uint8Array = seed;
+  chain[0] = toHex(cur);
+  for (let i = 1; i <= steps; i += 1) {
+    const ab = new ArrayBuffer(cur.byteLength);
+    new Uint8Array(ab).set(cur);
+    cur = new Uint8Array(await window.crypto.subtle.digest('SHA-256', ab));
+    chain[i] = toHex(cur);
+  }
+  return {
+    seedHex: chain[0],
+    rootHex: chain[steps],
+    chain,
+  };
+}

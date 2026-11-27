@@ -27,6 +27,13 @@ import {
   fetchL1Mission,
   missionPostTaskMessageHex,
   missionClaimTaskMessageHex,
+  BASE_USDC_ADDRESS,
+  BASE_PAYWORD_CHANNEL_ADDRESS,
+  encodeBaseOpenChannelCalldata,
+  encodeBaseClaimCalldata,
+  encodeFairCurveInjectRevenueCalldata,
+  decodeBasePayWordChannelWords,
+  createBasePayWordGate,
 } from "./newsatoshi-402.mjs";
 import { forwardJsonRpcLine } from "./bin/newsatoshi-mcp.mjs";
 
@@ -503,4 +510,96 @@ test("RFC-0027 Mission Launchpad bonding-curve quotes, exact conservation, task/
   });
   assert.equal(fetched.found, true);
   assert.equal(fetched.bounty_pool, 300_000_000);
+});
+
+test("v0.30.0 Base Mainnet USDC PayWordChannel ABI calldata, O(1) gate, replay protection & batch settlement", async () => {
+  const wallet = await generatePayWordChain(100, 1_000);
+  const recipient = "0x1744535521EB420be9700475400455a4Ad0EBEa2";
+  const payer = "0x1111111111111111111111111111111111111111";
+  const channelId = "0x" + "ab".repeat(32);
+  const expiry = Math.floor(Date.now() / 1000) + 86_400;
+
+  const openData = encodeBaseOpenChannelCalldata({
+    recipient,
+    token: BASE_USDC_ADDRESS,
+    rootHex: wallet.tipHex,
+    unitAmount: 1_000n,
+    maxSteps: 100,
+    expiryUnix: expiry,
+  });
+  assert.ok(openData.startsWith("0xfbbd272c"));
+  assert.equal(openData.length, 10 + 6 * 64);
+
+  const injectData = encodeFairCurveInjectRevenueCalldata(5_000n);
+  assert.equal(injectData, "0xe224ef38" + (5_000n).toString(16).padStart(64, "0"));
+
+  const fakeWords =
+    "0x" +
+    payer.slice(2).padStart(64, "0") +
+    recipient.slice(2).toLowerCase().padStart(64, "0") +
+    BASE_USDC_ADDRESS.slice(2).toLowerCase().padStart(64, "0") +
+    wallet.tipHex +
+    wallet.tipHex +
+    (1_000n).toString(16).padStart(64, "0") +
+    (100n).toString(16).padStart(64, "0") +
+    (0n).toString(16).padStart(64, "0") +
+    BigInt(expiry).toString(16).padStart(64, "0") +
+    (0n).toString(16).padStart(64, "0");
+
+  const decoded = decodeBasePayWordChannelWords(fakeWords, channelId);
+  assert.equal(decoded.found, true);
+  assert.equal(decoded.maxSteps, 100);
+  assert.equal(decoded.remainingAmount, 100_000n);
+
+  const gate = createBasePayWordGate({
+    recipient,
+    unitAmount: 1_000n,
+    channelFetcher: async () => decoded,
+  });
+
+  // Missing headers => HTTP 402 challenge
+  const missing = await gate.verifyHeaders({});
+  assert.equal(missing.ok, false);
+  assert.equal(missing.challenge.status, 402);
+
+  // 25 sequential O(1) calls (1 SHA-256 each)
+  let lastPayment = null;
+  for (let i = 1; i <= 25; i++) {
+    lastPayment = wallet.nextPayment(1);
+    const res = await gate.verifyHeaders({
+      "X-PayWord-Channel": channelId,
+      "X-PayWord-Index": String(lastPayment.ticks),
+      "X-PayWord-Preimage": `0x${lastPayment.tokenHex}`,
+    });
+    assert.equal(res.ok, true);
+    assert.equal(res.hashesEvaluated, 1);
+    assert.equal(res.unclaimedSteps, i);
+  }
+
+  // Replay rejected
+  const replay = await gate.verifyHeaders({
+    "X-PayWord-Channel": channelId,
+    "X-PayWord-Index": String(lastPayment.ticks),
+    "X-PayWord-Preimage": `0x${lastPayment.tokenHex}`,
+  });
+  assert.equal(replay.ok, false);
+
+  // Wrong preimage rejected
+  const forged = await gate.verifyHeaders({
+    "X-PayWord-Channel": channelId,
+    "X-PayWord-Index": "26",
+    "X-PayWord-Preimage": "0x" + "ff".repeat(32),
+  });
+  assert.equal(forged.ok, false);
+
+  // Batch settlement calldata exact match
+  const batch = gate.exportSettlementBatch(channelId);
+  assert.equal(batch.to, BASE_PAYWORD_CHANNEL_ADDRESS);
+  assert.equal(batch.stepsToClaim, 25);
+  assert.equal(batch.payoutRaw, 25_000n);
+  assert.equal(
+    batch.calldata,
+    encodeBaseClaimCalldata({ channelIdHex: channelId, steps: 25, preimageHex: `0x${lastPayment.tokenHex}` })
+  );
+  assert.ok(batch.calldata.startsWith("0xe0ab9c6b"));
 });

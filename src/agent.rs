@@ -877,7 +877,9 @@ pub fn render_mcp_server_card_json(base_url: &str) -> Value {
             "newsatoshi_verify_base_nsusd_escrow",
             "newsatoshi_estimate_paywords_savings",
             "newsatoshi_compile_payword_channel_setup",
-            "newsatoshi_simulate_fair_curve_launch"
+            "newsatoshi_simulate_fair_curve_launch",
+            "newsatoshi_list_base_fair_curves",
+            "newsatoshi_inspect_base_payword_channel"
         ],
         "resources": [
             "newsatoshi://llms.txt",
@@ -1060,6 +1062,8 @@ Available MCP tools (38 live tools — zero API keys required):
 - `newsatoshi_estimate_paywords_savings` — Calculate exact monthly & annual payment-fee savings comparing Stripe (`2.9% + $0.30`) & per-call Base x402 vs. Newsatoshi `O(1)` SHA-256 PayWords on live Base Mainnet (`0x971BA814Df91c20DcA3aDd870C2B55d643965C50`)
 - `newsatoshi_compile_payword_channel_setup` — Generate org-ready Base USDC `O(1)` SHA-256 PayWords HTTP 402 server middleware (Cloudflare Worker, Express, FastAPI) + `cast` settlement commands wired to live `NewsatoshiPayWordChannel`
 - `newsatoshi_simulate_fair_curve_launch` — Simulate exact integer constant-product USDC bonding-curve math + dilution-proof `injectRevenue()` PayWords dividends (Lean 4 Theorems 10–11, 0% premine, 0% platform cut) and emit 1-command deploy CLI for live Base Mainnet `NewsatoshiFairCurveFactory` (`0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933`)
+- `newsatoshi_list_base_fair_curves` — Read every live Fair Bonding Curve deployed on Base Mainnet `NewsatoshiFairCurveFactory` (`0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933`) directly from Base JSON-RPC (live USDC reserves, spot price, circulating supply, and injected PayWords revenue — zero fake data)
+- `newsatoshi_inspect_base_payword_channel` — Inspect any live Base Mainnet `NewsatoshiPayWordChannel` (`0x971BA814Df91c20DcA3aDd870C2B55d643965C50`) by `channel_id` directly from Base JSON-RPC (payer, recipient, token, current root, claimed/remaining steps & USDC balance)
 
 Stdio MCP Bridge (for stdio-only hosts such as Claude Desktop, Cursor, Cline, or shell scripts):
 ```json
@@ -2222,6 +2226,27 @@ pub fn mcp_tools_list() -> Value {
                         "fee_sink_evm": { "type": "string", "description": "Optional immutable fee recipient (omit or 0x000...000 for 100% holder dividend mode)" }
                     }
                 }
+            },
+            {
+                "name": "newsatoshi_list_base_fair_curves",
+                "description": "Read all live Fair Bonding Curves deployed via NewsatoshiFairCurveFactory (0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933) directly from Base Mainnet JSON-RPC (live USDC reserve, spot price, circulating supply, injected PayWords revenue, and unclaimed dividends — zero fake data).",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "refresh": { "type": "boolean", "default": false, "description": "Bypass the 15-second RPC cache and force a fresh Base Mainnet read" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_inspect_base_payword_channel",
+                "description": "Inspect any live Base Mainnet NewsatoshiPayWordChannel (0x971BA814Df91c20DcA3aDd870C2B55d643965C50) directly via Base JSON-RPC by its 32-byte channel_id.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["channel_id"],
+                    "properties": {
+                        "channel_id": { "type": "string", "description": "0x-prefixed 32-byte PayWord channel ID" }
+                    }
+                }
             }
         ]
     })
@@ -2868,6 +2893,17 @@ pub fn handle_mcp_jsonrpc(
                         name, sym, v_usdc, v_sup, fee_bps, buy_usdc, rev_usdc, sink,
                     )
                 }
+                "newsatoshi_list_base_fair_curves" => {
+                    let refresh = args.get("refresh").and_then(|v| v.as_bool()).unwrap_or(false);
+                    crate::paywords_launchpad::fetch_live_base_fair_curves(refresh)
+                }
+                "newsatoshi_inspect_base_payword_channel" => {
+                    let cid = args
+                        .get("channel_id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| "missing required 'channel_id'".to_string());
+                    cid.and_then(crate::paywords_launchpad::inspect_live_base_payword_channel)
+                }
                 other => Err(format!("unknown MCP tool '{other}'")),
             };
 
@@ -2973,6 +3009,6 @@ mod tests {
             &client,
             None,
         );
-        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 38);
+        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 40);
     }
 }

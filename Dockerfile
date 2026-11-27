@@ -11,6 +11,7 @@ FROM rust:bookworm AS rust-builder
 WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY src/ ./src/
+COPY sdk/ ./sdk/
 COPY skills/ ./skills/
 COPY scripts/ ./scripts/
 COPY docs/ ./docs/

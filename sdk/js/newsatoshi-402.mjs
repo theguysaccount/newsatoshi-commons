@@ -1759,3 +1759,423 @@ export async function compileBondedP2pOfferRemote(
   });
   return resp.json();
 }
+
+// =============================================================================
+// v0.30.0: Live Base Mainnet USDC PayWordChannel & FairCurvePool SDK (Zero-Dep)
+// =============================================================================
+
+export const BASE_CHAIN_ID = 8453;
+export const DEFAULT_BASE_RPC_URL = "https://mainnet.base.org";
+export const BASE_USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+export const BASE_PAYWORD_CHANNEL_ADDRESS = "0x971BA814Df91c20DcA3aDd870C2B55d643965C50";
+export const BASE_FAIR_CURVE_FACTORY_ADDRESS = "0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933";
+export const BASE_DEMO_CURVE_POOL_ADDRESS = "0xC3098ba25E39Effa63dE94EbACE6381781ad4cEd";
+
+function _abiPadAddress(addr) {
+  const clean = String(addr || "").trim().toLowerCase().replace(/^0x/, "");
+  if (!/^[0-9a-f]{40}$/.test(clean)) throw new Error(`Invalid EVM address: ${addr}`);
+  return clean.padStart(64, "0");
+}
+
+function _abiPadBytes32(hex) {
+  const clean = String(hex || "").trim().toLowerCase().replace(/^0x/, "");
+  if (!/^[0-9a-f]{64}$/.test(clean)) throw new Error(`Invalid bytes32 hex: ${hex}`);
+  return clean;
+}
+
+function _abiPadUint(val) {
+  const n = typeof val === "bigint" ? val : BigInt(val);
+  if (n < 0n) throw new Error("Unsigned ABI integer cannot be negative");
+  return n.toString(16).padStart(64, "0");
+}
+
+/** ABI-encode `ERC20.approve(address spender, uint256 amount)` (`0x095ea7b3`). */
+export function encodeErc20ApproveCalldata(spender, amount) {
+  return `0x095ea7b3${_abiPadAddress(spender)}${_abiPadUint(amount)}`;
+}
+
+/** ABI-encode `NewsatoshiPayWordChannel.openChannel(address,address,bytes32,uint256,uint32,uint64)` (`0xfbbd272c`). */
+export function encodeBaseOpenChannelCalldata({
+  recipient,
+  token = BASE_USDC_ADDRESS,
+  rootHex,
+  unitAmount,
+  maxSteps,
+  expiryUnix,
+}) {
+  return (
+    "0xfbbd272c" +
+    _abiPadAddress(recipient) +
+    _abiPadAddress(token) +
+    _abiPadBytes32(rootHex) +
+    _abiPadUint(unitAmount) +
+    _abiPadUint(maxSteps) +
+    _abiPadUint(expiryUnix)
+  );
+}
+
+/** ABI-encode `NewsatoshiPayWordChannel.claim(bytes32 channelId, uint32 steps, bytes32 preimage)` (`0xe0ab9c6b`). */
+export function encodeBaseClaimCalldata({ channelIdHex, steps, preimageHex }) {
+  return (
+    "0xe0ab9c6b" +
+    _abiPadBytes32(channelIdHex) +
+    _abiPadUint(steps) +
+    _abiPadBytes32(preimageHex)
+  );
+}
+
+/** ABI-encode `NewsatoshiPayWordChannel.closeAndRefund(bytes32 channelId)` (`0xa1fa8cf8`). */
+export function encodeBaseCloseAndRefundCalldata(channelIdHex) {
+  return `0xa1fa8cf8${_abiPadBytes32(channelIdHex)}`;
+}
+
+/** ABI-encode `NewsatoshiPayWordChannel.refund(bytes32 channelId)` (`0x7249fbb6`). */
+export function encodeBaseRefundCalldata(channelIdHex) {
+  return `0x7249fbb6${_abiPadBytes32(channelIdHex)}`;
+}
+
+/** ABI-encode `FairCurvePool.injectRevenue(uint256 amount)` (`0xe224ef38`). */
+export function encodeFairCurveInjectRevenueCalldata(amountRaw) {
+  return `0xe224ef38${_abiPadUint(amountRaw)}`;
+}
+
+/** ABI-encode `FairCurvePool.buy(uint256 reserveIn, uint256 minTokensOut)` (`0xd6febde8`). */
+export function encodeFairCurveBuyCalldata(reserveInRaw, minTokensOutRaw = 0n) {
+  return `0xd6febde8${_abiPadUint(reserveInRaw)}${_abiPadUint(minTokensOutRaw)}`;
+}
+
+/** ABI-encode `FairCurvePool.sell(uint256 tokensIn, uint256 minReserveOut)` (`0xd79875eb`). */
+export function encodeFairCurveSellCalldata(tokensInRaw, minReserveOutRaw = 0n) {
+  return `0xd79875eb${_abiPadUint(tokensInRaw)}${_abiPadUint(minReserveOutRaw)}`;
+}
+
+/** ABI-encode `FairCurvePool.claimRevenue()` (`0x564f4f76`). */
+export function encodeFairCurveClaimRevenueCalldata() {
+  return "0x564f4f76";
+}
+
+/** Decode 10-word ABI return tuple from `NewsatoshiPayWordChannel.channels(bytes32)`. */
+export function decodeBasePayWordChannelWords(resultHex, channelIdHex) {
+  const clean = String(resultHex || "").trim().toLowerCase().replace(/^0x/, "");
+  if (clean.length < 640) {
+    return { found: false, channelId: `0x${_abiPadBytes32(channelIdHex)}`, reason: "short RPC response" };
+  }
+  const word = (i) => clean.slice(i * 64, (i + 1) * 64);
+  const payer = `0x${word(0).slice(24)}`;
+  if (payer === "0x0000000000000000000000000000000000000000") {
+    return { found: false, channelId: `0x${_abiPadBytes32(channelIdHex)}`, reason: "channel not found" };
+  }
+  const recipient = `0x${word(1).slice(24)}`;
+  const token = `0x${word(2).slice(24)}`;
+  const initialRoot = `0x${word(3)}`;
+  const currentRoot = `0x${word(4)}`;
+  const unitAmount = BigInt(`0x${word(5)}`);
+  const maxSteps = Number(BigInt(`0x${word(6)}`));
+  const claimedSteps = Number(BigInt(`0x${word(7)}`));
+  const expiry = Number(BigInt(`0x${word(8)}`));
+  const closed = BigInt(`0x${word(9)}`) !== 0n;
+  const remainingSteps = closed ? 0 : Math.max(0, maxSteps - claimedSteps);
+  const remainingAmount = BigInt(remainingSteps) * unitAmount;
+  return {
+    found: true,
+    channelId: `0x${_abiPadBytes32(channelIdHex)}`,
+    payer,
+    recipient,
+    token,
+    initialRoot,
+    currentRoot,
+    unitAmount,
+    maxSteps,
+    claimedSteps,
+    expiry,
+    closed,
+    remainingSteps,
+    remainingAmount,
+  };
+}
+
+/**
+ * Query a live Base Mainnet `NewsatoshiPayWordChannel` (`0x971BA814Df91c20DcA3aDd870C2B55d643965C50`)
+ * via standard JSON-RPC `eth_call` with zero external libraries.
+ */
+export async function fetchBasePayWordChannel(
+  channelIdHex,
+  {
+    rpcUrl = DEFAULT_BASE_RPC_URL,
+    contractAddress = BASE_PAYWORD_CHANNEL_ADDRESS,
+    fetchImpl = globalThis.fetch,
+  } = {}
+) {
+  const callData = `0x7a7ebd7b${_abiPadBytes32(channelIdHex)}`;
+  const resp = await fetchImpl(rpcUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "eth_call",
+      params: [{ to: contractAddress, data: callData }, "latest"],
+    }),
+  });
+  if (!resp.ok) {
+    throw new Error(`Base RPC HTTP ${resp.status}`);
+  }
+  const rpcJson = await resp.json();
+  if (rpcJson.error) {
+    throw new Error(`Base RPC error: ${rpcJson.error.message || JSON.stringify(rpcJson.error)}`);
+  }
+  return decodeBasePayWordChannelWords(rpcJson.result, channelIdHex);
+}
+
+/**
+ * Parse Base PayWord request headers. Accepts either:
+ * - Combined `X-Newsatoshi-PayWord: channel=0x...,token=0x...,ticks=42`
+ * - Separate `X-PayWord-Channel`, `X-PayWord-Index`, `X-PayWord-Preimage`
+ */
+export function parseBasePayWordHeaders(headers) {
+  const getH = (name) => {
+    if (!headers) return null;
+    if (typeof headers.get === "function") return headers.get(name) || headers.get(name.toLowerCase());
+    const lower = name.toLowerCase();
+    for (const [k, v] of Object.entries(headers)) {
+      if (k.toLowerCase() === lower) return Array.isArray(v) ? v[0] : v;
+    }
+    return null;
+  };
+
+  const chHeader = getH("X-PayWord-Channel");
+  const idxHeader = getH("X-PayWord-Index");
+  const preHeader = getH("X-PayWord-Preimage");
+  if (chHeader && idxHeader && preHeader) {
+    const ticks = Number(idxHeader);
+    if (!Number.isInteger(ticks) || ticks < 1) return null;
+    return {
+      channelId: `0x${_abiPadBytes32(chHeader)}`,
+      tokenHex: _abiPadBytes32(preHeader),
+      ticks,
+    };
+  }
+
+  const combined = getH("X-Newsatoshi-PayWord");
+  if (!combined) return null;
+  const map = {};
+  for (const part of String(combined).split(",")) {
+    const eq = part.indexOf("=");
+    if (eq > 0) map[part.slice(0, eq).trim().toLowerCase()] = part.slice(eq + 1).trim();
+  }
+  if (!map.channel || !map.token || !map.ticks) return null;
+  const ticks = Number(map.ticks);
+  if (!Number.isInteger(ticks) || ticks < 1) return null;
+  return {
+    channelId: `0x${_abiPadBytes32(map.channel)}`,
+    tokenHex: _abiPadBytes32(map.token),
+    ticks,
+  };
+}
+
+/**
+ * Production O(1) SHA-256 PayWords HTTP 402 Gate settling in Base Mainnet USDC via
+ * `NewsatoshiPayWordChannel` (`0x971BA814Df91c20DcA3aDd870C2B55d643965C50`, 0% protocol cut).
+ *
+ * Verifies the on-chain USDC escrow ONCE per `channelId`, then verifies every API request
+ * in 1 SHA-256 hash (~0.013 ms, $0 gas) and emits exact `claim(channelId, steps, preimage)`
+ * calldata when you are ready to batch-settle 1,000+ calls in a single Base transaction.
+ */
+export function createBasePayWordGate({
+  recipient,
+  unitAmount,
+  token = BASE_USDC_ADDRESS,
+  contractAddress = BASE_PAYWORD_CHANNEL_ADDRESS,
+  rpcUrl = DEFAULT_BASE_RPC_URL,
+  minRemainingExpirySec = 300,
+  maxJumpPerCall = 4096,
+  channelFetcher = null,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const expectedRecipient = `0x${_abiPadAddress(recipient).slice(24)}`;
+  const expectedToken = `0x${_abiPadAddress(token).slice(24)}`;
+  const minUnit = BigInt(unitAmount);
+  if (minUnit <= 0n) throw new Error("unitAmount must be > 0");
+
+  // Map<channelId, { onchain, lastTicks, lastTokenHex, claimedStepsOnChain }>
+  const state = new Map();
+
+  function build402Challenge(reason = "Payment required via Base USDC PayWords (0% protocol fee)") {
+    return {
+      status: 402,
+      headers: {
+        "Content-Type": "application/json",
+        "WWW-Authenticate": `PayWords network="eip155:${BASE_CHAIN_ID}", contract="${contractAddress}", token="${expectedToken}", recipient="${expectedRecipient}", unit="${minUnit.toString()}"`,
+      },
+      body: {
+        error: "payment_required",
+        reason,
+        scheme: "newsatoshi-paywords-base-usdc",
+        network: `eip155:${BASE_CHAIN_ID}`,
+        contract: contractAddress,
+        token: expectedToken,
+        recipient: expectedRecipient,
+        unitAmountRaw: minUnit.toString(),
+        headersRequired: ["X-PayWord-Channel", "X-PayWord-Index", "X-PayWord-Preimage"],
+      },
+    };
+  }
+
+  async function verifyHeaders(headers) {
+    let parsed;
+    try {
+      parsed = parseBasePayWordHeaders(headers);
+    } catch (err) {
+      return { ok: false, challenge: build402Challenge(`Malformed PayWord header: ${err.message}`) };
+    }
+    if (!parsed) {
+      return { ok: false, challenge: build402Challenge() };
+    }
+
+    const { channelId, tokenHex, ticks } = parsed;
+    let entry = state.get(channelId);
+    if (!entry) {
+      const fetcher =
+        channelFetcher ||
+        ((id) => fetchBasePayWordChannel(id, { rpcUrl, contractAddress, fetchImpl }));
+      const ch = await fetcher(channelId);
+      if (!ch || !ch.found) {
+        return { ok: false, challenge: build402Challenge("Channel not found on Base Mainnet") };
+      }
+      if (ch.closed) {
+        return { ok: false, challenge: build402Challenge("Channel is already closed") };
+      }
+      if (ch.recipient.toLowerCase() !== expectedRecipient) {
+        return { ok: false, challenge: build402Challenge("Channel recipient mismatch") };
+      }
+      if (ch.token.toLowerCase() !== expectedToken) {
+        return { ok: false, challenge: build402Challenge("Channel token mismatch") };
+      }
+      if (ch.unitAmount < minUnit) {
+        return { ok: false, challenge: build402Challenge("Channel unitAmount below route price") };
+      }
+      const nowSec = Math.floor(Date.now() / 1000);
+      if (ch.expiry <= nowSec + minRemainingExpirySec) {
+        return { ok: false, challenge: build402Challenge("Channel expiry too close or elapsed") };
+      }
+      entry = {
+        onchain: ch,
+        claimedStepsOnChain: ch.claimedSteps,
+        lastTicks: ch.claimedSteps,
+        lastTokenHex: _abiPadBytes32(ch.currentRoot),
+      };
+      state.set(channelId, entry);
+    }
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (entry.onchain.expiry <= nowSec + minRemainingExpirySec) {
+      return { ok: false, challenge: build402Challenge("Channel approaching expiry — open fresh channel") };
+    }
+    if (ticks <= entry.lastTicks) {
+      return {
+        ok: false,
+        challenge: build402Challenge(`Replay rejected: index ${ticks} <= last accepted ${entry.lastTicks}`),
+      };
+    }
+    if (ticks > entry.onchain.maxSteps) {
+      return {
+        ok: false,
+        challenge: build402Challenge(`Index ${ticks} exceeds channel maxSteps ${entry.onchain.maxSteps}`),
+      };
+    }
+    const delta = ticks - entry.lastTicks;
+    if (delta > maxJumpPerCall) {
+      return {
+        ok: false,
+        challenge: build402Challenge(`Step jump ${delta} exceeds maxJumpPerCall ${maxJumpPerCall}`),
+      };
+    }
+
+    const hashed = await sha256Iterations(hexToBytes(tokenHex), delta);
+    const anchor = hexToBytes(entry.lastTokenHex);
+    if (!constantTimeEqual(hashed, anchor)) {
+      return {
+        ok: false,
+        challenge: build402Challenge("Invalid SHA-256 PayWord preimage"),
+      };
+    }
+
+    // Commit new monotonic watermark
+    entry.lastTicks = ticks;
+    entry.lastTokenHex = tokenHex;
+    const unclaimedSteps = entry.lastTicks - entry.claimedStepsOnChain;
+    const unclaimedRaw = BigInt(unclaimedSteps) * entry.onchain.unitAmount;
+    return {
+      ok: true,
+      channelId,
+      ticks,
+      deltaSteps: delta,
+      hashesEvaluated: delta,
+      unclaimedSteps,
+      unclaimedRaw,
+      unitAmountRaw: entry.onchain.unitAmount,
+      payer: entry.onchain.payer,
+    };
+  }
+
+  /** Export exact ABI calldata to settle all accumulated off-chain calls in 1 Base Mainnet tx. */
+  function exportSettlementBatch(channelIdHex) {
+    const id = `0x${_abiPadBytes32(channelIdHex)}`;
+    const entry = state.get(id);
+    if (!entry) return null;
+    const stepsToClaim = entry.lastTicks - entry.claimedStepsOnChain;
+    if (stepsToClaim <= 0) return null;
+    const payoutRaw = BigInt(stepsToClaim) * entry.onchain.unitAmount;
+    return {
+      to: contractAddress,
+      chainId: BASE_CHAIN_ID,
+      channelId: id,
+      stepsToClaim,
+      preimageHex: `0x${entry.lastTokenHex}`,
+      payoutRaw,
+      calldata: encodeBaseClaimCalldata({
+        channelIdHex: id,
+        steps: stepsToClaim,
+        preimageHex: `0x${entry.lastTokenHex}`,
+      }),
+    };
+  }
+
+  /** Mark steps settled after your `claim()` transaction confirms on Base Mainnet. */
+  function markSettledOnChain(channelIdHex, newClaimedSteps) {
+    const id = `0x${_abiPadBytes32(channelIdHex)}`;
+    const entry = state.get(id);
+    if (entry && newClaimedSteps >= entry.claimedStepsOnChain) {
+      entry.claimedStepsOnChain = newClaimedSteps;
+    }
+  }
+
+  /** Ready-to-use Express/Connect middleware. */
+  function expressMiddleware() {
+    return async (req, res, next) => {
+      try {
+        const result = await verifyHeaders(req.headers);
+        if (!result.ok) {
+          for (const [k, v] of Object.entries(result.challenge.headers)) {
+            res.setHeader(k, v);
+          }
+          res.status(402).json(result.challenge.body);
+          return;
+        }
+        req.payword = result;
+        next();
+      } catch (err) {
+        res.status(502).json({ error: "payword_verification_error", detail: err.message });
+      }
+    };
+  }
+
+  return {
+    verifyHeaders,
+    exportSettlementBatch,
+    markSettledOnChain,
+    build402Challenge,
+    expressMiddleware,
+    getActiveChannels: () => Array.from(state.keys()),
+  };
+}

@@ -1,9 +1,9 @@
 [package]
 name = "newsatoshi-commons"
-version = "0.29.0"
+version = "0.30.0"
 edition = "2021"
 license = "PolyForm-Noncommercial-1.0.0"
-description = "Newsatoshi Commons Gateway (Live Mainnet v2 nsM2 / v1.2.5 Pure SHA-2 L1 aligned + Live Base Mainnet O(1) SHA-256 PayWordChannel & Fair Bonding-Curve Launchpad + RFC-0028 nsUSD + L2 STARK Rollup): 38 zero-auth MCP tools, interactive stablecoin cost-savings & Cloudflare/Express/FastAPI PayWords setup studio, dilution-proof revenue-backed fair curves, 18-theorem zero-sorry Lean 4 kernel, and honest zero-fake-data telemetry."
+description = "Newsatoshi Commons Gateway (Live Mainnet v2 nsM2 / v1.2.5 Pure SHA-2 L1 aligned + Live Base Mainnet O(1) SHA-256 PayWordChannel & Fair Bonding-Curve Launchpad + 1-Click EIP-1193 Browser Wallet Console + Zero-Dep JS/Python SDKs + RFC-0028 nsUSD + L2 STARK Rollup): 40 zero-auth MCP tools, live Base Mainnet curve/channel RPC reader, 18-theorem zero-sorry Lean 4 kernel, and honest zero-fake-data telemetry."
 
 [[bin]]
 name = "newsatoshi-commons"

@@ -676,6 +676,8 @@ fn handle_request(req: Request, state: &AppState) {
             "/og-image.svg" => Some("image/svg+xml"),
             "/whitepaper.pdf" => Some("application/pdf"),
             "/install.sh" => Some("text/x-shellscript; charset=utf-8"),
+            "/sdk/newsatoshi-402.mjs" => Some("application/javascript; charset=utf-8"),
+            "/sdk/newsatoshi-402.py" => Some("text/x-python; charset=utf-8"),
             "/robots.txt"
             | "/.well-known/mcp-registry-auth"
             | "/.well-known/402index-verify.txt"
@@ -712,6 +714,8 @@ fn handle_request(req: Request, state: &AppState) {
             | "/api/v2/paywords/cost-savings"
             | "/api/v2/paywords/channel-kit"
             | "/api/v2/launchpad/fair-curve"
+            | "/api/v2/base/curves"
+            | "/api/v2/base/channel"
             | "/api/web4/charters"
             | "/api/web4/services"
             | "/api/web4/bounties"
@@ -1022,6 +1026,44 @@ fn handle_request(req: Request, state: &AppState) {
                 Ok(v) => respond_json(req, 200, &v),
                 Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
             }
+        }
+        (Method::Get, "/api/v2/base/curves") => {
+            let refresh = query_param(&raw_url, "refresh")
+                .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                .unwrap_or(false);
+            match crate::paywords_launchpad::fetch_live_base_fair_curves(refresh) {
+                Ok(v) => respond_json(req, 200, &v),
+                Err(e) => respond_json(req, 502, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Get, "/api/v2/base/channel") => {
+            match query_param(&raw_url, "id") {
+                Some(cid) => match crate::paywords_launchpad::inspect_live_base_payword_channel(&cid) {
+                    Ok(v) => respond_json(req, 200, &v),
+                    Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+                },
+                None => respond_json(
+                    req,
+                    400,
+                    &json!({ "ok": false, "error": "missing required query param 'id' (0x-prefixed 32-byte channel_id)" }),
+                ),
+            }
+        }
+        (Method::Get, "/sdk/newsatoshi-402.mjs") => {
+            respond_text(
+                req,
+                200,
+                "application/javascript; charset=utf-8",
+                crate::paywords_launchpad::SDK_JS_SOURCE.to_string(),
+            );
+        }
+        (Method::Get, "/sdk/newsatoshi-402.py") => {
+            respond_text(
+                req,
+                200,
+                "text/x-python; charset=utf-8",
+                crate::paywords_launchpad::SDK_PY_SOURCE.to_string(),
+            );
         }
         (Method::Get, "/api/v2/l2/status") => {
             let seed = state.get_seed_snapshot(false);

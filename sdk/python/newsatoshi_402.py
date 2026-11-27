@@ -1199,3 +1199,332 @@ def fetch_v2_cutover_readiness(
     req = urllib.request.Request(url, headers={"Accept": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read(1_048_576).decode("utf-8"))
+
+
+# =============================================================================
+# v0.30.0: Live Base Mainnet USDC PayWordChannel & FairCurvePool SDK (Zero-Dep)
+# =============================================================================
+
+BASE_CHAIN_ID = 8453
+DEFAULT_BASE_RPC_URL = "https://mainnet.base.org"
+BASE_USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+BASE_PAYWORD_CHANNEL_ADDRESS = "0x971BA814Df91c20DcA3aDd870C2B55d643965C50"
+BASE_FAIR_CURVE_FACTORY_ADDRESS = "0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933"
+BASE_DEMO_CURVE_POOL_ADDRESS = "0xC3098ba25E39Effa63dE94EbACE6381781ad4cEd"
+
+
+def _abi_pad_address(addr: str) -> str:
+    clean = str(addr).strip().lower().removeprefix("0x")
+    if len(clean) != 40 or any(c not in "0123456789abcdef" for c in clean):
+        raise ValueError(f"Invalid EVM address: {addr}")
+    return clean.rjust(64, "0")
+
+
+def _abi_pad_bytes32(hex_val: str) -> str:
+    clean = str(hex_val).strip().lower().removeprefix("0x")
+    if len(clean) != 64 or any(c not in "0123456789abcdef" for c in clean):
+        raise ValueError(f"Invalid bytes32 hex: {hex_val}")
+    return clean
+
+
+def _abi_pad_uint(val: int) -> str:
+    n = int(val)
+    if n < 0:
+        raise ValueError("Unsigned ABI integer cannot be negative")
+    return f"{n:064x}"
+
+
+def encode_erc20_approve_calldata(spender: str, amount: int) -> str:
+    """ABI-encode `ERC20.approve(address spender, uint256 amount)` (`0x095ea7b3`)."""
+    return f"0x095ea7b3{_abi_pad_address(spender)}{_abi_pad_uint(amount)}"
+
+
+def encode_base_open_channel_calldata(
+    recipient: str,
+    root_hex: str,
+    unit_amount: int,
+    max_steps: int,
+    expiry_unix: int,
+    token: str = BASE_USDC_ADDRESS,
+) -> str:
+    """ABI-encode `NewsatoshiPayWordChannel.openChannel(address,address,bytes32,uint256,uint32,uint64)` (`0xfbbd272c`)."""
+    return (
+        "0xfbbd272c"
+        + _abi_pad_address(recipient)
+        + _abi_pad_address(token)
+        + _abi_pad_bytes32(root_hex)
+        + _abi_pad_uint(unit_amount)
+        + _abi_pad_uint(max_steps)
+        + _abi_pad_uint(expiry_unix)
+    )
+
+
+def encode_base_claim_calldata(channel_id_hex: str, steps: int, preimage_hex: str) -> str:
+    """ABI-encode `NewsatoshiPayWordChannel.claim(bytes32,uint32,bytes32)` (`0xe0ab9c6b`)."""
+    return (
+        "0xe0ab9c6b"
+        + _abi_pad_bytes32(channel_id_hex)
+        + _abi_pad_uint(steps)
+        + _abi_pad_bytes32(preimage_hex)
+    )
+
+
+def encode_base_close_and_refund_calldata(channel_id_hex: str) -> str:
+    """ABI-encode `NewsatoshiPayWordChannel.closeAndRefund(bytes32)` (`0xa1fa8cf8`)."""
+    return f"0xa1fa8cf8{_abi_pad_bytes32(channel_id_hex)}"
+
+
+def encode_base_refund_calldata(channel_id_hex: str) -> str:
+    """ABI-encode `NewsatoshiPayWordChannel.refund(bytes32)` (`0x7249fbb6`)."""
+    return f"0x7249fbb6{_abi_pad_bytes32(channel_id_hex)}"
+
+
+def encode_fair_curve_inject_revenue_calldata(amount_raw: int) -> str:
+    """ABI-encode `FairCurvePool.injectRevenue(uint256)` (`0xe224ef38`)."""
+    return f"0xe224ef38{_abi_pad_uint(amount_raw)}"
+
+
+def encode_fair_curve_buy_calldata(reserve_in_raw: int, min_tokens_out_raw: int = 0) -> str:
+    """ABI-encode `FairCurvePool.buy(uint256,uint256)` (`0xd6febde8`)."""
+    return f"0xd6febde8{_abi_pad_uint(reserve_in_raw)}{_abi_pad_uint(min_tokens_out_raw)}"
+
+
+def encode_fair_curve_sell_calldata(tokens_in_raw: int, min_reserve_out_raw: int = 0) -> str:
+    """ABI-encode `FairCurvePool.sell(uint256,uint256)` (`0xd79875eb`)."""
+    return f"0xd79875eb{_abi_pad_uint(tokens_in_raw)}{_abi_pad_uint(min_reserve_out_raw)}"
+
+
+def encode_fair_curve_claim_revenue_calldata() -> str:
+    """ABI-encode `FairCurvePool.claimRevenue()` (`0x564f4f76`)."""
+    return "0x564f4f76"
+
+
+def decode_base_payword_channel_words(result_hex: str, channel_id_hex: str) -> Dict[str, Any]:
+    """Decode the 10-word ABI return tuple from `NewsatoshiPayWordChannel.channels(bytes32)`."""
+    clean = str(result_hex or "").strip().lower().removeprefix("0x")
+    cid = f"0x{_abi_pad_bytes32(channel_id_hex)}"
+    if len(clean) < 640:
+        return {"found": False, "channel_id": cid, "reason": "short RPC response"}
+
+    def w(idx: int) -> str:
+        return clean[idx * 64 : (idx + 1) * 64]
+
+    payer = f"0x{w(0)[24:]}"
+    if payer == "0x0000000000000000000000000000000000000000":
+        return {"found": False, "channel_id": cid, "reason": "channel not found"}
+
+    recipient = f"0x{w(1)[24:]}"
+    token = f"0x{w(2)[24:]}"
+    initial_root = f"0x{w(3)}"
+    current_root = f"0x{w(4)}"
+    unit_amount = int(w(5), 16)
+    max_steps = int(w(6), 16)
+    claimed_steps = int(w(7), 16)
+    expiry = int(w(8), 16)
+    closed = int(w(9), 16) != 0
+    remaining_steps = 0 if closed else max(0, max_steps - claimed_steps)
+    return {
+        "found": True,
+        "channel_id": cid,
+        "payer": payer,
+        "recipient": recipient,
+        "token": token,
+        "initial_root": initial_root,
+        "current_root": current_root,
+        "unit_amount": unit_amount,
+        "max_steps": max_steps,
+        "claimed_steps": claimed_steps,
+        "expiry": expiry,
+        "closed": closed,
+        "remaining_steps": remaining_steps,
+        "remaining_amount": remaining_steps * unit_amount,
+    }
+
+
+def fetch_base_payword_channel(
+    channel_id_hex: str,
+    rpc_url: str = DEFAULT_BASE_RPC_URL,
+    contract_address: str = BASE_PAYWORD_CHANNEL_ADDRESS,
+    timeout: int = 12,
+) -> Dict[str, Any]:
+    """Read a live Base Mainnet `NewsatoshiPayWordChannel` via JSON-RPC `eth_call`."""
+    calldata = f"0x7a7ebd7b{_abi_pad_bytes32(channel_id_hex)}"
+    payload = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "eth_call",
+            "params": [{"to": contract_address, "data": calldata}, "latest"],
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        rpc_url,
+        data=payload,
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        data = json.loads(resp.read(1_048_576).decode("utf-8"))
+    if "error" in data:
+        raise RuntimeError(f"Base RPC error: {data['error']}")
+    return decode_base_payword_channel_words(data.get("result", ""), channel_id_hex)
+
+
+class BasePayWordGate:
+    """
+    Thread-safe O(1) SHA-256 PayWords HTTP 402 Gate settling in Base Mainnet USDC via
+    `NewsatoshiPayWordChannel` (`0x971BA814Df91c20DcA3aDd870C2B55d643965C50`, 0% protocol fee).
+    """
+
+    def __init__(
+        self,
+        recipient: str,
+        unit_amount: int,
+        token: str = BASE_USDC_ADDRESS,
+        contract_address: str = BASE_PAYWORD_CHANNEL_ADDRESS,
+        rpc_url: str = DEFAULT_BASE_RPC_URL,
+        min_remaining_expiry_sec: int = 300,
+        max_jump_per_call: int = 4096,
+        channel_fetcher: Optional[Callable[[str], Dict[str, Any]]] = None,
+    ) -> None:
+        import threading
+
+        if unit_amount <= 0:
+            raise ValueError("unit_amount must be > 0")
+        self.recipient = f"0x{_abi_pad_address(recipient)[24:]}"
+        self.token = f"0x{_abi_pad_address(token)[24:]}"
+        self.unit_amount = int(unit_amount)
+        self.contract_address = contract_address
+        self.rpc_url = rpc_url
+        self.min_remaining_expiry_sec = int(min_remaining_expiry_sec)
+        self.max_jump_per_call = int(max_jump_per_call)
+        self._fetcher = channel_fetcher or (
+            lambda cid: fetch_base_payword_channel(cid, rpc_url=rpc_url, contract_address=contract_address)
+        )
+        self._lock = threading.Lock()
+        self._channels: Dict[str, Dict[str, Any]] = {}
+
+    def build_402_challenge(self, reason: str = "Payment required via Base USDC PayWords") -> Dict[str, Any]:
+        return {
+            "status": 402,
+            "headers": {
+                "WWW-Authenticate": (
+                    f'PayWords network="eip155:{BASE_CHAIN_ID}", contract="{self.contract_address}", '
+                    f'token="{self.token}", recipient="{self.recipient}", unit="{self.unit_amount}"'
+                )
+            },
+            "body": {
+                "error": "payment_required",
+                "reason": reason,
+                "network": f"eip155:{BASE_CHAIN_ID}",
+                "contract": self.contract_address,
+                "token": self.token,
+                "recipient": self.recipient,
+                "unit_amount_raw": self.unit_amount,
+            },
+        }
+
+    def verify_headers(self, headers: Dict[str, str]) -> Dict[str, Any]:
+        lower = {str(k).lower(): str(v) for k, v in headers.items()}
+        ch_raw = lower.get("x-payword-channel")
+        idx_raw = lower.get("x-payword-index")
+        pre_raw = lower.get("x-payword-preimage")
+        if not (ch_raw and idx_raw and pre_raw):
+            combined = lower.get("x-newsatoshi-payword", "")
+            parts = {}
+            for item in combined.split(","):
+                if "=" in item:
+                    k, v = item.split("=", 1)
+                    parts[k.strip().lower()] = v.strip()
+            ch_raw = parts.get("channel")
+            idx_raw = parts.get("ticks")
+            pre_raw = parts.get("token")
+        if not (ch_raw and idx_raw and pre_raw):
+            return {"ok": False, "challenge": self.build_402_challenge()}
+
+        try:
+            cid = f"0x{_abi_pad_bytes32(ch_raw)}"
+            token_hex = _abi_pad_bytes32(pre_raw)
+            ticks = int(idx_raw)
+            if ticks < 1:
+                raise ValueError("ticks must be >= 1")
+        except Exception as exc:
+            return {"ok": False, "challenge": self.build_402_challenge(f"Malformed header: {exc}")}
+
+        with self._lock:
+            entry = self._channels.get(cid)
+            if entry is None:
+                ch = self._fetcher(cid)
+                if not ch or not ch.get("found"):
+                    return {"ok": False, "challenge": self.build_402_challenge("Channel not found on Base Mainnet")}
+                if ch.get("closed"):
+                    return {"ok": False, "challenge": self.build_402_challenge("Channel is closed")}
+                if str(ch.get("recipient", "")).lower() != self.recipient:
+                    return {"ok": False, "challenge": self.build_402_challenge("Recipient mismatch")}
+                if str(ch.get("token", "")).lower() != self.token:
+                    return {"ok": False, "challenge": self.build_402_challenge("Token mismatch")}
+                if int(ch.get("unit_amount", 0)) < self.unit_amount:
+                    return {"ok": False, "challenge": self.build_402_challenge("Unit amount below route price")}
+                if int(ch.get("expiry", 0)) <= int(time.time()) + self.min_remaining_expiry_sec:
+                    return {"ok": False, "challenge": self.build_402_challenge("Channel expired or expiring soon")}
+                entry = {
+                    "onchain": ch,
+                    "claimed_steps_onchain": int(ch["claimed_steps"]),
+                    "last_ticks": int(ch["claimed_steps"]),
+                    "last_token_hex": _abi_pad_bytes32(ch["current_root"]),
+                }
+                self._channels[cid] = entry
+
+            if int(entry["onchain"]["expiry"]) <= int(time.time()) + self.min_remaining_expiry_sec:
+                return {"ok": False, "challenge": self.build_402_challenge("Channel expiring soon")}
+            if ticks <= entry["last_ticks"]:
+                return {
+                    "ok": False,
+                    "challenge": self.build_402_challenge(
+                        f"Replay rejected: index {ticks} <= last accepted {entry['last_ticks']}"
+                    ),
+                }
+            if ticks > int(entry["onchain"]["max_steps"]):
+                return {"ok": False, "challenge": self.build_402_challenge("Index exceeds channel max_steps")}
+            delta = ticks - entry["last_ticks"]
+            if delta > self.max_jump_per_call:
+                return {"ok": False, "challenge": self.build_402_challenge("Step jump exceeds max_jump_per_call")}
+
+            cur = bytes.fromhex(token_hex)
+            for _ in range(delta):
+                cur = hashlib.sha256(cur).digest()
+            if not hmac.compare_digest(cur, bytes.fromhex(entry["last_token_hex"])):
+                return {"ok": False, "challenge": self.build_402_challenge("Invalid SHA-256 PayWord preimage")}
+
+            entry["last_ticks"] = ticks
+            entry["last_token_hex"] = token_hex
+            unclaimed_steps = entry["last_ticks"] - entry["claimed_steps_onchain"]
+            return {
+                "ok": True,
+                "channel_id": cid,
+                "ticks": ticks,
+                "delta_steps": delta,
+                "unclaimed_steps": unclaimed_steps,
+                "unclaimed_raw": unclaimed_steps * int(entry["onchain"]["unit_amount"]),
+                "payer": entry["onchain"]["payer"],
+            }
+
+    def export_settlement_batch(self, channel_id_hex: str) -> Optional[Dict[str, Any]]:
+        cid = f"0x{_abi_pad_bytes32(channel_id_hex)}"
+        with self._lock:
+            entry = self._channels.get(cid)
+            if not entry:
+                return None
+            steps = entry["last_ticks"] - entry["claimed_steps_onchain"]
+            if steps <= 0:
+                return None
+            preimage = f"0x{entry['last_token_hex']}"
+            return {
+                "to": self.contract_address,
+                "chain_id": BASE_CHAIN_ID,
+                "channel_id": cid,
+                "steps_to_claim": steps,
+                "preimage_hex": preimage,
+                "payout_raw": steps * int(entry["onchain"]["unit_amount"]),
+                "calldata": encode_base_claim_calldata(cid, steps, preimage),
+            }
