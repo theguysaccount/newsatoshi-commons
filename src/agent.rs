@@ -455,7 +455,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                     "/l2",
                     "Newsatoshi Layer-2 Expansion & Perfection Layers — PayWords, nsUSD & Shielded STARK Rollups",
                     "Hourglass Layer-2 Perfection Architecture above Mainnet v2 (nsM2): O(1) SHA-256 PayWords, RFC-0028 sovereign nsUSD CDP/oracle engine, Winterfell STARK shielded rollup batching, and unilateral Merkle L1 escape hatches.",
-                    "<h1>Newsatoshi Layer-2 Expansion &amp; Perfection Layers (<code>v0.28.4</code>)</h1>\n\
+                    "<h1>Newsatoshi Layer-2 Expansion &amp; Perfection Layers (<code>v0.29.0</code>)</h1>\n\
                      <p><strong>Hourglass Architecture:</strong> Layer 1 (<code>newsatoshi-rfc0021</code>, Mainnet v2 <code>nsM2</code>) stays minimal, pure FIPS SHA-2, and ossified. Layer 2 (<code>newsatoshi-commons</code>) delivers machine-speed throughput, private USD stability (<code>nsUSD</code>), and zero-custody escape hatches.</p>\n\
                      <p>Live APIs: <a href=\"/l2.md\">Full Markdown Spec (/l2.md)</a> &middot; <a href=\"/api/v2/l2/status\">GET /api/v2/l2/status</a> &middot; <a href=\"/api/v2/nsusd/state\">GET /api/v2/nsusd/state</a> &middot; <a href=\"/formal/NsUsdAndL2Perfection.lean\">Lean 4 Proof (11 Theorems, 0 sorry)</a> &middot; <a href=\"/nsusd\">nsUSD Spec (/nsusd)</a> &middot; <a href=\"/whitepaper.pdf\">Whitepaper v2.2 PDF</a></p>\n\
                      <h2>Layer 2A &mdash; Microsecond Streaming (<code>O(1)</code> SHA-256 PayWords)</h2>\n\
@@ -636,7 +636,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                      - All REST responses include `X-API-Version: 2026-11` and `RateLimit-Policy: 120;w=60`.\n\
                      - Breaking changes are introduced under a new versioned path or header with at least 90 days of advance notice via `Deprecation` and `Sunset` HTTP response headers.\n\n\
                      ## Core Endpoints\n\
-                     - `POST {base_url}/mcp` — Streamable HTTP MCP JSON-RPC 2.0 server (**35 live tools**, including 60-second private `x402`/`nsUSD` paywall middleware generator, live Base USDC vault escrow verifier, RFC-0028 `nsUSD` engine, L2 STARK rollup benchmark, and 5 zero-API-key EVM/BTC/BOLT-11/Uniswap V3 tools).\n\
+                     - `POST {base_url}/mcp` — Streamable HTTP MCP JSON-RPC 2.0 server (**38 live tools**, including Base USDC `O(1)` SHA-256 PayWordChannel cost-savings & Cloudflare/Express/FastAPI setup studio, Fair Bonding-Curve Launchpad simulator, 60-second private `x402`/`nsUSD` paywall kit, live Base USDC vault escrow verifier, RFC-0028 `nsUSD` engine, L2 STARK rollup benchmark, and 5 zero-API-key EVM/BTC/BOLT-11/Uniswap V3 tools).\n\
                      - `npx -y github:theguysaccount/newsatoshi-commons` — Zero-dependency stdio MCP bridge & CLI for Claude Desktop, Cursor, Codex, Cline & shell agents.\n\
                      - `GET {base_url}/.well-known/x402` — 4 live Native `LOVE` (zero-gas `<1ms` SHA-256 PayWord / `PriorLock`) + `x402 v2` outer bridge on-ramp (`$0.001` Base/Arb/Polygon USDC) endpoints (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).\n\
                      - `GET {base_url}/api/health` — Node version, verify-only posture, and uptime.\n\
@@ -874,7 +874,10 @@ pub fn render_mcp_server_card_json(base_url: &str) -> Value {
             "newsatoshi_simulate_nsusd_stress",
             "newsatoshi_benchmark_l2_perfection_batch",
             "newsatoshi_generate_private_x402_middleware",
-            "newsatoshi_verify_base_nsusd_escrow"
+            "newsatoshi_verify_base_nsusd_escrow",
+            "newsatoshi_estimate_paywords_savings",
+            "newsatoshi_compile_payword_channel_setup",
+            "newsatoshi_simulate_fair_curve_launch"
         ],
         "resources": [
             "newsatoshi://llms.txt",
@@ -954,7 +957,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 - Commons Treasury Balance: `{bal} LOVE` (`nonce={nonce}`, `parcels={parcels}`, `kwh={kwh}`, `starks={starks}`)
 
 ## Agent Interfaces (Zero Auth Required for All Reads, Compilers & Verifiers)
-- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **35 live tools** (including 60-second private `x402`/`nsUSD` paywall middleware generator, live Base USDC vault escrow verifier, `nsUSD` Dual-Tier stablecoin engine + stress suite, L2 Perfection Layer STARK batch benchmark, 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.4` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
+- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **38 live tools** (including Base Mainnet `O(1)` SHA-256 PayWordChannel cost-savings & Cloudflare/Express/FastAPI setup kit, dilution-proof Fair Bonding-Curve Launchpad simulator, 60-second private `x402`/`nsUSD` paywall middleware generator, live Base USDC vault escrow verifier, `nsUSD` Dual-Tier stablecoin engine + stress suite, L2 Perfection Layer STARK batch benchmark, 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.5` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
 - **Zero-Install Stdio MCP Bridge & CLI (Node 18+, Zero Dependencies):** `npx -y github:theguysaccount/newsatoshi-commons` (`inspect`, `btc-fees`, `decode-bolt11`, `quote-base`, `verify-tx`, `payword-demo`, or stdio MCP `serve`).
 - [Native LOVE PayWord & x402 v2 Discovery]({base_url}/.well-known/x402): 4 live monetized endpoints settling primarily in **native `LOVE`** (`<1ms` zero-gas SHA-256 PayWords / `PriorLock`), with Base/Arbitrum/Polygon USDC (`x402 v2`, `$0.001`) supported as outer bridge on-ramps (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).
 - [MCP Server Card]({base_url}/.well-known/mcp/server-card.json) & [MCP Registry Manifest]({base_url}/server.json): Standard MCP discovery cards (`org.newsatoshi.commons/newsatoshi-commons`).
@@ -1018,7 +1021,7 @@ Add to Claude Desktop, Cursor, Codex, Antigravity, or any Streamable HTTP MCP ho
   }}
 }}
 ```
-Available MCP tools (35 live tools — zero API keys required):
+Available MCP tools (38 live tools — zero API keys required):
 - `crypto_inspect_evm_contract` — Live multi-chain EVM smart contract security audit (bytecode, EIP-1967 proxy/admin slots, `owner()` admin risk, ERC-20 metadata, Sourcify v2 exact-match verification across Ethereum, Base, Arbitrum, Optimism & Polygon)
 - `crypto_bitcoin_mempool_oracle` — Live Bitcoin chain tip, recommended sat/vB fee tiers (`fastest`, `30m`, `60m`, `economy`), and mempool backlog
 - `crypto_decode_bolt11_invoice` — Pure-Rust BOLT-11 Lightning invoice decoder (network, sats/msats, payment hash, expiry, description)
@@ -1054,6 +1057,9 @@ Available MCP tools (35 live tools — zero API keys required):
 - `newsatoshi_benchmark_l2_perfection_batch` — Run a live measured L2 PayWord + `nsUSD` batch + Winterfell 0.13 STARK conservation proof + verified unilateral Merkle L1 Escape Hatch benchmark
 - `newsatoshi_generate_private_x402_middleware` — Generate copy-paste-ready Express, Next.js, FastAPI, or Rust Axum HTTP 402 middleware accepting private zero-gas `O(1)` SHA-256 PayWords (`nsUSD` USD-quoted) + Base USDC `x402 v2` fallback
 - `newsatoshi_verify_base_nsusd_escrow` — Verify any real Base Mainnet USDC deposit tx hash live via Base JSON-RPC against the immutable `NewsatoshiBackingVault` (`0x37Ed94525DBE408fA72cDd156409875666679265`) into an auditable RFC-0028 Tier-1B `nsUSD-B` 1:1 receipt
+- `newsatoshi_estimate_paywords_savings` — Calculate exact monthly & annual payment-fee savings comparing Stripe (`2.9% + $0.30`) & per-call Base x402 vs. Newsatoshi `O(1)` SHA-256 PayWords on live Base Mainnet (`0x971BA814Df91c20DcA3aDd870C2B55d643965C50`)
+- `newsatoshi_compile_payword_channel_setup` — Generate org-ready Base USDC `O(1)` SHA-256 PayWords HTTP 402 server middleware (Cloudflare Worker, Express, FastAPI) + `cast` settlement commands wired to live `NewsatoshiPayWordChannel`
+- `newsatoshi_simulate_fair_curve_launch` — Simulate exact integer constant-product USDC bonding-curve math + dilution-proof `injectRevenue()` PayWords dividends (Lean 4 Theorems 10–11, 0% premine, 0% platform cut) and emit 1-command deploy CLI for live Base Mainnet `NewsatoshiFairCurveFactory` (`0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933`)
 
 Stdio MCP Bridge (for stdio-only hosts such as Claude Desktop, Cursor, Cline, or shell scripts):
 ```json
@@ -2171,6 +2177,51 @@ pub fn mcp_tools_list() -> Value {
                         "tx_hash": { "type": "string", "description": "Base Mainnet 0x-prefixed 32-byte transaction hash (e.g. 0xd3c521e3dcdd1465f6f51384a5c721c0c445c3d384282ae0c67b2b07195029ba)" }
                     }
                 }
+            },
+            {
+                "name": "newsatoshi_estimate_paywords_savings",
+                "description": "Calculate exact monthly & annual payment-fee savings comparing Stripe cards (2.9% + $0.30/tx), per-call Base L2 x402 USDC, and Newsatoshi O(1) SHA-256 PayWords settled via live Base Mainnet NewsatoshiPayWordChannel (0x971BA814Df91c20DcA3aDd870C2B55d643965C50, 0% protocol fee).",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "monthly_calls": { "type": "integer", "minimum": 1, "default": 1000000, "description": "Monthly micro-payment API calls" },
+                        "price_per_call_usd": { "type": "number", "default": 0.005, "description": "Average USD price per API call" },
+                        "calls_per_batch": { "type": "integer", "minimum": 10, "maximum": 4096, "default": 1000, "description": "API calls settled per on-chain claim() transaction" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_compile_payword_channel_setup",
+                "description": "Generate an org-ready Base Mainnet USDC O(1) SHA-256 PayWords HTTP 402 server gate (Cloudflare Worker, Express, or FastAPI) + cast CLI settlement commands wired to live Sourcify-verified NewsatoshiPayWordChannel (0x971BA814Df91c20DcA3aDd870C2B55d643965C50).",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["framework"],
+                    "properties": {
+                        "framework": { "type": "string", "enum": ["cloudflare_worker", "express", "fastapi"], "description": "Target edge or API framework" },
+                        "recipient_evm": { "type": "string", "description": "Optional 0x... Base treasury address receiving USDC settlements" },
+                        "price_usd": { "type": "number", "default": 0.002, "description": "USD price per API call in Base USDC" },
+                        "max_steps": { "type": "integer", "minimum": 1, "default": 1000, "description": "PayWord channel step depth N (e.g. 1000 calls)" },
+                        "route_path": { "type": "string", "default": "/api/inference", "description": "Route path to gate" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_simulate_fair_curve_launch",
+                "description": "Simulate exact integer constant-product bonding-curve math + dilution-proof x402 PayWords USDC revenue injection (Lean 4 Theorems 10-11, 0% premine, 0% platform cut) and emit 1-command cast deployment for live Sourcify-verified Base Mainnet NewsatoshiFairCurveFactory (0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933).",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["name", "symbol"],
+                    "properties": {
+                        "name": { "type": "string", "description": "Curve token name (2..=64 chars)" },
+                        "symbol": { "type": "string", "description": "Curve ticker symbol (1..=12 alphanumeric chars)" },
+                        "virtual_reserve_usdc": { "type": "number", "default": 10000, "description": "Virtual USDC reserve depth V" },
+                        "virtual_supply_tokens": { "type": "integer", "default": 1000000000, "description": "Virtual token supply Y0" },
+                        "swap_fee_bps": { "type": "integer", "minimum": 0, "maximum": 500, "default": 100, "description": "Swap fee in bps (<=500; routed 100% to holders or fee_sink, 0% platform cut)" },
+                        "buy_usdc": { "type": "number", "default": 1000, "description": "Simulated initial USDC buy amount" },
+                        "paywords_revenue_usdc": { "type": "number", "default": 500, "description": "Simulated settled x402 PayWords USDC earnings injected to holders" },
+                        "fee_sink_evm": { "type": "string", "description": "Optional immutable fee recipient (omit or 0x000...000 for 100% holder dividend mode)" }
+                    }
+                }
             }
         ]
     })
@@ -2788,6 +2839,35 @@ pub fn handle_mcp_jsonrpc(
                         .ok_or_else(|| "missing required 'tx_hash'".to_string());
                     tx_hash.and_then(crate::backing::verify_base_usdc_escrow_tx)
                 }
+                "newsatoshi_estimate_paywords_savings" => {
+                    let calls = args.get("monthly_calls").and_then(|v| v.as_u64()).unwrap_or(1_000_000);
+                    let price = args.get("price_per_call_usd").and_then(|v| v.as_f64()).unwrap_or(0.005);
+                    let batch = args.get("calls_per_batch").and_then(|v| v.as_u64()).unwrap_or(1_000);
+                    crate::paywords_launchpad::estimate_paywords_cost_savings(calls, price, batch)
+                }
+                "newsatoshi_compile_payword_channel_setup" => {
+                    let fw = args.get("framework").and_then(|v| v.as_str()).unwrap_or("cloudflare_worker");
+                    let rec = args.get("recipient_evm").and_then(|v| v.as_str());
+                    let price = args.get("price_usd").and_then(|v| v.as_f64()).unwrap_or(0.002);
+                    let steps = args.get("max_steps").and_then(|v| v.as_u64()).unwrap_or(1_000) as u32;
+                    let route = args.get("route_path").and_then(|v| v.as_str()).unwrap_or("/api/inference");
+                    crate::paywords_launchpad::compile_payword_channel_setup(
+                        fw, rec, price, steps, route, base_url,
+                    )
+                }
+                "newsatoshi_simulate_fair_curve_launch" => {
+                    let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("Agent API Curve");
+                    let sym = args.get("symbol").and_then(|v| v.as_str()).unwrap_or("AGAPI");
+                    let v_usdc = args.get("virtual_reserve_usdc").and_then(|v| v.as_f64()).unwrap_or(10_000.0);
+                    let v_sup = args.get("virtual_supply_tokens").and_then(|v| v.as_u64()).unwrap_or(1_000_000_000);
+                    let fee_bps = args.get("swap_fee_bps").and_then(|v| v.as_u64()).unwrap_or(100) as u16;
+                    let buy_usdc = args.get("buy_usdc").and_then(|v| v.as_f64()).unwrap_or(1_000.0);
+                    let rev_usdc = args.get("paywords_revenue_usdc").and_then(|v| v.as_f64()).unwrap_or(500.0);
+                    let sink = args.get("fee_sink_evm").and_then(|v| v.as_str());
+                    crate::paywords_launchpad::simulate_fair_curve_launch(
+                        name, sym, v_usdc, v_sup, fee_bps, buy_usdc, rev_usdc, sink,
+                    )
+                }
                 other => Err(format!("unknown MCP tool '{other}'")),
             };
 
@@ -2893,6 +2973,6 @@ mod tests {
             &client,
             None,
         );
-        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 35);
+        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 38);
     }
 }

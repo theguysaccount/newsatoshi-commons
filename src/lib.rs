@@ -11,6 +11,7 @@ pub mod launchpad;
 pub mod nsusd;
 pub mod ops_hub;
 pub mod p2p;
+pub mod paywords_launchpad;
 pub mod rpc;
 pub mod seed;
 pub mod server;

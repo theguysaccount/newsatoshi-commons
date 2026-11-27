@@ -86,6 +86,76 @@ interface BaseEscrowVerifyResult {
   error?: string;
 }
 
+interface PayWordsSavingsResult {
+  ok: boolean;
+  inputs?: {
+    monthly_calls: number;
+    price_per_call_usd: number;
+    calls_per_settlement_batch: number;
+    gross_monthly_revenue_usd: number;
+  };
+  comparison?: {
+    stripe_cards: { monthly_fees_usd: number; effective_fee_pct: number };
+    per_call_base_x402_usdc: { monthly_fees_usd: number; effective_fee_pct: number };
+    newsatoshi_paywords_base_usdc: {
+      monthly_settlement_txs: number;
+      estimated_gas_per_claim_tx: number;
+      monthly_fees_usd: number;
+      effective_fee_pct: number;
+    };
+  };
+  savings?: {
+    monthly_savings_vs_stripe_usd: number;
+    annual_savings_vs_stripe_usd: number;
+    fee_reduction_vs_stripe_pct: number;
+    monthly_savings_vs_per_call_x402_usd: number;
+    fee_reduction_vs_per_call_x402_pct: number;
+  };
+  error?: string;
+}
+
+interface ChannelKitResult {
+  ok: boolean;
+  framework?: string;
+  filename?: string;
+  code?: string;
+  cli_settlement_commands?: {
+    step1_approve_usdc: string;
+    step2_open_channel: string;
+    step3_claim_batch: string;
+    step4_early_close_refund: string;
+  };
+  error?: string;
+}
+
+interface FairCurveSimResult {
+  ok: boolean;
+  curve_params?: {
+    name: string;
+    symbol: string;
+    swap_fee_bps: number;
+    fee_mode: string;
+  };
+  simulation?: {
+    buy_input_usdc: number;
+    tokens_minted: number;
+    initial_spot_price_usdc: number;
+    post_buy_spot_price_usdc: number;
+    curve_redemption_value_usdc: number;
+    injected_paywords_revenue_usdc: number;
+    holder_claimable_usdc_dividends: number;
+    combined_exit_plus_dividends_usdc: number;
+    effective_usdc_backing_pct: number;
+    invariant_v_plus_r_times_y_ge_k0: boolean;
+    solvency_gross_sell_le_reserve: boolean;
+  };
+  cli_deploy_commands?: {
+    create_curve: string;
+    inject_paywords_revenue: string;
+  };
+  error?: string;
+}
+
 interface OverviewPageProps {
   seed: SeedStatusResponse | null;
   backing: BackingProofSummary | null;
@@ -149,6 +219,32 @@ newsatoshi-swap keygen`,
 
 const CANONICAL_CONTRACTS = [
   {
+    name: 'NewsatoshiPayWordChannel',
+    role: 'L2/Base USDC · Ownerless O(1) SHA-256 PayWords channel (0% fee, 0 per-call gas, 96k-gas live claim proof)',
+    address: '0x971BA814Df91c20DcA3aDd870C2B55d643965C50',
+    badge: 'Base · Sourcify Exact Match',
+    explorers: [
+      { label: 'Contract', url: 'https://basescan.org/address/0x971BA814Df91c20DcA3aDd870C2B55d643965C50' },
+      { label: 'Live Open Tx', url: 'https://basescan.org/tx/0x8229bb7282f79b819122c40e66e8f8dcec832d30fccb1a5b75f9eb49133be31d' },
+      { label: 'Live Claim(7) Tx', url: 'https://basescan.org/tx/0x122885e1b36aa5b8a62f97f4b4bfb3b235bdebe0055a8cd3a4ed7c52393a5356' },
+      { label: 'Live Refund Tx', url: 'https://basescan.org/tx/0x3a826c82fdaffdbbdb8049db7793a342524e3a74742c9504ef8baad1380c4c0d' },
+    ],
+    sourcify: 'https://repo.sourcify.dev/8453/0x971BA814Df91c20DcA3aDd870C2B55d643965C50',
+  },
+  {
+    name: 'NewsatoshiFairCurveFactory',
+    role: 'L2/Base USDC Launchpad · 0% premine, 0% platform cut, PayWords-revenue-backed fair bonding curves (Lean 4 proved)',
+    address: '0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933',
+    badge: 'Base · Sourcify Exact Match',
+    explorers: [
+      { label: 'Factory', url: 'https://basescan.org/address/0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933' },
+      { label: 'Demo Pool (NSPAY)', url: 'https://basescan.org/address/0xC3098ba25E39Effa63dE94EbACE6381781ad4cEd' },
+      { label: 'Live InjectRev Tx', url: 'https://basescan.org/tx/0xa5ea78b2392ed07db61ebd2115485f80dad6551551bedbcd17bfdfa670a3beb2' },
+      { label: 'Live ClaimRev Tx', url: 'https://basescan.org/tx/0x83163d3af4eefcc89d4ddc8f319e6eddcb2f42450b91db8c6e19ed9c7b1eda8a' },
+    ],
+    sourcify: 'https://repo.sourcify.dev/8453/0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933',
+  },
+  {
     name: 'NewsatoshiBackingVault',
     role: 'L2/EVM · Ownerless multi-chain reserve & charter anchor (0 withdrawal path)',
     address: '0x37Ed94525DBE408fA72cDd156409875666679265',
@@ -205,6 +301,18 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
   );
   const [escrowBusy, setEscrowBusy] = useState(false);
   const [escrowResult, setEscrowResult] = useState<BaseEscrowVerifyResult | null>(null);
+  const [monthlyCalls, setMonthlyCalls] = useState('1000000');
+  const [callPriceUsd, setCallPriceUsd] = useState('0.005');
+  const [channelFw, setChannelFw] = useState<'cloudflare_worker' | 'express' | 'fastapi'>('cloudflare_worker');
+  const [savingsBusy, setSavingsBusy] = useState(false);
+  const [savingsRes, setSavingsRes] = useState<PayWordsSavingsResult | null>(null);
+  const [channelKitRes, setChannelKitRes] = useState<ChannelKitResult | null>(null);
+  const [curveName, setCurveName] = useState('Agent API Pool');
+  const [curveSym, setCurveSym] = useState('AGAPI');
+  const [curveBuyUsdc, setCurveBuyUsdc] = useState('1000');
+  const [curveRevUsdc, setCurveRevUsdc] = useState('500');
+  const [curveBusy, setCurveBusy] = useState(false);
+  const [curveRes, setCurveRes] = useState<FairCurveSimResult | null>(null);
   const ms = seed?.mainnet_live ? seed.mainnet_status : null;
   const activeSnippet = SNIPPETS[snippetTab];
 
@@ -325,6 +433,86 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
       onNotice('error', err instanceof Error ? err.message : 'L2 benchmark request failed');
     } finally {
       setL2Busy(false);
+    }
+  };
+
+  const runStablecoinStudio = async (fwOverride?: 'cloudflare_worker' | 'express' | 'fastapi') => {
+    const fw = fwOverride ?? channelFw;
+    if (fwOverride) setChannelFw(fwOverride);
+    setSavingsBusy(true);
+    try {
+      const callsNum = Math.max(1, Number.parseInt(monthlyCalls, 10) || 1_000_000);
+      const priceNum = Math.max(0.000001, Number.parseFloat(callPriceUsd) || 0.005);
+      const [savResp, kitResp] = await Promise.all([
+        fetch('/api/v2/paywords/cost-savings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            monthly_calls: callsNum,
+            price_per_call_usd: priceNum,
+            calls_per_batch: 1000,
+          }),
+        }),
+        fetch('/api/v2/paywords/channel-kit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            framework: fw,
+            price_usd: priceNum,
+            max_steps: 1000,
+            route_path: '/api/inference',
+          }),
+        }),
+      ]);
+      const savData = (await savResp.json().catch(() => null)) as PayWordsSavingsResult | null;
+      const kitData = (await kitResp.json().catch(() => null)) as ChannelKitResult | null;
+      if (!savResp.ok || !savData?.ok) {
+        onNotice('error', savData?.error || `Cost savings failed (HTTP ${savResp.status})`);
+        return;
+      }
+      setSavingsRes(savData);
+      if (kitResp.ok && kitData?.ok) setChannelKitRes(kitData);
+      onNotice(
+        'success',
+        `Saves $${Number(savData.savings?.monthly_savings_vs_stripe_usd ?? 0).toLocaleString()}/mo vs Stripe (${savData.savings?.fee_reduction_vs_stripe_pct}% fee reduction)`
+      );
+    } catch (err) {
+      onNotice('error', err instanceof Error ? err.message : 'Stablecoin studio request failed');
+    } finally {
+      setSavingsBusy(false);
+    }
+  };
+
+  const runFairCurveSim = async () => {
+    setCurveBusy(true);
+    try {
+      const resp = await fetch('/api/v2/launchpad/fair-curve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: curveName.trim() || 'Agent API Pool',
+          symbol: curveSym.trim() || 'AGAPI',
+          virtual_reserve_usdc: 10000,
+          virtual_supply_tokens: 1000000000,
+          swap_fee_bps: 100,
+          buy_usdc: Math.max(1, Number.parseFloat(curveBuyUsdc) || 1000),
+          paywords_revenue_usdc: Math.max(0, Number.parseFloat(curveRevUsdc) || 500),
+        }),
+      });
+      const data = (await resp.json().catch(() => null)) as FairCurveSimResult | null;
+      if (!resp.ok || !data?.ok || !data.simulation) {
+        onNotice('error', data?.error || `Fair curve simulation failed (HTTP ${resp.status})`);
+        return;
+      }
+      setCurveRes(data);
+      onNotice(
+        'success',
+        `Fair curve ${data.curve_params?.symbol}: ${data.simulation.effective_usdc_backing_pct}% USDC backing (curve + PayWords revenue, invariant verified)`
+      );
+    } catch (err) {
+      onNotice('error', err instanceof Error ? err.message : 'Fair curve simulation failed');
+    } finally {
+      setCurveBusy(false);
     }
   };
 
@@ -548,10 +736,10 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
           <div className="p-5 sm:border-l sm:border-t sm:border-white/[0.07] sm:p-6 lg:border-l-0 lg:border-t-0">
             <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-[0.08em] text-zinc-500">
               <span>L2 Agent Gateway</span>
-              <span className="font-mono text-[10px] text-emerald-400">MCP Registry 0.28.4</span>
+              <span className="font-mono text-[10px] text-emerald-400">MCP Registry 0.29.0</span>
             </div>
             <div className="mt-2.5 font-mono text-2xl font-medium tracking-tight text-zinc-100">
-              35 Live Tools
+              38 Live Tools
             </div>
             <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-zinc-500">
               <span className="truncate font-mono text-[11px]">commons.newsatoshi.org/mcp</span>
@@ -933,6 +1121,248 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
                   </>
                 ) : (
                   <div className="text-rose-300">{escrowResult.error || 'Verification failed'}</div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Card E: Enterprise Lowest-Cost Stablecoin Payment Setup Studio (Live Base PayWordChannel) */}
+          <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.03] p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.08em] text-cyan-300">
+                  <Zap className="h-4 w-4" />
+                  <span>Lowest-Cost Stablecoin Rail · Live Base Mainnet</span>
+                </div>
+                <h3 className="mt-2 text-lg font-medium text-zinc-100">
+                  Org PayWords Cost-Savings &amp; 3-Minute Base USDC Setup
+                </h3>
+              </div>
+              <span className="shrink-0 rounded-full border border-cyan-500/25 bg-cyan-500/10 px-2.5 py-0.5 font-mono text-[10px] text-cyan-200">
+                0% Protocol Fee
+              </span>
+            </div>
+
+            <p className="text-[13px] leading-relaxed text-zinc-400">
+              Compare Stripe (<code className="font-mono text-zinc-200">2.9% + $0.30</code>) &amp; per-call Base x402 vs.
+              our live Sourcify-verified{' '}
+              <a
+                href="https://basescan.org/address/0x971BA814Df91c20DcA3aDd870C2B55d643965C50"
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-cyan-300 underline hover:text-white"
+              >
+                NewsatoshiPayWordChannel
+              </a>{' '}
+              (live Base USDC{' '}
+              <a
+                href="https://basescan.org/tx/0x122885e1b36aa5b8a62f97f4b4bfb3b235bdebe0055a8cd3a4ed7c52393a5356"
+                target="_blank"
+                rel="noreferrer"
+                className="text-cyan-300 underline hover:text-white"
+              >
+                96k-gas claim proof
+              </a>
+              ).
+            </p>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {(['cloudflare_worker', 'express', 'fastapi'] as const).map((fw) => (
+                <button
+                  key={fw}
+                  type="button"
+                  onClick={() => void runStablecoinStudio(fw)}
+                  className={`rounded-full px-2.5 py-1 font-mono text-[10.5px] transition cursor-pointer ${
+                    channelFw === fw
+                      ? 'bg-cyan-400 font-semibold text-zinc-950'
+                      : 'border border-white/[0.1] bg-white/[0.03] text-zinc-300 hover:bg-white/[0.08]'
+                  }`}
+                >
+                  {fw === 'cloudflare_worker' ? 'CF Worker' : fw}
+                </button>
+              ))}
+              <input
+                type="text"
+                value={monthlyCalls}
+                onChange={(e) => setMonthlyCalls(e.target.value)}
+                aria-label="Monthly API calls"
+                className="w-24 rounded-lg border border-white/[0.1] bg-[#090c12] px-2 py-1 font-mono text-[11px] text-zinc-200"
+                placeholder="1000000"
+              />
+              <input
+                type="text"
+                value={callPriceUsd}
+                onChange={(e) => setCallPriceUsd(e.target.value)}
+                aria-label="Price per call USD"
+                className="w-16 rounded-lg border border-white/[0.1] bg-[#090c12] px-2 py-1 font-mono text-[11px] text-zinc-200"
+                placeholder="0.005"
+              />
+              <button
+                type="button"
+                onClick={() => void runStablecoinStudio()}
+                disabled={savingsBusy}
+                className="inline-flex items-center gap-1.5 rounded-full bg-cyan-400 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-cyan-300 cursor-pointer disabled:opacity-60"
+              >
+                {savingsBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                <span>Compute &amp; Setup</span>
+              </button>
+            </div>
+
+            {savingsRes?.ok && savingsRes.comparison && savingsRes.savings && (
+              <div className="rounded-xl border border-cyan-500/25 bg-[#090c12] p-3.5 font-mono text-[11px] space-y-1.5 text-zinc-300">
+                <div className="flex items-center justify-between text-emerald-300">
+                  <span>ESTIMATED MONTHLY SAVINGS VS STRIPE</span>
+                  <span>
+                    ${Number(savingsRes.savings.monthly_savings_vs_stripe_usd).toLocaleString()} ({savingsRes.savings.fee_reduction_vs_stripe_pct}%)
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Stripe (2.9% + $0.30/call)</span>
+                  <span className="text-rose-300">${Number(savingsRes.comparison.stripe_cards.monthly_fees_usd).toLocaleString()}/mo</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Per-Call Base x402 (~$0.001/tx)</span>
+                  <span className="text-amber-300">${Number(savingsRes.comparison.per_call_base_x402_usdc.monthly_fees_usd).toLocaleString()}/mo</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Newsatoshi PayWords (1k-call Base batch)</span>
+                  <span className="text-emerald-300">
+                    ${savingsRes.comparison.newsatoshi_paywords_base_usdc.monthly_fees_usd}/mo ({savingsRes.comparison.newsatoshi_paywords_base_usdc.effective_fee_pct}%)
+                  </span>
+                </div>
+                {channelKitRes?.code && (
+                  <div className="pt-2 border-t border-white/[0.07] space-y-1.5">
+                    <div className="flex items-center justify-between text-cyan-300">
+                      <span>{channelKitRes.filename} (Live Base Contract Wired)</span>
+                      <CopyButton value={channelKitRes.code} />
+                    </div>
+                    <pre className="max-h-40 overflow-auto text-[10px] leading-relaxed text-zinc-300">
+                      {channelKitRes.code}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Card F: PayWords-Revenue-Backed Fair Bonding Curve Launchpad (Live Base FairCurveFactory) */}
+          <div className="rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/[0.03] p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.08em] text-fuchsia-300">
+                  <Layers className="h-4 w-4" />
+                  <span>Fair Curve Launchpad · Live Base Mainnet</span>
+                </div>
+                <h3 className="mt-2 text-lg font-medium text-zinc-100">
+                  Zero-Premine USDC Bonding Curve + PayWords Revenue Floor
+                </h3>
+              </div>
+              <span className="shrink-0 rounded-full border border-fuchsia-500/25 bg-fuchsia-500/10 px-2.5 py-0.5 font-mono text-[10px] text-fuchsia-200">
+                Lean 4 Proved
+              </span>
+            </div>
+
+            <p className="text-[13px] leading-relaxed text-zinc-400">
+              Launch an immutable, 0%-premine, 0%-platform-cut USDC bonding curve on{' '}
+              <a
+                href="https://basescan.org/address/0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933"
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-fuchsia-300 underline hover:text-white"
+              >
+                NewsatoshiFairCurveFactory
+              </a>
+              . Route settled HTTP 402 PayWords USDC into <code className="font-mono text-zinc-200">injectRevenue()</code>{' '}
+              (live{' '}
+              <a
+                href="https://basescan.org/tx/0xa5ea78b2392ed07db61ebd2115485f80dad6551551bedbcd17bfdfa670a3beb2"
+                target="_blank"
+                rel="noreferrer"
+                className="text-fuchsia-300 underline hover:text-white"
+              >
+                NSPAY proof
+              </a>
+              ) for dilution-proof holder dividends.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="text"
+                value={curveName}
+                onChange={(e) => setCurveName(e.target.value)}
+                aria-label="Curve token name"
+                className="w-32 rounded-lg border border-white/[0.1] bg-[#090c12] px-2.5 py-1 font-mono text-[11px] text-zinc-200"
+                placeholder="Agent API Pool"
+              />
+              <input
+                type="text"
+                value={curveSym}
+                onChange={(e) => setCurveSym(e.target.value)}
+                aria-label="Curve ticker"
+                className="w-16 rounded-lg border border-white/[0.1] bg-[#090c12] px-2 py-1 font-mono text-[11px] text-zinc-200"
+                placeholder="AGAPI"
+              />
+              <input
+                type="text"
+                value={curveBuyUsdc}
+                onChange={(e) => setCurveBuyUsdc(e.target.value)}
+                aria-label="Simulated buy USDC"
+                className="w-16 rounded-lg border border-white/[0.1] bg-[#090c12] px-2 py-1 font-mono text-[11px] text-zinc-200"
+                placeholder="1000"
+              />
+              <input
+                type="text"
+                value={curveRevUsdc}
+                onChange={(e) => setCurveRevUsdc(e.target.value)}
+                aria-label="Injected PayWords revenue USDC"
+                className="w-16 rounded-lg border border-white/[0.1] bg-[#090c12] px-2 py-1 font-mono text-[11px] text-zinc-200"
+                placeholder="500"
+              />
+              <button
+                type="button"
+                onClick={() => void runFairCurveSim()}
+                disabled={curveBusy}
+                className="inline-flex items-center gap-1.5 rounded-full bg-fuchsia-400 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-fuchsia-300 cursor-pointer disabled:opacity-60"
+              >
+                {curveBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                <span>Simulate &amp; Deploy CLI</span>
+              </button>
+            </div>
+
+            {curveRes?.ok && curveRes.simulation && (
+              <div className="rounded-xl border border-fuchsia-500/25 bg-[#090c12] p-3.5 font-mono text-[11px] space-y-1.5 text-zinc-300">
+                <div className="flex items-center justify-between text-emerald-300">
+                  <span>CURVE INVARIANT &amp; SOLVENCY</span>
+                  <span>
+                    {curveRes.simulation.invariant_v_plus_r_times_y_ge_k0 && curveRes.simulation.solvency_gross_sell_le_reserve
+                      ? 'VERIFIED (LEAN 4)'
+                      : 'ERR'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Buy ${curveRes.simulation.buy_input_usdc} USDC → Minted</span>
+                  <span>{Number(curveRes.simulation.tokens_minted).toLocaleString()} {curveRes.curve_params?.symbol}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Injected PayWords Revenue Dividends</span>
+                  <span className="text-emerald-300">+${curveRes.simulation.holder_claimable_usdc_dividends} USDC</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Combined Curve Exit + Dividends</span>
+                  <span className="text-fuchsia-300">
+                    ${curveRes.simulation.combined_exit_plus_dividends_usdc} ({curveRes.simulation.effective_usdc_backing_pct}% backing)
+                  </span>
+                </div>
+                {curveRes.cli_deploy_commands?.create_curve && (
+                  <div className="pt-2 border-t border-white/[0.07] space-y-1">
+                    <div className="flex items-center justify-between text-fuchsia-300">
+                      <span>1-Command Base Mainnet Deploy (0% Platform Fee)</span>
+                      <CopyButton value={curveRes.cli_deploy_commands.create_curve} />
+                    </div>
+                    <pre className="max-h-24 overflow-auto text-[10px] leading-relaxed text-zinc-300">
+                      {curveRes.cli_deploy_commands.create_curve}
+                    </pre>
+                  </div>
                 )}
               </div>
             )}

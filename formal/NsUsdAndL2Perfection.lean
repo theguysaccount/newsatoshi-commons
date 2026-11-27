@@ -271,4 +271,119 @@ theorem aliased_index_rejected (idx k d : Nat) (hk : k ≥ 1) :
   have hlt := index_exhausted_implies_lt_pow2 (idx + k * 2^d) d hzero
   omega
 
+/-!
+## Theorem 9: EVM `NewsatoshiPayWordChannel` Exact Conservation (`bridges/evm/NewsatoshiPayWordChannel.sol`)
+
+For any SHA-256 PayWord channel locking `totalDeposit = maxSteps * unitAmount` where `claimedSteps ≤ maxSteps`,
+the settled recipient payout `claimedSteps * unitAmount` plus the early/expiry payer refund
+`(maxSteps - claimedSteps) * unitAmount` equals `totalDeposit` identically (0 wei created or stranded),
+and every incremental claim `steps > 0` strictly advances `claimedSteps` (blocking replay).
+-/
+
+theorem payword_channel_exact_conservation
+    (maxSteps claimedSteps unitAmount : Nat)
+    (hBound : claimedSteps ≤ maxSteps) :
+    claimedSteps * unitAmount + (maxSteps - claimedSteps) * unitAmount = maxSteps * unitAmount := by
+  rw [← Nat.add_mul, Nat.add_sub_of_le hBound]
+
+theorem payword_incremental_claim_strict_monotonic
+    (claimedSteps steps maxSteps : Nat)
+    (hPos : steps > 0)
+    (hFit : claimedSteps + steps ≤ maxSteps) :
+    claimedSteps < claimedSteps + steps ∧ claimedSteps + steps ≤ maxSteps := by
+  omega
+
+/-!
+## Theorem 10: Fair Bonding Curve Integer Buy & Sell Solvency (`bridges/evm/NewsatoshiFairCurveFactory.sol`)
+
+Let `V` = `virtualReserve`, `Y0` = `virtualSupply`, `R` = `curveReserve`, `S` = `totalSupply` (`S < Y0`),
+and remaining virtual inventory `y = Y0 - S > 0`.
+Suppose the constant-product invariant holds: `(V + R) * y ≥ V * Y0`.
+1. Under `buy(netIn)`: `Δs = (y * netIn) / (V + R + netIn)`. We prove `Δs ≤ y` (in fact `< y` for `V + R > 0`)
+   AND the post-buy state `(R' = R + netIn, y' = y - Δs)` strictly preserves `(V + R') * y' ≥ V * Y0`!
+2. Under `sell(t)` (`t ≤ S = Y0 - y`): `grossOut = ((V + R) * t) / (y + t)`. We prove:
+   - **Never Insolvent:** `grossOut ≤ R` ALWAYS (integer floor rounding can never drain the reserve!), AND
+   - **Invariant Preserved:** `(V + (R - grossOut)) * (y + t) ≥ V * Y0` ALWAYS!
+-/
+
+theorem fair_curve_buy_preserves_invariant
+    (V R y Y0 netIn : Nat)
+    (hInv : (V + R) * y ≥ V * Y0)
+    (hPos : V + R > 0) :
+    let ds := (y * netIn) / (V + R + netIn)
+    ds ≤ y ∧ (V + R + netIn) * (y - ds) ≥ V * Y0 := by
+  intro ds
+  have hDenPos : 0 < V + R + netIn := by omega
+  have hMulLe : ds * (V + R + netIn) ≤ y * netIn := Nat.div_mul_le_self (y * netIn) (V + R + netIn)
+  have hLeY : ds ≤ y := by
+    have h1 : y * netIn ≤ y * (V + R + netIn) := Nat.mul_le_mul_left y (by omega)
+    have h2 : ds * (V + R + netIn) ≤ y * (V + R + netIn) := Nat.le_trans hMulLe h1
+    exact Nat.le_of_mul_le_mul_right h2 hDenPos
+  refine ⟨hLeY, ?_⟩
+  have hDist : (V + R + netIn) * (y - ds) + (V + R + netIn) * ds = (V + R + netIn) * y := by
+    rw [← Nat.mul_add, Nat.sub_add_cancel hLeY]
+  have hComm : (V + R + netIn) * ds = ds * (V + R + netIn) := Nat.mul_comm _ _
+  have hSplit : (V + R + netIn) * y = (V + R) * y + netIn * y := Nat.add_mul (V + R) netIn y
+  have hComm2 : netIn * y = y * netIn := Nat.mul_comm _ _
+  omega
+
+theorem fair_curve_sell_never_insolvent
+    (V R y Y0 t : Nat)
+    (hInv : (V + R) * y ≥ V * Y0)
+    (hLeY0 : y ≤ Y0)
+    (hSellBound : t ≤ Y0 - y)
+    (hDenPos : y + t > 0) :
+    let grossOut := ((V + R) * t) / (y + t)
+    grossOut ≤ R ∧ (V + (R - grossOut)) * (y + t) ≥ V * Y0 := by
+  intro grossOut
+  -- Step 1: Prove grossOut ≤ R via (V + R) * t ≤ R * (y + t) ⟺ V * t ≤ R * y
+  have hVtLeRy : V * t ≤ R * y := by
+    have h1 : V * t ≤ V * (Y0 - y) := Nat.mul_le_mul_left V hSellBound
+    have h2 : V * (Y0 - y) + V * y = V * Y0 := by
+      rw [← Nat.mul_add, Nat.sub_add_cancel hLeY0]
+    have h3 : (V + R) * y = V * y + R * y := Nat.add_mul V R y
+    omega
+  have hNumLe : (V + R) * t ≤ R * (y + t) := by
+    have hL : (V + R) * t = V * t + R * t := Nat.add_mul V R t
+    have hR : R * (y + t) = R * y + R * t := Nat.mul_add R y t
+    omega
+  have hGrossLeR : grossOut ≤ R := by
+    have hCommR : R * (y + t) = (y + t) * R := Nat.mul_comm R (y + t)
+    exact (Nat.div_le_iff_le_mul_add_pred hDenPos).mpr (by omega)
+  refine ⟨hGrossLeR, ?_⟩
+  -- Step 2: Prove post-sell invariant (V + (R - grossOut)) * (y + t) ≥ (V + R) * y ≥ V * Y0
+  have hMulLe : grossOut * (y + t) ≤ (V + R) * t := Nat.div_mul_le_self ((V + R) * t) (y + t)
+  have hEqV : V + (R - grossOut) = (V + R) - grossOut := by omega
+  rw [hEqV]
+  have hSubAdd : ((V + R) - grossOut) * (y + t) + grossOut * (y + t) = (V + R) * (y + t) := by
+    rw [← Nat.add_mul, Nat.sub_add_cancel (by omega : grossOut ≤ V + R)]
+  have hExpand : (V + R) * (y + t) = (V + R) * y + (V + R) * t := Nat.mul_add (V + R) y t
+  omega
+
+/-!
+## Theorem 11: Dilution-Proof `injectRevenue` Monotonicity (`bridges/evm/NewsatoshiFairCurveFactory.sol`)
+
+Injecting `rev` units of settled x402 / PayWords USDC revenue when `activeSupply > 0` increases
+`accRevPerToken` monotonically (`acc' ≥ acc`, and strictly `acc' > acc` whenever `rev * REV_PRECISION ≥ activeSupply`),
+strictly increasing claimable USDC per existing share with zero token minting or dilution.
+-/
+
+theorem fair_curve_inject_revenue_monotone
+    (acc rev prec activeSupply : Nat)
+    (hSupply : activeSupply > 0) :
+    acc + (rev * prec) / activeSupply ≥ acc ∧
+      (rev * prec ≥ activeSupply → acc + (rev * prec) / activeSupply > acc) := by
+  refine ⟨Nat.le_add_right acc _, ?_⟩
+  intro hGe
+  have hDivPos : 1 ≤ (rev * prec) / activeSupply := by
+    rw [Nat.le_div_iff_mul_le hSupply]
+    omega
+  omega
+
+#print axioms payword_channel_exact_conservation
+#print axioms payword_incremental_claim_strict_monotonic
+#print axioms fair_curve_buy_preserves_invariant
+#print axioms fair_curve_sell_never_insolvent
+#print axioms fair_curve_inject_revenue_monotone
+
 end Newsatoshi.NsUsdL2

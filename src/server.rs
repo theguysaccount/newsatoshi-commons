@@ -709,6 +709,9 @@ fn handle_request(req: Request, state: &AppState) {
             | "/api/v2/nsusd/state"
             | "/api/v2/l2/status"
             | "/api/v2/x402/paywall-kit"
+            | "/api/v2/paywords/cost-savings"
+            | "/api/v2/paywords/channel-kit"
+            | "/api/v2/launchpad/fair-curve"
             | "/api/web4/charters"
             | "/api/web4/services"
             | "/api/web4/bounties"
@@ -934,6 +937,89 @@ fn handle_request(req: Request, state: &AppState) {
                 &base_url,
             ) {
                 Ok(kit) => respond_json(req, 200, &kit),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Get, "/api/v2/paywords/cost-savings") => {
+            let calls = query_param(&raw_url, "monthly_calls")
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(1_000_000);
+            let price = query_param(&raw_url, "price_per_call_usd")
+                .and_then(|v| v.parse::<f64>().ok())
+                .unwrap_or(0.005);
+            let batch = query_param(&raw_url, "calls_per_batch")
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(1_000);
+            match crate::paywords_launchpad::estimate_paywords_cost_savings(calls, price, batch) {
+                Ok(v) => respond_json(req, 200, &v),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/v2/paywords/cost-savings") => {
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let p: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+            let calls = p.get("monthly_calls").and_then(|v| v.as_u64()).unwrap_or(1_000_000);
+            let price = p.get("price_per_call_usd").and_then(|v| v.as_f64()).unwrap_or(0.005);
+            let batch = p.get("calls_per_batch").and_then(|v| v.as_u64()).unwrap_or(1_000);
+            match crate::paywords_launchpad::estimate_paywords_cost_savings(calls, price, batch) {
+                Ok(v) => respond_json(req, 200, &v),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Get, "/api/v2/paywords/channel-kit") => {
+            let base_url = infer_base_url(&req);
+            let fw = query_param(&raw_url, "framework").unwrap_or_else(|| "cloudflare_worker".into());
+            let recipient = query_param(&raw_url, "recipient_evm");
+            let price = query_param(&raw_url, "price_usd")
+                .and_then(|v| v.parse::<f64>().ok())
+                .unwrap_or(0.002);
+            let steps = query_param(&raw_url, "max_steps")
+                .and_then(|v| v.parse::<u32>().ok())
+                .unwrap_or(1_000);
+            let route = query_param(&raw_url, "route_path").unwrap_or_else(|| "/api/inference".into());
+            match crate::paywords_launchpad::compile_payword_channel_setup(
+                &fw,
+                recipient.as_deref(),
+                price,
+                steps,
+                &route,
+                &base_url,
+            ) {
+                Ok(v) => respond_json(req, 200, &v),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/v2/paywords/channel-kit") => {
+            let base_url = infer_base_url(&req);
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let p: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+            let fw = p.get("framework").and_then(|v| v.as_str()).unwrap_or("cloudflare_worker");
+            let recipient = p.get("recipient_evm").and_then(|v| v.as_str());
+            let price = p.get("price_usd").and_then(|v| v.as_f64()).unwrap_or(0.002);
+            let steps = p.get("max_steps").and_then(|v| v.as_u64()).unwrap_or(1_000) as u32;
+            let route = p.get("route_path").and_then(|v| v.as_str()).unwrap_or("/api/inference");
+            match crate::paywords_launchpad::compile_payword_channel_setup(
+                fw, recipient, price, steps, route, &base_url,
+            ) {
+                Ok(v) => respond_json(req, 200, &v),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/v2/launchpad/fair-curve") => {
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let p: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+            let name = p.get("name").and_then(|v| v.as_str()).unwrap_or("Agent API Curve");
+            let sym = p.get("symbol").and_then(|v| v.as_str()).unwrap_or("AGAPI");
+            let v_usdc = p.get("virtual_reserve_usdc").and_then(|v| v.as_f64()).unwrap_or(10_000.0);
+            let v_sup = p.get("virtual_supply_tokens").and_then(|v| v.as_u64()).unwrap_or(1_000_000_000);
+            let fee_bps = p.get("swap_fee_bps").and_then(|v| v.as_u64()).unwrap_or(100) as u16;
+            let buy_usdc = p.get("buy_usdc").and_then(|v| v.as_f64()).unwrap_or(1_000.0);
+            let rev_usdc = p.get("paywords_revenue_usdc").and_then(|v| v.as_f64()).unwrap_or(500.0);
+            let sink = p.get("fee_sink_evm").and_then(|v| v.as_str());
+            match crate::paywords_launchpad::simulate_fair_curve_launch(
+                name, sym, v_usdc, v_sup, fee_bps, buy_usdc, rev_usdc, sink,
+            ) {
+                Ok(v) => respond_json(req, 200, &v),
                 Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
             }
         }
