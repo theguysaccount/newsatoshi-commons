@@ -207,6 +207,7 @@ pub const BUG_BOUNTY_MARKDOWN: &str = include_str!("../docs/BUG_BOUNTY.md");
 pub const NSUSD_RFC_MARKDOWN: &str = include_str!("../docs/RFC-0028-NSUSD-SHIELDED-DOLLAR.md");
 pub const WHITEPAPER_LATEX: &str = include_str!("../docs/newsatoshi_2_1_whitepaper.tex");
 pub const LEAN_FORMAL_PROOF: &str = include_str!("../formal/NewsatoshiCovenants.lean");
+pub const LEAN_NSUSD_L2_PROOF: &str = include_str!("../formal/NsUsdAndL2Perfection.lean");
 
 /// Computes strictly real, live derived network & AuxPoW merge-mining metrics from
 /// live Newsatoshi Mainnet and Testnet `/status` snapshots (zero fabricated figures).
@@ -352,6 +353,7 @@ pub fn render_sitemap_xml(base_url: &str) -> String {
         ("/bounty", "0.9", "daily"),
         ("/manifesto", "0.9", "weekly"),
         ("/formal/NewsatoshiCovenants.lean", "0.9", "weekly"),
+        ("/formal/NsUsdAndL2Perfection.lean", "0.9", "weekly"),
         ("/developers", "0.9", "daily"),
         ("/about", "0.8", "weekly"),
         ("/contact", "0.7", "monthly"),
@@ -455,7 +457,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                     "Hourglass Layer-2 Perfection Architecture above Mainnet v2 (nsM2): O(1) SHA-256 PayWords, RFC-0028 sovereign nsUSD CDP/oracle engine, Winterfell STARK shielded rollup batching, and unilateral Merkle L1 escape hatches.",
                     "<h1>Newsatoshi Layer-2 Expansion &amp; Perfection Layers (<code>v0.28.0</code>)</h1>\n\
                      <p><strong>Hourglass Architecture:</strong> Layer 1 (<code>newsatoshi-rfc0021</code>, Mainnet v2 <code>nsM2</code>) stays minimal, pure FIPS SHA-2, and ossified. Layer 2 (<code>newsatoshi-commons</code>) delivers machine-speed throughput, private USD stability (<code>nsUSD</code>), and zero-custody escape hatches.</p>\n\
-                     <p>Live APIs: <a href=\"/l2.md\">Full Markdown Spec (/l2.md)</a> &middot; <a href=\"/api/v2/l2/status\">GET /api/v2/l2/status</a> &middot; <a href=\"/api/v2/nsusd/state\">GET /api/v2/nsusd/state</a> &middot; <a href=\"/nsusd\">nsUSD Spec (/nsusd)</a> &middot; <a href=\"/whitepaper.pdf\">Whitepaper v2.2 PDF</a></p>\n\
+                     <p>Live APIs: <a href=\"/l2.md\">Full Markdown Spec (/l2.md)</a> &middot; <a href=\"/api/v2/l2/status\">GET /api/v2/l2/status</a> &middot; <a href=\"/api/v2/nsusd/state\">GET /api/v2/nsusd/state</a> &middot; <a href=\"/formal/NsUsdAndL2Perfection.lean\">Lean 4 Proof (11 Theorems, 0 sorry)</a> &middot; <a href=\"/nsusd\">nsUSD Spec (/nsusd)</a> &middot; <a href=\"/whitepaper.pdf\">Whitepaper v2.2 PDF</a></p>\n\
                      <h2>Layer 2A &mdash; Microsecond Streaming (<code>O(1)</code> SHA-256 PayWords)</h2>\n\
                      <ul><li><code>1</code> SHA-256 hash per API call (zero per-call gas, up to <code>1,000,000</code> ticks per channel) backed by unilateral partial-claim L1 settlement (<code>RFC-0022</code>).</li></ul>\n\
                      <h2>Layer 2B &mdash; Stable Private Value (<code>nsUSD</code>, <code>RFC-0028</code>)</h2>\n\

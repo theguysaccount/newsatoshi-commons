@@ -133,6 +133,7 @@ impl NsUsdEngine {
     }
 
     /// Submit or update a `PriorLock`-bonded BTC/USD price quote.
+    /// Permanently slashed reporters cannot un-slash themselves by resubmitting.
     pub fn submit_oracle_quote(
         &mut self,
         reporter_id: &str,
@@ -142,6 +143,11 @@ impl NsUsdEngine {
     ) -> Result<(), String> {
         if reporter_id.trim().is_empty() {
             return Err("reporter_id required".to_string());
+        }
+        if let Some(prev) = self.quotes.get(reporter_id) {
+            if prev.slashed {
+                return Err("reporter_slashed_permanently: cannot resubmit after PriorLock slash".to_string());
+            }
         }
         if bond_love_sats < 1_000_000 {
             return Err("PriorLock oracle bond must be >= 0.01 LOVE (1,000,000 sats)".to_string());
@@ -162,13 +168,19 @@ impl NsUsdEngine {
         Ok(())
     }
 
-    /// Computes exact integer median BTC/USD price across non-slashed, non-stale reporters.
-    /// Fails closed (halts new minting) if fewer than `MIN_FRESH_ORACLE_REPORTERS` fresh quotes exist.
+    /// Computes exact integer median BTC/USD price across non-slashed, non-stale, non-future reporters.
+    /// Rejects future-dated timestamps (> 60 s clock drift) and fails closed if fewer than
+    /// `MIN_FRESH_ORACLE_REPORTERS` fresh quotes exist.
     pub fn fresh_median_btc_usd_cents(&self, now_unix: u64) -> Result<u64, String> {
+        let max_future = now_unix.saturating_add(60);
         let mut fresh: Vec<u64> = self
             .quotes
             .values()
-            .filter(|q| !q.slashed && now_unix.saturating_sub(q.quoted_at_unix) <= MAX_ORACLE_AGE_SECS)
+            .filter(|q| {
+                !q.slashed
+                    && q.quoted_at_unix <= max_future
+                    && now_unix.saturating_sub(q.quoted_at_unix) <= MAX_ORACLE_AGE_SECS
+            })
             .map(|q| q.btc_usd_cents)
             .collect();
         if fresh.len() < MIN_FRESH_ORACLE_REPORTERS {
@@ -330,12 +342,15 @@ impl NsUsdEngine {
             };
             let take_debt = remaining_micro.min(v.debt_nsusd_micro);
             // Exact BTC satoshis worth `take_debt` micro-USD at `price` cents/BTC:
-            // sats = take_debt * 10_000 / price
-            let btc_sats_needed = (((take_debt as u128) * 10_000) / (price as u128)) as u64;
+            // sats = take_debt * 10_000 / price (checked conversion, no u64 truncation).
+            let btc_sats_needed_u128 = ((take_debt as u128) * 10_000) / (price as u128);
+            let btc_sats_needed = u64::try_from(btc_sats_needed_u128)
+                .map_err(|_| "redemption btc_sats overflow".to_string())?;
             let take_sats = btc_sats_needed.min(v.btc_collateral_sats);
             v.debt_nsusd_micro -= take_debt;
             v.btc_collateral_sats -= take_sats;
-            if v.debt_nsusd_micro == 0 {
+            // Only close the vault if BOTH debt AND residual collateral are zero (never strand owner BTC!).
+            if v.debt_nsusd_micro == 0 && v.btc_collateral_sats == 0 {
                 v.closed = true;
             }
             remaining_micro -= take_debt;
@@ -436,11 +451,17 @@ impl NsUsdEngine {
     }
 
     pub fn total_sovereign_btc_sats(&self) -> u64 {
-        self.vaults.values().filter(|v| !v.closed).map(|v| v.btc_collateral_sats).sum()
+        self.vaults
+            .values()
+            .filter(|v| !v.closed)
+            .fold(0u64, |acc, v| acc.saturating_add(v.btc_collateral_sats))
     }
 
     pub fn total_sovereign_debt_micro(&self) -> u64 {
-        self.vaults.values().filter(|v| !v.closed).map(|v| v.debt_nsusd_micro).sum()
+        self.vaults
+            .values()
+            .filter(|v| !v.closed)
+            .fold(0u64, |acc, v| acc.saturating_add(v.debt_nsusd_micro))
     }
 
     /// Deterministic 32-byte SHA-256 solvency commitment root for L1 anchoring.
@@ -580,12 +601,20 @@ pub fn run_adversarial_stress_suite(crash_pct: u64) -> Value {
         .unwrap_err();
     let stale_halted = stale_err.contains("oracle_circuit_breaker_stale");
 
+    let liq_expected = crash >= 29; // Vault A starts at 166.67% CR -> drops < 120% when crash >= 29%
+    let scenario_1_ok = if liq_expected {
+        liq.is_ok() && liq_conserved
+    } else {
+        liq.is_err() // Healthy vault MUST NOT be liquidated
+    };
+
     json!({
         "ok": true,
         "sandbox_only": true,
         "live_state_mutated": false,
+        "note": "In-memory accounting & adversarial state-machine stress test (no live L1 custody or real BTC moved).",
         "crash_pct_simulated": crash,
-        "all_invariants_passed": (liq.is_err() || liq_conserved) && red_conserved && slash_exact && stale_halted,
+        "all_invariants_passed": scenario_1_ok && red_conserved && slash_exact && stale_halted,
         "scenarios": {
             "1_flash_crash_liquidation": {
                 "initial_btc_usd": initial_price / 100,
@@ -645,5 +674,30 @@ mod tests {
         assert_eq!(br.asset_id, NsUsdAssetId::BridgedNsUsdB);
         assert_eq!(eng.total_sovereign_debt_micro(), 0);
         assert_eq!(eng.total_bridged_nsusd_b_micro, 50_000_000);
+    }
+
+    #[test]
+    fn nsusd_blocks_slashed_reporter_resubmit_and_future_timestamps() {
+        let mut eng = NsUsdEngine::new();
+        let t0 = 1_795_800_000;
+        eng.submit_oracle_quote("h1", 500_000_000, 10_000_000, t0).unwrap();
+        eng.submit_oracle_quote("h2", 500_000_000, 10_010_000, t0).unwrap();
+        eng.submit_oracle_quote("h3", 500_000_000, 9_990_000, t0).unwrap();
+        // Future-dated quote (+10 hours) MUST NOT be counted as fresh
+        eng.submit_oracle_quote("future-bot", 500_000_000, 99_999_999, t0 + 36_000)
+            .unwrap();
+        let med = eng.fresh_median_btc_usd_cents(t0).unwrap();
+        assert_eq!(med, 10_000_000);
+
+        // Slashed attacker MUST be permanently locked out from un-slashing via resubmit
+        eng.submit_oracle_quote("bad", 500_000_000, 15_000_000, t0).unwrap();
+        eng.challenge_oracle_outlier("bad", "chal", t0).unwrap();
+        let err = eng.submit_oracle_quote("bad", 500_000_000, 10_000_000, t0 + 10).unwrap_err();
+        assert!(err.contains("reporter_slashed_permanently"));
+
+        // Non-liquidation crash (<29%) passes strictly because healthy vault rejects liquidation
+        let mild = run_adversarial_stress_suite(10);
+        assert_eq!(mild["all_invariants_passed"], json!(true));
+        assert_eq!(mild["scenarios"]["1_flash_crash_liquidation"]["vault_a_liquidated"], json!(false));
     }
 }

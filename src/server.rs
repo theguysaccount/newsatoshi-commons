@@ -680,6 +680,7 @@ fn handle_request(req: Request, state: &AppState) {
             | "/.well-known/mcp-registry-auth"
             | "/.well-known/402index-verify.txt"
             | "/formal/NewsatoshiCovenants.lean"
+            | "/formal/NsUsdAndL2Perfection.lean"
             | "/whitepaper.tex" => {
                 Some("text/plain; charset=utf-8")
             }
@@ -959,6 +960,14 @@ fn handle_request(req: Request, state: &AppState) {
                 200,
                 "text/plain; charset=utf-8",
                 LEAN_FORMAL_PROOF.to_string(),
+            );
+        }
+        (Method::Get, "/formal/NsUsdAndL2Perfection.lean") => {
+            respond_text(
+                req,
+                200,
+                "text/plain; charset=utf-8",
+                crate::agent::LEAN_NSUSD_L2_PROOF.to_string(),
             );
         }
         (Method::Get, "/whitepaper" | "/manifesto" | "/bounty" | "/nsusd" | "/l2" | "/docs" | "/developers" | "/about" | "/contact" | "/privacy") => {
