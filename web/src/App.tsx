@@ -417,6 +417,14 @@ function AppShell() {
             </button>
 
             <a
+              href="/bounty"
+              className="hidden shrink-0 items-center gap-1 whitespace-nowrap text-[13px] font-medium text-emerald-400/90 transition hover:text-emerald-300 lg:inline-flex"
+            >
+              <span>Bug Bounty</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </a>
+
+            <a
               href="/manifesto"
               className="hidden shrink-0 items-center gap-1 whitespace-nowrap text-[13px] font-medium text-amber-300/90 transition hover:text-amber-200 lg:inline-flex"
             >
@@ -783,6 +791,9 @@ function AppShell() {
           <div className="flex flex-wrap items-center gap-5">
             <a href="https://newsatoshi.org/" className="transition hover:text-zinc-200">
               newsatoshi.org
+            </a>
+            <a href="/bounty" className="transition hover:text-zinc-200">
+              Bug Bounty
             </a>
             <a href="/manifesto" className="transition hover:text-zinc-200">
               Manifesto

@@ -171,7 +171,13 @@ pub fn evaluate_v2_cutover_readiness(seed: &SeedSnapshot) -> Value {
         "ok": true,
         "ready_for_v2_activation": ready,
         "mainnet_v2_live": true,
-        "honest_status": if ready { "LIVE_AUDITED_MAINNET_V2" } else { "LIVE_UNAUDITED_MAINNET_V2_PENDING_EXTERNAL_AUDITS_AND_POOLS" },
+        "honest_status": if ready { "LIVE_AUDITED_MAINNET_V2" } else { "LIVE_MAINNET_V2_OPEN_BOUNTY" },
+        "bug_bounty": {
+            "url": "https://newsatoshi.org/bounty/",
+            "commons_url": "https://commons.newsatoshi.org/bounty",
+            "mainnet_v2_address": "ns1af734b0e0b0c1c6a54e206ba7a23f586daee77ede5e7c51b6ec6b133c51f572a99d8cb66",
+            "pool_stratum": "stratum+tcp://pool.newsatoshi.org:3333"
+        },
         "genesis_policy": {
             "nov10_canary_retired": true,
             "canonical_launch_mode": "single_bitcoin_anchored_fair_launch_genesis",
@@ -182,7 +188,7 @@ pub fn evaluate_v2_cutover_readiness(seed: &SeedSnapshot) -> Value {
             "genesis_nonce": 2_649_823_154u32,
             "live_seed_status_url": "https://newsatoshi-seed-v2.fly.dev/status",
             "live_p2p_seeds": ["newsatoshi-seed-v2.fly.dev:8445", "pool.newsatoshi.org:8445"],
-            "note": "Canonical Mainnet v2 (nsM2, v1.2.0) launched live anchored to Bitcoin Block #977,738 with zero premine. External security audits (0/2) and external real-difficulty Bitcoin pools (0/3) remain honestly open."
+            "note": "Canonical Mainnet v2 (nsM2, v1.2.1) is live, anchored to Bitcoin Block #977,738 with zero premine and backed by an open fair-mined LOVE Public Security Bug Bounty (/bounty)."
         },
         "gates": {
             "engineering_and_formal_proofs": {

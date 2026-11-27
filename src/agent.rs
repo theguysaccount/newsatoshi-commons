@@ -203,6 +203,7 @@ pub const WHITEPAPER_MARKDOWN: &str = include_str!("../docs/NEWSATOSHI-2.1-WHITE
 pub const WHITEPAPER_V2_2_MARKDOWN: &str = include_str!("../docs/NEWSATOSHI-2.2-WHITEPAPER.md");
 pub const WHITEPAPER_V2_2_PDF: &[u8] = include_bytes!("../docs/newsatoshi-v2.2.pdf");
 pub const MANIFESTO_MARKDOWN: &str = include_str!("../docs/MANIFESTO.md");
+pub const BUG_BOUNTY_MARKDOWN: &str = include_str!("../docs/BUG_BOUNTY.md");
 pub const WHITEPAPER_LATEX: &str = include_str!("../docs/newsatoshi_2_1_whitepaper.tex");
 pub const LEAN_FORMAL_PROOF: &str = include_str!("../formal/NewsatoshiCovenants.lean");
 
@@ -438,6 +439,34 @@ fn wrap_public_html(
 /// (`/docs`, `/developers`, `/about`, `/contact`, `/privacy`).
 pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<(&'static str, String)> {
     match slug {
+        "/bounty" => {
+            if wants_md {
+                Some(("text/markdown; charset=utf-8", BUG_BOUNTY_MARKDOWN.to_string()))
+            } else {
+                let html = wrap_public_html(
+                    base_url,
+                    "/bounty",
+                    "Newsatoshi (LOVE) Public Security Bug Bounty Program",
+                    "Verify the math. Break the code. Collect fair-mined Mainnet v2 LOVE directly from the public Bug Bounty treasury.",
+                    "<h1>Newsatoshi (<code>LOVE</code>) Public Security Bug Bounty</h1>\n\
+                     <p><strong>Verify the math. Break the code. Collect native <code>LOVE</code>.</strong> &middot; Mainnet v2 (<code>nsM2</code>)</p>\n\
+                     <p>Artifacts: <a href=\"/bounty.md\">Full Bounty Rules (.md)</a> &middot; <a href=\"https://newsatoshi.org/bounty/\">Terminal Edition</a> &middot; <a href=\"https://github.com/theguysaccount/newsatoshi-rfc0021/blob/main/docs/AUDIT_SCOPE_V2.md\">Exact Target Scope &amp; SHA-256s</a> &middot; <a href=\"/whitepaper.pdf\">Satoshi-Format Whitepaper PDF</a></p>\n\
+                     <h2>Public Mainnet v2 Bounty Treasury</h2>\n\
+                     <p>Funded purely by fair-mined Mainnet v2 Proof-of-Work blocks and community contributions (zero premine):</p>\n\
+                     <pre>Mainnet v2 Shielded Bounty Address (ns1):\nns1af734b0e0b0c1c6a54e206ba7a23f586daee77ede5e7c51b6ec6b133c51f572a99d8cb66\n\nMine directly into the bounty treasury (0% fee solo pool):\nstratum+tcp://pool.newsatoshi.org:3333\nworker: ns1af734b0e0b0c1c6a54e206ba7a23f586daee77ede5e7c51b6ec6b133c51f572a99d8cb66.bounty</pre>\n\
+                     <h2>Reward Tiers (Denominated in <code>LOVE</code>)</h2>\n\
+                     <ul>\n\
+                       <li><strong>Critical (up to 50% of Bounty Treasury &mdash; target 1,000&ndash;10,000+ LOVE):</strong> Shielded spend soundness / counterfeit coin creation, double-spend bypass, Winterfell field/masking exploit, Lean 4 proof-to-Rust mismatch, consensus split, or AuxPoW forgery.</li>\n\
+                       <li><strong>High (up to 25% of Bounty Treasury &mdash; target 250&ndash;1,000 LOVE):</strong> Remote node crash / consensus DoS, <code>BatchSpend</code> fee break, <code>PriorLock</code> SCGS-I3 bypass, <code>RFC-0022</code> PayWord theft, FlyClient work forgery, or <code>NSPQ2</code> auth bypass.</li>\n\
+                       <li><strong>Medium (50&ndash;250 LOVE):</strong> P2P slowloris bypass, mempool griefing, <code>wallet.wasm</code> proof bug, or independent JS verifier divergence.</li>\n\
+                       <li><strong>Low / Hardening (10&ndash;50 LOVE):</strong> Non-consensus bugs, edge-case RPC issues, or verifiable cryptographic hardening.</li>\n\
+                     </ul>\n\
+                     <h2>Submit Responsible Disclosure</h2>\n\
+                     <p>Open a private Security Advisory on <a href=\"https://github.com/theguysaccount/newsatoshi-rfc0021/security/advisories\">GitHub</a> or email <code>contributors@newsatoshi.org</code> with a reproducible test against <code>--net regtest</code> and your Mainnet v2 <code>ns1...</code> / <code>nsd1...</code> payout address.</p>",
+                );
+                Some(("text/html; charset=utf-8", html))
+            }
+        }
         "/manifesto" => {
             if wants_md {
                 Some(("text/markdown; charset=utf-8", MANIFESTO_MARKDOWN.to_string()))
@@ -465,8 +494,8 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                          </ol>\n\
                          <h2>III. Why We Named It <code>LOVE</code></h2>\n\
                          <p>Empedocles named <em>Love</em> (<em>Philotes</em>) the force that binds scattered matter into coherent order. Physics calls it <strong>negentropy</strong>; cognitive science calls it <strong>minimizing free energy</strong>. Good money lets strangers &mdash; human or machine &mdash; cooperate peacefully without rulers, banks, or censors.</p>\n\
-                         <h2>IV. Brutal Honesty Over Crypto Theater</h2>\n\
-                         <p>Zero fabricated users, zero fake pools, zero hidden self-mining. Live Mainnet v2 (<code>nsM2</code>) is open today, while external human security audits (<code>0/2</code>) and independent real-difficulty Bitcoin pools (<code>0/3</code>) remain transparently tracked at <a href=\"/api/v2/cutover-readiness\">/api/v2/cutover-readiness</a>. Verify everything yourself: <a href=\"https://newsatoshi.org/\">live browser STARK verifier</a> or <code>node verifier-ts/newsatoshi_verifier.mjs --live https://newsatoshi.org/mainnet</code>.</p>\n\
+                         <h2>IV. Open Verification &amp; Public Bug Bounty</h2>\n\
+                         <p>Zero fabricated users, zero fake pools, zero premine. Every line of consensus code, every STARK constraint, and every Lean 4 proof is backed by an open coin-denominated <a href=\"/bounty\">Public Security Bug Bounty in LOVE</a> (<code>ns1af734b0e0…d8cb66</code>). Verify everything yourself: <a href=\"https://newsatoshi.org/\">live browser STARK verifier</a> or <code>node verifier-ts/newsatoshi_verifier.mjs --live https://newsatoshi.org/mainnet</code>.</p>\n\
                          <h2>V. The Covenant</h2>\n\
                          <p>No founders' reward. No kill switch. No permission required. <strong>Verify the math. Run a node. Build what comes next.</strong></p>\n\
                          <pre>Canonical Genesis (nsM2): 00000000ba1cdad4aa8e82d6613b4df536394c41008fc3a0914a47a44604b9c8\nJoin: newsatoshi --net mainnet-v2 node · Pool: stratum+tcp://pool.newsatoshi.org:3333\nFull Markdown: {base_url}/manifesto.md</pre>"
@@ -501,7 +530,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                          <h2>Honest Trade-Offs &amp; Open Non-Code Gates</h2>\n\
                          <ul>\n\
                            <li><strong>Reserved BIP-9 Soft-Fork Bits:</strong> <code>bit 5</code> (future WHIR/Binius compact pure-SHA-2 proofs), <code>bit 6</code> (future GPU-scaled zero-witness recursive spend aggregation), and <code>bit 7</code> (permanent monetary-base ossification)</li>\n\
-                           <li><strong>External Gates Tracked Live (<a href=\"/api/v2/cutover-readiness\">/api/v2/cutover-readiness</a>):</strong> <code>0/2</code> independent human security audits completed (<code>docs/AUDIT_SCOPE_V2.md</code>) and <code>0/3</code> independent real-difficulty Bitcoin pools (&ge; 10,000 difficulty) observed. Hold only what you can afford to lose until external audits close.</li>\n\
+                           <li><strong>Open Security Bug Bounty (<a href=\"/bounty\">/bounty</a>):</strong> Funded directly in fair-mined Mainnet v2 <code>LOVE</code> (<code>ns1af734b0e0…d8cb66</code>), covering all consensus modules and Lean 4 proofs (<code>docs/AUDIT_SCOPE_V2.md</code>).</li>\n\
                          </ul>\n\
                          <p>Read the complete raw Markdown at <a href=\"/whitepaper.md\">/whitepaper.md</a> or inspect live verification telemetry at <a href=\"/api/v2/live-verify\">/api/v2/live-verify</a>.</p>",
                 );
@@ -927,7 +956,7 @@ Available MCP tools (30 live tools — zero API keys required):
 - `newsatoshi_inspect_mission_launchpad` — Legacy `/api/mission` query helper (L1 `v1.0.0-core` exposes unified `/api/prior?id=...` instead)
 - `newsatoshi_format_swarm_task_claim` — Compute deterministic `nsMISSTASK` & `nsMISSCLAIM` signing digests for off-chain/L2 agent swarm coordinators
 - `newsatoshi_verify_zktls_proof` — Cryptographically verify real `reclaim_v1` (EIP-191 secp256k1 ecrecover), `tlsnotary_v1` (Ed25519/secp256k1 + Merkle selective redaction), or `newsatoshi_pq_notary_v1` (FIPS 205 SLH-DSA) zkTLS proofs for off-chain/P2P verification
-- `newsatoshi_check_v2_cutover_readiness` — Honest live `v1.2.0` Mainnet v2 cutover gate checking external audits (0/2), real-difficulty independent Bitcoin AuxPoW pools (0/3), and honest formal/STARK bounds
+- `newsatoshi_check_v2_cutover_readiness` — Live `v1.2.1` Mainnet v2 status, formal/STARK security bounds, independent Bitcoin AuxPoW pool adoption, and LOVE Public Security Bug Bounty telemetry
 - `newsatoshi_compile_bonded_p2p_offer` — Compile a zero-custody `PriorLock`-backed zkTLS P2P Fiat/USDC <-> LOVE market-maker quote (100%+ stake coverage required)
 
 Stdio MCP Bridge (for stdio-only hosts such as Claude Desktop, Cursor, Cline, or shell scripts):

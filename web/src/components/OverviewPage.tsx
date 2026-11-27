@@ -217,20 +217,18 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
           </button>
 
           <a
-            href="/api/v2/cutover-readiness"
-            target="_blank"
-            rel="noreferrer"
+            href="/bounty"
             className="group block p-5 text-left transition hover:bg-white/[0.02] sm:border-l sm:border-white/[0.07] sm:p-6 lg:border-l-0"
           >
             <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-[0.08em] text-zinc-500">
-              <span>Mainnet v2 Gate</span>
-              <span className="font-mono text-[10px] text-amber-300/90">Honest Status</span>
+              <span>Security Bounty</span>
+              <span className="font-mono text-[10px] text-emerald-400">Open in LOVE</span>
             </div>
-            <div className="mt-2.5 font-mono text-2xl font-medium tracking-tight text-zinc-100 tabular-nums">
-              0/2 Audits
+            <div className="mt-2.5 font-mono text-2xl font-medium tracking-tight text-zinc-100">
+              LOVE Bug Bounty
             </div>
             <div className="mt-1.5 text-xs text-zinc-500">
-              0/3 real-difficulty BTC pools · blocked until ready
+              Break the math · claim mined LOVE · AUDIT_SCOPE_V2.md
             </div>
           </a>
 

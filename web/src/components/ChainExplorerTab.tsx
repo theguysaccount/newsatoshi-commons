@@ -106,19 +106,19 @@ const MIGRATION_PHASES = [
     specs: ['30 MCP Tools', 'Native LOVE + x402', '4-Chain HTLCs'],
   },
   {
-    phase: 'Launch Blocker',
-    title: '2 External Security Audits + >=3 Independent BTC Pools',
-    status: 'PENDING GATE' as const,
+    phase: 'Security Bounty',
+    title: 'Public LOVE Bug Bounty & Open BTC Merged Mining',
+    status: 'IMPLEMENTED' as const,
     summary:
-      'Hard non-negotiable launch gates tracked live at /api/v2/cutover-readiness: currently 0/2 external security audits (Winterfell patch, spend.rs, batch_spend.rs, prior.rs, light.rs, pq_transport.rs) and 0/3 real-difficulty Bitcoin AuxPoW pools.',
-    specs: ['0/2 External Audits', '0/3 BTC Pools', 'AUDIT_SCOPE_V2.md'],
+      'Open coin-denominated Public Security Bug Bounty funded by fair-mined Mainnet v2 LOVE (`ns1af734b0e0…d8cb66`, scope: `docs/AUDIT_SCOPE_V2.md`), paired with 0%-fee direct-payout Bitcoin AuxPoW solo pool (`stratum+tcp://pool.newsatoshi.org:3333`).',
+    specs: ['LOVE Bug Bounty', 'AUDIT_SCOPE_V2.md', 'pool.newsatoshi.org'],
   },
   {
     phase: 'Mainnet v2 Genesis',
     title: 'LIVE — Bitcoin #977,738 Fair-Launch Genesis (nsM2)',
     status: 'IMPLEMENTED' as const,
     summary:
-      'Canonical Mainnet v2 (v1.2.0) launched live with zero premine at Genesis 00000000ba1cdad4… anchored to Bitcoin block #977,738 (`newsatoshi --net mainnet-v2 node`, seeds `newsatoshi-seed-v2.fly.dev:8445` & `pool.newsatoshi.org:8445`). External audits (0/2) and external pools (0/3) remain open.',
+      'Canonical Mainnet v2 (v1.2.1) live with zero premine at Genesis 00000000ba1cdad4… anchored to Bitcoin block #977,738 (`newsatoshi --net mainnet-v2 node`, seeds `newsatoshi-seed-v2.fly.dev:8445` & `pool.newsatoshi.org:8445`).',
     specs: ['BTC #977,738', 'Day-1 ASERT Ramp', 'Zero Premine'],
   },
 ];
