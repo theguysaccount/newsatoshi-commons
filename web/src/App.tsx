@@ -425,6 +425,14 @@ function AppShell() {
             </a>
 
             <a
+              href="/l2"
+              className="hidden shrink-0 items-center gap-1 whitespace-nowrap text-[13px] font-medium text-violet-300/90 transition hover:text-violet-200 lg:inline-flex"
+            >
+              <span>L2 Perfection</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </a>
+
+            <a
               href="/bounty"
               className="hidden shrink-0 items-center gap-1 whitespace-nowrap text-[13px] font-medium text-emerald-400/90 transition hover:text-emerald-300 lg:inline-flex"
             >
@@ -787,13 +795,19 @@ function AppShell() {
             <span className="font-medium text-zinc-300">Newsatoshi Commons</span>
             <span className="text-zinc-700">·</span>
             <span className="font-mono text-[11px]">
-              v{health?.version ?? '0.22.1'} · L2 Gateway · Verify-Only · 0 Server Keys
+              v{health?.version ?? '0.28.0'} · L2 Gateway · Verify-Only · 0 Server Keys
             </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-5">
             <a href="https://newsatoshi.org/" className="transition hover:text-zinc-200">
               newsatoshi.org
+            </a>
+            <a href="/nsusd" className="transition hover:text-zinc-200">
+              nsUSD
+            </a>
+            <a href="/l2" className="transition hover:text-zinc-200">
+              L2 Perfection
             </a>
             <a href="/bounty" className="transition hover:text-zinc-200">
               Bug Bounty

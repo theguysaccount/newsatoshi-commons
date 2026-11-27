@@ -1,9 +1,67 @@
 import { useState } from 'react';
-import { ArrowRight, ArrowUpRight, Check, ExternalLink, Layers, ShieldCheck } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Check, ExternalLink, Layers, Loader2, Play, ShieldCheck, Zap } from 'lucide-react';
 import type { BackingProofSummary, PrimaryView, ProtocolSubTab, SeedStatusResponse } from '../types';
 import { formatL1IssuedLove } from '../api/normalize';
 import type { SwapHubSection } from './SwapsMiningTab';
 import { CopyButton, truncateHash } from './ui/CopyButton';
+
+interface NsUsdStressResult {
+  ok: boolean;
+  sandbox_only: boolean;
+  crash_pct_simulated: number;
+  all_invariants_passed: boolean;
+  scenarios: {
+    '1_flash_crash_liquidation': {
+      initial_btc_usd: number;
+      crashed_btc_usd: number;
+      vault_a_liquidated: boolean;
+      satoshi_conservation_exact: boolean;
+      post_liquidation_system_cr_bps: number;
+    };
+    '2_bank_run_redemption_floor': {
+      remaining_debt_nsusd_micro: number;
+      exact_conservation: boolean;
+    };
+    '3_priorlock_oracle_spoof_slash': {
+      exact_50_50_bounty_burn: boolean;
+      receipt: {
+        deviation_bps: number;
+        challenger_bounty_love_sats: number;
+        burned_love_sats: number;
+      };
+    };
+    '4_stale_oracle_circuit_breaker': {
+      mint_halted: boolean;
+    };
+  };
+}
+
+interface L2BenchmarkResult {
+  ok: boolean;
+  sandbox_benchmark: boolean;
+  tx_count: number;
+  conservation_exact: boolean;
+  payword_execution_us: number;
+  measured_offchain_tps: number;
+  new_l2_state_root_hex: string;
+  winterfell_stark_batch_proof: {
+    proof_id: string;
+    verified: boolean;
+    proof_bytes: number;
+    security_bits: number;
+    prove_ms: number;
+    verify_ms: number;
+  };
+  unilateral_l1_escape_hatch?: {
+    verified: boolean;
+    leaf_index: number;
+    siblings_hex: string[];
+  };
+  l1_mainnet_v2_anchor: {
+    l1_height: number | null;
+    anchor_commitment_hex: string;
+  };
+}
 
 interface OverviewPageProps {
   seed: SeedStatusResponse | null;
@@ -24,7 +82,7 @@ const SNIPPETS: Record<
 > = {
   mcp: {
     label: 'MCP Server',
-    caption: '30 zero-auth L2 gateway & crypto tools (EVM audit, BTC mempool, BOLT-11, Uniswap V3, Native LOVE PayWords & v2 cutover gate)',
+    caption: '33 zero-auth L2 gateway & crypto tools (nsUSD CDP/stress, L2 STARK rollup benchmark, EVM audit, BTC mempool, BOLT-11, Native LOVE PayWords)',
     code: `{
   "mcpServers": {
     "newsatoshi": {
@@ -107,10 +165,60 @@ const CANONICAL_CONTRACTS = [
   },
 ] as const;
 
-export function OverviewPage({ seed, backing, onNavigate }: OverviewPageProps) {
+export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPageProps) {
   const [snippetTab, setSnippetTab] = useState<SnippetTab>('mcp');
+  const [stressBusy, setStressBusy] = useState(false);
+  const [stressResult, setStressResult] = useState<NsUsdStressResult | null>(null);
+  const [l2Busy, setL2Busy] = useState(false);
+  const [l2Result, setL2Result] = useState<L2BenchmarkResult | null>(null);
   const ms = seed?.mainnet_live ? seed.mainnet_status : null;
   const activeSnippet = SNIPPETS[snippetTab];
+
+  const runNsUsdStress = async () => {
+    setStressBusy(true);
+    try {
+      const resp = await fetch('/api/v2/nsusd/simulate-stress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ crash_pct: 50 }),
+      });
+      const data = (await resp.json()) as NsUsdStressResult;
+      setStressResult(data);
+      onNotice(
+        data.all_invariants_passed ? 'success' : 'error',
+        data.all_invariants_passed
+          ? 'nsUSD -50% BTC crash stress suite: 4/4 invariants verified (isolated sandbox)'
+          : 'nsUSD stress invariant check failed'
+      );
+    } catch (err) {
+      onNotice('error', err instanceof Error ? err.message : 'Stress test request failed');
+    } finally {
+      setStressBusy(false);
+    }
+  };
+
+  const runL2Benchmark = async () => {
+    setL2Busy(true);
+    try {
+      const resp = await fetch('/api/v2/l2/benchmark', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tx_count: 2000 }),
+      });
+      const data = (await resp.json()) as L2BenchmarkResult;
+      setL2Result(data);
+      onNotice(
+        data.ok && data.winterfell_stark_batch_proof?.verified ? 'success' : 'error',
+        data.ok
+          ? `L2 Perfection Batch: ${data.measured_offchain_tps.toLocaleString()} off-chain TPS + Winterfell STARK verified in ${data.winterfell_stark_batch_proof.verify_ms}ms`
+          : 'L2 benchmark failed'
+      );
+    } catch (err) {
+      onNotice('error', err instanceof Error ? err.message : 'L2 benchmark request failed');
+    } finally {
+      setL2Busy(false);
+    }
+  };
 
   return (
     <div className="animate-fade-in mx-auto max-w-[1120px] space-y-16 pb-20 pt-8 sm:pt-12">
@@ -134,7 +242,7 @@ export function OverviewPage({ seed, backing, onNavigate }: OverviewPageProps) {
             sovereign Layer-1 cash — default shielded privacy via pure FIPS SHA-2/SHA-384 STARKs,
             mechanized in Lean 4, and merge-mined by Bitcoin ASICs (<span className="font-mono text-[13px] text-zinc-300">chainid 20051</span>).
             Above the waist, this gateway delivers stable USD settlement (<span className="font-mono text-[13px] text-sky-300">nsUSD</span>),
-            30 zero-auth MCP tools, sub-millisecond PayWords, and trustless BTC/Lightning/EVM HTLC bridges.
+            L2 STARK rollup perfection layers, 33 zero-auth MCP tools, sub-millisecond PayWords, and trustless BTC/Lightning/EVM HTLC bridges.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -162,6 +270,14 @@ export function OverviewPage({ seed, backing, onNavigate }: OverviewPageProps) {
               className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-4 py-2.5 text-[13px] font-medium text-sky-200 transition hover:bg-sky-500/20"
             >
               <span>nsUSD Stable Rail</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </a>
+
+            <a
+              href="/l2"
+              className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-4 py-2.5 text-[13px] font-medium text-violet-200 transition hover:bg-violet-500/20"
+            >
+              <span>L2 Perfection</span>
               <ArrowUpRight className="h-3.5 w-3.5" />
             </a>
           </div>
@@ -318,12 +434,192 @@ export function OverviewPage({ seed, backing, onNavigate }: OverviewPageProps) {
               <span className="font-mono text-[10px] text-emerald-400">LOVE Primary</span>
             </div>
             <div className="mt-2.5 font-mono text-2xl font-medium tracking-tight text-zinc-100">
-              30 Live Tools
+              33 Live Tools
             </div>
             <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-zinc-500">
               <span className="truncate font-mono text-[11px]">commons.newsatoshi.org/mcp</span>
               <CopyButton value="https://commons.newsatoshi.org/mcp" />
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 2B. Live nsUSD Stablecoin & L2 Perfection Layer Interactive Verification */}
+      <section aria-label="Live nsUSD and L2 Perfection Verification">
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-sky-300/90">
+              Live Cryptographic Lab · Zero Fake TVL (Isolated Sandboxes)
+            </p>
+            <h2 className="font-display mt-1.5 text-3xl tracking-tight text-zinc-100 sm:text-4xl">
+              Verify nsUSD stability &amp; L2 STARK rollup perfection live.
+            </h2>
+          </div>
+          <div className="flex items-center gap-3 text-xs">
+            <a href="/nsusd" className="inline-flex items-center gap-1 font-mono text-sky-300 hover:text-white">
+              <span>RFC-0028 Spec</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </a>
+            <a href="/l2" className="inline-flex items-center gap-1 font-mono text-violet-300 hover:text-white">
+              <span>L2 Architecture</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          {/* Card A: RFC-0028 nsUSD Adversarial Stress Test */}
+          <div className="rounded-2xl border border-sky-500/20 bg-sky-500/[0.03] p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.08em] text-sky-300">
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>RFC-0028 · Dual-Tier nsUSD Engine</span>
+                </div>
+                <h3 className="mt-2 text-lg font-medium text-zinc-100">
+                  Sovereign BTC CDP (`asset_id=1`) &amp; PriorLock Oracle
+                </h3>
+              </div>
+              <span className="shrink-0 rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-0.5 font-mono text-[10px] text-sky-200">
+                0 Freeze Switch
+              </span>
+            </div>
+
+            <p className="text-[13px] leading-relaxed text-zinc-400">
+              Live vault ledger starts at honest <code className="font-mono text-zinc-200">0</code> debt.
+              Run the real Rust integer engine in an isolated sandbox to verify a{' '}
+              <strong className="text-zinc-200">-50% BTC flash crash</strong>, direct{' '}
+              <strong className="text-zinc-200">$1.00 redemption floor</strong>,{' '}
+              <strong className="text-zinc-200">+40% oracle spoof 50/50 slash</strong>, and stale-feed mint halt.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => void runNsUsdStress()}
+                disabled={stressBusy}
+                className="inline-flex items-center gap-2 rounded-full bg-sky-400 px-4 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-sky-300 cursor-pointer disabled:opacity-60"
+              >
+                {stressBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                <span>Run -50% BTC Crash Stress Test</span>
+              </button>
+              <a
+                href="/api/v2/nsusd/state"
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-[11px] text-zinc-400 hover:text-zinc-200"
+              >
+                GET /api/v2/nsusd/state
+              </a>
+            </div>
+
+            {stressResult && (
+              <div className="rounded-xl border border-sky-500/25 bg-[#090c12] p-4 font-mono text-[11px] space-y-1.5 text-zinc-300">
+                <div className="flex items-center justify-between text-emerald-300">
+                  <span>ALL 4 ADVERSARIAL INVARIANTS</span>
+                  <span>{stressResult.all_invariants_passed ? 'PASS (4/4)' : 'FAIL'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">1. -{stressResult.crash_pct_simulated}% BTC Crash Liquidation</span>
+                  <span>
+                    {stressResult.scenarios['1_flash_crash_liquidation'].vault_a_liquidated ? 'LIQUIDATED' : 'HELD'} ·{' '}
+                    CR {(stressResult.scenarios['1_flash_crash_liquidation'].post_liquidation_system_cr_bps / 100).toFixed(1)}%
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">2. $1.00 Bank-Run Redemption</span>
+                  <span>
+                    {stressResult.scenarios['2_bank_run_redemption_floor'].exact_conservation ? 'EXACT SATOSHI CONSERVATION' : 'ERR'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">3. +40% PriorLock Oracle Spoof</span>
+                  <span>
+                    SLASHED ({stressResult.scenarios['3_priorlock_oracle_spoof_slash'].receipt.deviation_bps} bps · 50% burn)
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">4. Stale Oracle Circuit Breaker</span>
+                  <span>
+                    {stressResult.scenarios['4_stale_oracle_circuit_breaker'].mint_halted ? 'MINT HALTED' : 'OPEN'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Card B: L2 Perfection Layer Live Winterfell STARK Batch Benchmark */}
+          <div className="rounded-2xl border border-violet-500/20 bg-violet-500/[0.03] p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.08em] text-violet-300">
+                  <Zap className="h-4 w-4" />
+                  <span>L2A–L2D · Shielded Rollup &amp; Perfection</span>
+                </div>
+                <h3 className="mt-2 text-lg font-medium text-zinc-100">
+                  PayWords + Winterfell STARK + Unilateral Escape Hatch
+                </h3>
+              </div>
+              <span className="shrink-0 rounded-full border border-violet-500/25 bg-violet-500/10 px-2.5 py-0.5 font-mono text-[10px] text-violet-200">
+                0 Sequencer Custody
+              </span>
+            </div>
+
+            <p className="text-[13px] leading-relaxed text-zinc-400">
+              Execute <strong className="text-zinc-200">2,000 real SHA-256 PayWord + nsUSD transfers</strong> live on the server,
+              generate &amp; verify a real <strong className="text-zinc-200">Winterfell 0.13 STARK conservation proof</strong>,
+              verify a unilateral <strong className="text-zinc-200">SHA-256 Merkle L1 Escape Hatch</strong>, and anchor to the live Mainnet v2 tip.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => void runL2Benchmark()}
+                disabled={l2Busy}
+                className="inline-flex items-center gap-2 rounded-full bg-violet-400 px-4 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-violet-300 cursor-pointer disabled:opacity-60"
+              >
+                {l2Busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                <span>Run 2,000-tx L2 STARK Batch</span>
+              </button>
+              <a
+                href="/api/v2/l2/status"
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-[11px] text-zinc-400 hover:text-zinc-200"
+              >
+                GET /api/v2/l2/status
+              </a>
+            </div>
+
+            {l2Result && (
+              <div className="rounded-xl border border-violet-500/25 bg-[#090c12] p-4 font-mono text-[11px] space-y-1.5 text-zinc-300">
+                <div className="flex items-center justify-between text-emerald-300">
+                  <span>LIVE MEASURED L2 THROUGHPUT</span>
+                  <span>{l2Result.measured_offchain_tps.toLocaleString()} TPS ({l2Result.payword_execution_us} µs)</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Winterfell 0.13 STARK Proof</span>
+                  <span>
+                    {l2Result.winterfell_stark_batch_proof.verified ? 'VERIFIED' : 'FAIL'} ·{' '}
+                    {(l2Result.winterfell_stark_batch_proof.proof_bytes / 1024).toFixed(1)} KB ·{' '}
+                    {l2Result.winterfell_stark_batch_proof.verify_ms} ms
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Unilateral L1 Escape Hatch</span>
+                  <span>
+                    {l2Result.unilateral_l1_escape_hatch?.verified ? 'MERKLE PROOF VERIFIED' : 'N/A'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Mainnet v2 Anchor Commit</span>
+                  <span>
+                    {l2Result.l1_mainnet_v2_anchor.l1_height ? `#${l2Result.l1_mainnet_v2_anchor.l1_height} · ` : ''}
+                    {truncateHash(l2Result.l1_mainnet_v2_anchor.anchor_commitment_hex, 8, 6)}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -456,8 +752,8 @@ export function OverviewPage({ seed, backing, onNavigate }: OverviewPageProps) {
                 <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" />
                 <span>
                   <strong className="text-zinc-100">A2A Commerce &amp; Identity Ready:</strong>{' '}
-                  30 zero-auth MCP tools, <code className="font-mono text-xs">ERC-8004</code> dual
-                  identity, and opt-in escrow/arbitration hooks for agent marketplaces (e.g. Psilo).
+                  33 zero-auth MCP tools, <code className="font-mono text-xs">ERC-8004</code> dual
+                  identity, RFC-0028 <code className="font-mono text-xs">nsUSD</code> stability, and L2 STARK rollups.
                 </span>
               </li>
               <li className="flex items-start gap-2.5">

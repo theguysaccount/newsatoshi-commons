@@ -347,6 +347,10 @@ pub fn render_sitemap_xml(base_url: &str) -> String {
         ("/", "1.0", "hourly"),
         ("/docs", "0.9", "daily"),
         ("/whitepaper", "0.95", "daily"),
+        ("/nsusd", "0.9", "daily"),
+        ("/l2", "0.9", "daily"),
+        ("/bounty", "0.9", "daily"),
+        ("/manifesto", "0.9", "weekly"),
         ("/formal/NewsatoshiCovenants.lean", "0.9", "weekly"),
         ("/developers", "0.9", "daily"),
         ("/about", "0.8", "weekly"),
@@ -440,6 +444,35 @@ fn wrap_public_html(
 /// (`/docs`, `/developers`, `/about`, `/contact`, `/privacy`).
 pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<(&'static str, String)> {
     match slug {
+        "/l2" => {
+            if wants_md {
+                Some(("text/markdown; charset=utf-8", crate::l2_rollup::render_l2_architecture_markdown().to_string()))
+            } else {
+                let html = wrap_public_html(
+                    base_url,
+                    "/l2",
+                    "Newsatoshi Layer-2 Expansion & Perfection Layers — PayWords, nsUSD & Shielded STARK Rollups",
+                    "Hourglass Layer-2 Perfection Architecture above Mainnet v2 (nsM2): O(1) SHA-256 PayWords, RFC-0028 sovereign nsUSD CDP/oracle engine, Winterfell STARK shielded rollup batching, and unilateral Merkle L1 escape hatches.",
+                    "<h1>Newsatoshi Layer-2 Expansion &amp; Perfection Layers (<code>v0.28.0</code>)</h1>\n\
+                     <p><strong>Hourglass Architecture:</strong> Layer 1 (<code>newsatoshi-rfc0021</code>, Mainnet v2 <code>nsM2</code>) stays minimal, pure FIPS SHA-2, and ossified. Layer 2 (<code>newsatoshi-commons</code>) delivers machine-speed throughput, private USD stability (<code>nsUSD</code>), and zero-custody escape hatches.</p>\n\
+                     <p>Live APIs: <a href=\"/l2.md\">Full Markdown Spec (/l2.md)</a> &middot; <a href=\"/api/v2/l2/status\">GET /api/v2/l2/status</a> &middot; <a href=\"/api/v2/nsusd/state\">GET /api/v2/nsusd/state</a> &middot; <a href=\"/nsusd\">nsUSD Spec (/nsusd)</a> &middot; <a href=\"/whitepaper.pdf\">Whitepaper v2.2 PDF</a></p>\n\
+                     <h2>Layer 2A &mdash; Microsecond Streaming (<code>O(1)</code> SHA-256 PayWords)</h2>\n\
+                     <ul><li><code>1</code> SHA-256 hash per API call (zero per-call gas, up to <code>1,000,000</code> ticks per channel) backed by unilateral partial-claim L1 settlement (<code>RFC-0022</code>).</li></ul>\n\
+                     <h2>Layer 2B &mdash; Stable Private Value (<code>nsUSD</code>, <code>RFC-0028</code>)</h2>\n\
+                     <ul>\n\
+                       <li><strong>Sovereign <code>nsUSD</code> (<code>asset_id = 1</code>):</strong> Integer-exact BTC CDPs (<code>&gt;= 150%</code> MCR, <code>120%</code> liquidation), Stability Pool, permissionless <code>$1.00</code> BTC redemption floor, and <code>PriorLock</code> bonded median BTC/USD oracle (<code>50%</code> challenger slash / <code>50%</code> permanent <code>LOVE</code> burn + stale-feed mint halt).</li>\n\
+                       <li><strong>Bridged <code>nsUSD-B</code> (<code>asset_id = 2</code>):</strong> Strictly isolated 1:1 <code>USDC</code>/<code>USDS</code>/<code>DAI</code> escrow receipts with honest issuer-risk disclosure.</li>\n\
+                     </ul>\n\
+                     <h2>Layer 2C &mdash; Shielded Rollup Batching &amp; Winterfell STARK Conservation</h2>\n\
+                     <ul><li>Compresses thousands of off-chain <code>LOVE</code> + <code>nsUSD</code> micro-transfers into one deterministic <code>SHA-256</code> Merkle state root, proved by a live Winterfell 0.13 STARK (~22 KB), and anchored via a 32-byte commitment to Mainnet v2 L1.</li></ul>\n\
+                     <h2>Layer 2D &mdash; Unilateral L1 Escape Hatch (Zero Sequencer Custody)</h2>\n\
+                     <ul><li>Every L2 leaf carries a verifiable <code>SHA-256</code> Merkle inclusion proof enabling trustless unilateral L1 exit via native <code>SHA-256</code> HTLC / <code>PriorLock</code> even if every sequencer goes offline.</li></ul>\n\
+                     <h2>Run Live Sandbox Verification via curl</h2>\n\
+                     <pre># 1. Run 4-scenario adversarial nsUSD stress suite (-50% BTC crash, bank run, +40% oracle spoof, stale halt):\ncurl -sS -X POST https://commons.newsatoshi.org/api/v2/nsusd/simulate-stress -H 'Content-Type: application/json' -d '{\"crash_pct\":50}'\n\n# 2. Run live 2,000-tx L2 PayWord + Winterfell STARK + Escape-Hatch benchmark:\ncurl -sS -X POST https://commons.newsatoshi.org/api/v2/l2/benchmark -H 'Content-Type: application/json' -d '{\"tx_count\":2000}'</pre>",
+                );
+                Some(("text/html; charset=utf-8", html))
+            }
+        }
         "/nsusd" => {
             if wants_md {
                 Some(("text/markdown; charset=utf-8", NSUSD_RFC_MARKDOWN.to_string()))
@@ -451,20 +484,20 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                     "Zero-volatility private USD settlement for humans and AI agents on Newsatoshi: Tier-1 JIT x402 PayWords + Tier-2 sovereign BTC-backed over-collateralized nsUSD with PriorLock bonded oracles and zero corporate freeze switch.",
                     "<h1><code>nsUSD</code> &mdash; Private, Post-Quantum Dollar Settlement (<code>RFC-0028</code>)</h1>\n\
                      <p><strong>Stable USD pricing for everyday commerce &amp; AI agents &mdash; backed by Newsatoshi pure SHA-384 STARK privacy and zero algorithmic death-spiral risk.</strong></p>\n\
-                     <p>Artifacts: <a href=\"/nsusd.md\">Full RFC-0028 Spec (.md)</a> &middot; <a href=\"/api/v2/nsusd/quote?usd=0.01\">Live USD Quote JSON API</a> &middot; <a href=\"https://newsatoshi.org/nsusd/\">Terminal Edition</a> &middot; <a href=\"/whitepaper.pdf\">Satoshi-Format Whitepaper PDF</a></p>\n\
+                     <p>Artifacts: <a href=\"/nsusd.md\">Full RFC-0028 Spec (.md)</a> &middot; <a href=\"/api/v2/nsusd/state\">Live State JSON</a> &middot; <a href=\"/api/v2/nsusd/quote?usd=0.01\">Live USD Quote JSON</a> &middot; <a href=\"/l2\">L2 Perfection Layer</a> &middot; <a href=\"https://newsatoshi.org/nsusd/\">Terminal Edition</a> &middot; <a href=\"/whitepaper.pdf\">Whitepaper v2.2 PDF</a></p>\n\
                      <h2>Tier 1 &mdash; Live Today (Zero L1 Fork, Zero Volatility)</h2>\n\
                      <ul>\n\
                        <li><strong>USD-Denominated JIT <code>x402</code> + <code>O(1)</code> PayWords:</strong> Quote any API or service strictly in USD (e.g. <code>$0.0005/call</code>), stream micro-payments off-chain in microseconds with zero per-call gas, and settle atomically via zero-custody Bitcoin/Lightning/EVM/L1 SHA-256 HTLCs.</li>\n\
-                       <li><strong><code>nsUSD-B</code> (Transparently Labeled Bridged Dollar):</strong> 1:1 redeemable deposit/withdrawal escrow for USDC/USDS/DAI giving immediate private transfers inside Newsatoshi L2 while keeping bridge reserve risk explicitly separated from sovereign <code>nsUSD</code>.</li>\n\
+                       <li><strong><code>nsUSD-B</code> (<code>asset_id = 2</code>, Transparently Labeled Bridged Dollar):</strong> 1:1 redeemable deposit/withdrawal escrow for USDC/USDS/DAI giving immediate private transfers inside Newsatoshi L2 while keeping underlying issuer risk strictly isolated from sovereign <code>nsUSD</code>.</li>\n\
                      </ul>\n\
-                     <h2>Tier 2 &mdash; Sovereign Unfreezable <code>nsUSD</code> (Zero Corporate Freeze Switch)</h2>\n\
+                     <h2>Tier 2 &mdash; Sovereign Unfreezable <code>nsUSD</code> (<code>asset_id = 1</code>, Zero Corporate Freeze Switch)</h2>\n\
                      <ul>\n\
-                       <li><strong>Over-Collateralized Bitcoin First (<code>&gt;= 150%</code> CR):</strong> Backed by native BTC (plus native Mainnet v2 <code>LOVE &gt;= 250%</code> CR once deep spot liquidity matures) &mdash; never an undercollateralized algorithmic peg.</li>\n\
-                       <li><strong><code>PriorLock</code> Bonded Median Oracle (RFC-0021):</strong> Price reporters bond real <code>LOVE</code> behind BTC/USD quotes; manipulated prices are slashed <code>50%</code> to the challenger and <code>50%</code> permanently burned.</li>\n\
-                       <li><strong>Hard <code>$1.00</code> Redemption Floor + BIP-9 Multi-Asset L1 Notes:</strong> Permissionless collateral redemption holds the peg via arbitrage, and future soft-fork <code>BIT_MULTI_ASSET_NOTES = 7</code> lets <code>LOVE</code> and <code>nsUSD</code> share one shielded L1 STARK anonymity set with zero Genesis restart.</li>\n\
+                       <li><strong>Over-Collateralized Bitcoin First (<code>&gt;= 150%</code> CR, <code>120%</code> liquidation):</strong> Backed by native BTC (plus native Mainnet v2 <code>LOVE &gt;= 250%</code> CR once deep spot liquidity matures) &mdash; never an undercollateralized algorithmic peg.</li>\n\
+                       <li><strong><code>PriorLock</code> Bonded Median Oracle (RFC-0021):</strong> Price reporters bond real <code>LOVE</code> behind BTC/USD quotes; manipulated prices are slashed <code>50%</code> to the challenger and <code>50%</code> permanently burned, with automatic stale-feed circuit breakers.</li>\n\
+                       <li><strong>Hard <code>$1.00</code> Redemption Floor + Hourglass L2 Rollup Settlement:</strong> Permissionless collateral redemption holds the peg via arbitrage, operating directly above ossified Mainnet v2 L1 via native SHA-256 HTLCs, <code>PriorLock</code> bonds, and L2 shielded Merkle roots with zero L1 consensus fork required.</li>\n\
                      </ul>\n\
-                     <h2>Try the Live USD Quote Endpoint</h2>\n\
-                     <pre>curl -sS https://commons.newsatoshi.org/api/v2/nsusd/quote?usd=0.01</pre>",
+                     <h2>Try the Live Engine &amp; Adversarial Stress Test</h2>\n\
+                     <pre>curl -sS https://commons.newsatoshi.org/api/v2/nsusd/state\ncurl -sS -X POST https://commons.newsatoshi.org/api/v2/nsusd/simulate-stress -H 'Content-Type: application/json' -d '{\"crash_pct\":50}'</pre>",
                 );
                 Some(("text/html; charset=utf-8", html))
             }
@@ -813,7 +846,10 @@ pub fn render_mcp_server_card_json(base_url: &str) -> Value {
             "newsatoshi_format_swarm_task_claim",
             "newsatoshi_verify_zktls_proof",
             "newsatoshi_check_v2_cutover_readiness",
-            "newsatoshi_compile_bonded_p2p_offer"
+            "newsatoshi_compile_bonded_p2p_offer",
+            "newsatoshi_get_nsusd_state",
+            "newsatoshi_simulate_nsusd_stress",
+            "newsatoshi_benchmark_l2_perfection_batch"
         ],
         "resources": [
             "newsatoshi://llms.txt",
@@ -877,11 +913,11 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
         "\
 # Newsatoshi Commons & Agent Transaction Interface ({proto})
 
-> **The Hourglass Architecture:** Newsatoshi (`LOVE`) keeps **Layer 1 (`v1.2.0`)** radically small — private, quantum-proof electronic cash secured by Bitcoin merge-mining (`chainid = 20051`) and built strictly on SHA-2 (256-bit Quartic Goldilocks FRI at `100–104` conservative QROM bits, full 249-constraint Lean 4 circuit proof, real pure-SHA-2 STARK-in-STARK IVC verifier, zero elliptic curves, zero trusted setup, zero L1 launchpads or subjective juries). **This gateway (`commons.newsatoshi.org`) lives above the waist at Layer 2** — providing 30 zero-auth MCP tools, Native `LOVE` PayWords + `x402 v2` USDC bridge on-ramps, zero-custody BTC/Lightning/Solana/EVM HTLC atomic swaps, `ERC-8004` identity, Web4 charters, off-chain mission launchpads, zkTLS P2P verification, and A2A escrow hooks.
+> **The Hourglass Architecture:** Newsatoshi (`LOVE`) keeps **Layer 1 (`v1.2.1`)** radically small — private, quantum-proof electronic cash secured by Bitcoin merge-mining (`chainid = 20051`) and built strictly on SHA-2 (256-bit Quartic Goldilocks FRI at `100–104` conservative QROM bits, full 249-constraint Lean 4 circuit proof, real pure-SHA-2 STARK-in-STARK IVC verifier, zero elliptic curves, zero trusted setup, zero L1 launchpads or subjective juries). **This gateway (`commons.newsatoshi.org`) lives above the waist at Layer 2** — providing 33 zero-auth MCP tools, RFC-0028 `nsUSD` Dual-Tier stablecoin engine + live stress simulator, L2 Shielded Rollup & Perfection Layer (Winterfell STARK batching + unilateral Merkle escape hatches), Native `LOVE` PayWords + `x402 v2` USDC bridge on-ramps, zero-custody BTC/Lightning/Solana/EVM HTLC atomic swaps, `ERC-8004` identity, Web4 charters, off-chain mission launchpads, zkTLS P2P verification, and A2A escrow hooks.
 
 ## When to use Newsatoshi Commons
-- Use `{base_url}/mcp` or `{base_url}/api/*` when an agent needs to **check live Newsatoshi Mainnet/Testnet state**, **bridge BTC/Lightning/Solana/Base into LOVE trustlessly**, **issue or verify HTTP 402 PayWord micropayments**, or **cryptographically verify Winterfell STARK covenant proofs and L1 hash-locks**.
-- Human & developer documentation: [Whitepaper & Lean 4 Proof]({base_url}/whitepaper), [API Docs]({base_url}/docs), [Developer Portal]({base_url}/developers), [About]({base_url}/about), [Contact]({base_url}/contact), [Privacy]({base_url}/privacy).
+- Use `{base_url}/mcp` or `{base_url}/api/*` when an agent needs to **check live Newsatoshi Mainnet/Testnet state**, **bridge BTC/Lightning/Solana/Base into LOVE trustlessly**, **run live RFC-0028 `nsUSD` stablecoin quotes/stress tests or L2 STARK rollup benchmarks**, **issue or verify HTTP 402 PayWord micropayments**, or **cryptographically verify Winterfell STARK covenant proofs and L1 hash-locks**.
+- Human & developer documentation: [Whitepaper & Lean 4 Proof]({base_url}/whitepaper), [nsUSD Stablecoin (RFC-0028)]({base_url}/nsusd), [L2 Perfection Layer]({base_url}/l2), [Bug Bounty]({base_url}/bounty), [API Docs]({base_url}/docs), [Developer Portal]({base_url}/developers), [About]({base_url}/about), [Contact]({base_url}/contact), [Privacy]({base_url}/privacy).
 
 ## Live Network Status
 - {mainnet_line}
@@ -893,7 +929,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 - Commons Treasury Balance: `{bal} LOVE` (`nonce={nonce}`, `parcels={parcels}`, `kwh={kwh}`, `starks={starks}`)
 
 ## Agent Interfaces (Zero Auth Required for All Reads, Compilers & Verifiers)
-- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **30 live tools** (including 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.0` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
+- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **33 live tools** (including `nsUSD` Dual-Tier stablecoin engine + stress suite, L2 Perfection Layer STARK batch benchmark, 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.1` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
 - **Zero-Install Stdio MCP Bridge & CLI (Node 18+, Zero Dependencies):** `npx -y github:theguysaccount/newsatoshi-commons` (`inspect`, `btc-fees`, `decode-bolt11`, `quote-base`, `verify-tx`, `payword-demo`, or stdio MCP `serve`).
 - [Native LOVE PayWord & x402 v2 Discovery]({base_url}/.well-known/x402): 4 live monetized endpoints settling primarily in **native `LOVE`** (`<1ms` zero-gas SHA-256 PayWords / `PriorLock`), with Base/Arbitrum/Polygon USDC (`x402 v2`, `$0.001`) supported as outer bridge on-ramps (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).
 - [MCP Server Card]({base_url}/.well-known/mcp/server-card.json) & [MCP Registry Manifest]({base_url}/server.json): Standard MCP discovery cards (`org.newsatoshi.commons/newsatoshi-commons`).
@@ -957,7 +993,7 @@ Add to Claude Desktop, Cursor, Codex, Antigravity, or any Streamable HTTP MCP ho
   }}
 }}
 ```
-Available MCP tools (30 live tools — zero API keys required):
+Available MCP tools (33 live tools — zero API keys required):
 - `crypto_inspect_evm_contract` — Live multi-chain EVM smart contract security audit (bytecode, EIP-1967 proxy/admin slots, `owner()` admin risk, ERC-20 metadata, Sourcify v2 exact-match verification across Ethereum, Base, Arbitrum, Optimism & Polygon)
 - `crypto_bitcoin_mempool_oracle` — Live Bitcoin chain tip, recommended sat/vB fee tiers (`fastest`, `30m`, `60m`, `economy`), and mempool backlog
 - `crypto_decode_bolt11_invoice` — Pure-Rust BOLT-11 Lightning invoice decoder (network, sats/msats, payment hash, expiry, description)
@@ -988,6 +1024,9 @@ Available MCP tools (30 live tools — zero API keys required):
 - `newsatoshi_verify_zktls_proof` — Cryptographically verify real `reclaim_v1` (EIP-191 secp256k1 ecrecover), `tlsnotary_v1` (Ed25519/secp256k1 + Merkle selective redaction), or `newsatoshi_pq_notary_v1` (FIPS 205 SLH-DSA) zkTLS proofs for off-chain/P2P verification
 - `newsatoshi_check_v2_cutover_readiness` — Live `v1.2.1` Mainnet v2 status, formal/STARK security bounds, independent Bitcoin AuxPoW pool adoption, and LOVE Public Security Bug Bounty telemetry
 - `newsatoshi_compile_bonded_p2p_offer` — Compile a zero-custody `PriorLock`-backed zkTLS P2P Fiat/USDC <-> LOVE market-maker quote (100%+ stake coverage required)
+- `newsatoshi_get_nsusd_state` — Live honest RFC-0028 `nsUSD` Dual-Tier stablecoin engine state (Sovereign BTC CDP `asset_id=1` + isolated Bridged `nsUSD-B` `asset_id=2` + `PriorLock` oracle status)
+- `newsatoshi_simulate_nsusd_stress` — Run the 4-scenario isolated adversarial `nsUSD` stress-test suite (flash-crash liquidation, `$1.00` bank-run redemption, `+40%` oracle spoof 50/50 slash, stale circuit-breaker halt)
+- `newsatoshi_benchmark_l2_perfection_batch` — Run a live measured L2 PayWord + `nsUSD` batch + Winterfell 0.13 STARK conservation proof + verified unilateral Merkle L1 Escape Hatch benchmark
 
 Stdio MCP Bridge (for stdio-only hosts such as Claude Desktop, Cursor, Cline, or shell scripts):
 ```json
@@ -2054,6 +2093,31 @@ pub fn mcp_tools_list() -> Value {
                         "expected_tls_server_name": { "type": "string", "description": "e.g. api.wise.com or api.revolut.com" }
                     }
                 }
+            },
+            {
+                "name": "newsatoshi_get_nsusd_state",
+                "description": "Return the honest live RFC-0028 Dual-Tier nsUSD stablecoin engine state (Sovereign BTC-backed asset_id=1 + strictly isolated Bridged USDC/USDS/DAI asset_id=2, PriorLock oracle circuit-breaker status, and SHA-256 solvency commitment root).",
+                "inputSchema": { "type": "object", "properties": {} }
+            },
+            {
+                "name": "newsatoshi_simulate_nsusd_stress",
+                "description": "Execute a deterministic 4-scenario adversarial stress test of the RFC-0028 nsUSD CDP & PriorLock oracle engine inside an isolated sandbox (flash crash liquidation, bank-run $1.00 BTC redemption floor, +40% oracle spoof 50/50 slash, and stale oracle mint halt) without mutating live balances.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "crash_pct": { "type": "integer", "minimum": 10, "maximum": 75, "default": 50, "description": "Simulated BTC flash crash percentage (10..=75, default 50)" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_benchmark_l2_perfection_batch",
+                "description": "Run a real live measured Newsatoshi L2 Shielded Rollup & Perfection Layer benchmark: executes N O(1) SHA-256 PayWord + nsUSD transfers, computes SHA-256 L2 Merkle roots + a verified unilateral L1 Escape-Hatch proof, generates & verifies a live Winterfell 0.13 STARK conservation proof, and binds an L1 Mainnet v2 anchor commitment.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "tx_count": { "type": "integer", "minimum": 10, "maximum": 50000, "default": 2000, "description": "Number of off-chain PayWord + nsUSD transfers to batch (10..=50000, default 2000)" }
+                    }
+                }
             }
         ]
     })
@@ -2643,6 +2707,19 @@ pub fn handle_mcp_jsonrpc(
                         .and_then(|req| crate::p2p::compile_bonded_p2p_offer(&req, base_url))
                         .map(|offer| json!({ "ok": true, "persisted": false, "offer": offer }))
                 }
+                "newsatoshi_get_nsusd_state" => {
+                    let eng = crate::nsusd::NsUsdEngine::new();
+                    Ok(eng.summary_json(unix_now()))
+                }
+                "newsatoshi_simulate_nsusd_stress" => {
+                    let crash = args.get("crash_pct").and_then(|v| v.as_u64()).unwrap_or(50);
+                    Ok(crate::nsusd::run_adversarial_stress_suite(crash))
+                }
+                "newsatoshi_benchmark_l2_perfection_batch" => {
+                    let count = args.get("tx_count").and_then(|v| v.as_u64()).unwrap_or(2_000) as usize;
+                    let eng = crate::nsusd::NsUsdEngine::new();
+                    crate::l2_rollup::run_live_l2_batch_benchmark(count, seed_snapshot, eng.solvency_root())
+                }
                 other => Err(format!("unknown MCP tool '{other}'")),
             };
 
@@ -2748,6 +2825,6 @@ mod tests {
             &client,
             None,
         );
-        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 30);
+        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 33);
     }
 }

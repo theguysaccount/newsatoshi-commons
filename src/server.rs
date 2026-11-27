@@ -666,7 +666,7 @@ fn handle_request(req: Request, state: &AppState) {
 
     if method == Method::Head {
         let head_ct = match path.as_str() {
-            "/" | "/index.html" | "/whitepaper" | "/manifesto" | "/bounty" | "/nsusd" | "/docs" | "/developers" | "/about" | "/contact" | "/privacy" => {
+            "/" | "/index.html" | "/whitepaper" | "/manifesto" | "/bounty" | "/nsusd" | "/l2" | "/docs" | "/developers" | "/about" | "/contact" | "/privacy" => {
                 if wants_markdown(&req) {
                     Some("text/markdown; charset=utf-8")
                 } else {
@@ -684,7 +684,7 @@ fn handle_request(req: Request, state: &AppState) {
                 Some("text/plain; charset=utf-8")
             }
             "/sitemap.xml" => Some("application/xml; charset=utf-8"),
-            "/llms.txt" | "/llms-full.txt" | "/whitepaper.md" | "/whitepaper-v2.1.md" | "/manifesto.md" | "/bounty.md" | "/nsusd.md" | "/skills/newsatoshi-agent-payments/SKILL.md" => {
+            "/llms.txt" | "/llms-full.txt" | "/whitepaper.md" | "/whitepaper-v2.1.md" | "/manifesto.md" | "/bounty.md" | "/nsusd.md" | "/l2.md" | "/skills/newsatoshi-agent-payments/SKILL.md" => {
                 Some("text/markdown; charset=utf-8")
             }
             "/.well-known/api-catalog" => Some("application/linkset+json; charset=utf-8"),
@@ -705,6 +705,8 @@ fn handle_request(req: Request, state: &AppState) {
             | "/api/network/metrics"
             | "/api/backing/summary"
             | "/api/v2/nsusd/quote"
+            | "/api/v2/nsusd/state"
+            | "/api/v2/l2/status"
             | "/api/web4/charters"
             | "/api/web4/services"
             | "/api/web4/bounties"
@@ -803,6 +805,91 @@ fn handle_request(req: Request, state: &AppState) {
                 crate::agent::NSUSD_RFC_MARKDOWN.to_string(),
             );
         }
+        (Method::Get, "/l2.md") => {
+            respond_text(
+                req,
+                200,
+                "text/markdown; charset=utf-8",
+                crate::l2_rollup::render_l2_architecture_markdown().to_string(),
+            );
+        }
+        (Method::Get, "/api/v2/nsusd/state") => {
+            let now_unix = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            let eng = crate::nsusd::NsUsdEngine::new();
+            let seed = state.get_seed_snapshot(false);
+            let backing = state.get_backing_summary(false);
+            respond_json(
+                req,
+                200,
+                &json!({
+                    "ok": true,
+                    "honest_initial_state": true,
+                    "engine": eng.summary_json(now_unix),
+                    "live_mainnet_v2": {
+                        "height": seed.mainnet_status.as_ref().map(|s| s.height),
+                        "difficulty": seed.mainnet_status.as_ref().map(|s| s.difficulty),
+                        "tip": seed.mainnet_status.as_ref().map(|s| s.tip.clone()),
+                        "genesis": "00000000ba1cdad4aa8e82d6613b4df536394c41008fc3a0914a47a44604b9c8"
+                    },
+                    "live_backing_vault": {
+                        "vault_address": backing.canonical_vault_address,
+                        "total_eth": backing.total_eth_formatted,
+                        "total_usdc": backing.total_usdc_formatted,
+                        "deposits": backing.total_vault_deposits
+                    },
+                    "stress_test_endpoint": "POST /api/v2/nsusd/simulate-stress"
+                }),
+            );
+        }
+        (Method::Post, "/api/v2/nsusd/simulate-stress") => {
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let parsed: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+            let crash_pct = parsed.get("crash_pct").and_then(|v| v.as_u64()).unwrap_or(50);
+            let report = crate::nsusd::run_adversarial_stress_suite(crash_pct);
+            respond_json(req, 200, &report);
+        }
+        (Method::Get, "/api/v2/l2/status") => {
+            let seed = state.get_seed_snapshot(false);
+            let eng = crate::nsusd::NsUsdEngine::new();
+            respond_json(
+                req,
+                200,
+                &json!({
+                    "ok": true,
+                    "architecture": "Hourglass L2 Shielded Rollup & Perfection Layer",
+                    "version": env!("CARGO_PKG_VERSION"),
+                    "layers": [
+                        { "id": "L2A", "name": "O(1) SHA-256 PayWord Streaming", "max_ticks_per_channel": 1_000_000, "gas_per_call": 0 },
+                        { "id": "L2B", "name": "RFC-0028 Dual-Tier nsUSD Stablecoin", "sovereign_asset_id": 1, "bridged_asset_id": 2, "mcr_bps": 15_000, "liq_bps": 12_000 },
+                        { "id": "L2C", "name": "Shielded Merkle Batching + Winterfell 0.13 STARK Conservation", "proof_hash": "Winterfell 0.13 STARK (~22 KB) anchored via 32B SHA-256 L1 commitment" },
+                        { "id": "L2D", "name": "Unilateral L1 Escape Hatch", "sequencer_custody": false, "exit_proof": "SHA-256 Merkle inclusion -> native L1 SHA-256 HTLC / PriorLock" }
+                    ],
+                    "nsusd_solvency_root_hex": hex::encode(eng.solvency_root()),
+                    "live_mainnet_v2_anchor": {
+                        "height": seed.mainnet_status.as_ref().map(|s| s.height),
+                        "tip": seed.mainnet_status.as_ref().map(|s| s.tip.clone()),
+                        "difficulty": seed.mainnet_status.as_ref().map(|s| s.difficulty),
+                        "genesis": "00000000ba1cdad4aa8e82d6613b4df536394c41008fc3a0914a47a44604b9c8"
+                    },
+                    "benchmark_endpoint": "POST /api/v2/l2/benchmark",
+                    "docs_url": "https://commons.newsatoshi.org/l2"
+                }),
+            );
+        }
+        (Method::Post, "/api/v2/l2/benchmark") => {
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let parsed: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+            let tx_count = parsed.get("tx_count").and_then(|v| v.as_u64()).unwrap_or(2_000) as usize;
+            let seed = state.get_seed_snapshot(false);
+            let eng = crate::nsusd::NsUsdEngine::new();
+            match crate::l2_rollup::run_live_l2_batch_benchmark(tx_count, &seed, eng.solvency_root()) {
+                Ok(report) => respond_json(req, 200, &report),
+                Err(e) => respond_json(req, 500, &json!({ "ok": false, "error": e })),
+            }
+        }
         (Method::Get, "/api/v2/nsusd/quote") => {
             let usd = query_param(&raw_url, "usd")
                 .and_then(|v| v.parse::<f64>().ok())
@@ -834,14 +921,14 @@ fn handle_request(req: Request, state: &AppState) {
                     }
                 ],
                 "tier_2_sovereign_nsusd": {
-                    "status": "SPECIFIED_BIP9_READY",
+                    "status": "ENGINE_LIVE_SANDBOX_VERIFIED",
                     "primary_collateral": "BTC (>= 150% CR, 120% liquidation)",
                     "secondary_collateral": "Native Mainnet v2 LOVE (>= 250% CR after deep spot liquidity)",
                     "algorithmic_unbacked_mint": false,
                     "freeze_switch": false,
                     "oracle": "PriorLock (RFC-0021) bonded median oracle (50% challenger slash / 50% burn)",
                     "redemption_floor": "$1.00 direct collateral redemption",
-                    "l1_soft_fork_bit": "BIT_MULTI_ASSET_NOTES = 7 (zero Genesis restart)"
+                    "settlement_architecture": "Hourglass L2 Rollup + native SHA-256 HTLC / PriorLock (zero L1 consensus fork required)"
                 },
                 "live_mainnet_v2": {
                     "height": seed.mainnet_status.as_ref().map(|s| s.height),
@@ -874,7 +961,7 @@ fn handle_request(req: Request, state: &AppState) {
                 LEAN_FORMAL_PROOF.to_string(),
             );
         }
-        (Method::Get, "/whitepaper" | "/manifesto" | "/bounty" | "/nsusd" | "/docs" | "/developers" | "/about" | "/contact" | "/privacy") => {
+        (Method::Get, "/whitepaper" | "/manifesto" | "/bounty" | "/nsusd" | "/l2" | "/docs" | "/developers" | "/about" | "/contact" | "/privacy") => {
             let base_url = infer_base_url(&req);
             if let Some((ct, body)) = render_public_page(&path, &base_url, wants_markdown(&req)) {
                 let mut resp = Response::from_string(body)

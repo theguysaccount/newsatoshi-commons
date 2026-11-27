@@ -2038,7 +2038,67 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 30);
+    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 33);
+
+    // Live nsUSD Dual-Tier Engine + Adversarial Stress Test + L2 Perfection Layer STARK Benchmark
+    let nsusd_state: Value = serde_json::from_str(
+        &ureq::get(&format!("{base}/api/v2/nsusd/state"))
+            .call()
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(nsusd_state["ok"], true);
+    assert_eq!(nsusd_state["engine"]["sovereign_nsusd"]["active_vaults"], 0);
+    assert_eq!(nsusd_state["engine"]["sovereign_nsusd"]["total_debt_nsusd_micro"], 0);
+
+    let nsusd_stress: Value = serde_json::from_str(
+        &ureq::post(&format!("{base}/api/v2/nsusd/simulate-stress"))
+            .header("Content-Type", "application/json")
+            .send(r#"{"crash_pct":50}"#)
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(nsusd_stress["all_invariants_passed"], true);
+
+    let l2_status: Value = serde_json::from_str(
+        &ureq::get(&format!("{base}/api/v2/l2/status"))
+            .call()
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(l2_status["ok"], true);
+
+    let l2_bench: Value = serde_json::from_str(
+        &ureq::post(&format!("{base}/api/v2/l2/benchmark"))
+            .header("Content-Type", "application/json")
+            .send(r#"{"tx_count":500}"#)
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(l2_bench["ok"], true);
+    assert_eq!(l2_bench["conservation_exact"], true);
+    assert_eq!(l2_bench["winterfell_stark_batch_proof"]["verified"], true);
+    assert_eq!(l2_bench["unilateral_l1_escape_hatch"]["verified"], true);
+
+    let l2_md = ureq::get(&format!("{base}/l2.md"))
+        .call()
+        .unwrap()
+        .body_mut()
+        .read_to_string()
+        .unwrap();
+    assert!(l2_md.contains("Layer-2 Expansion & Perfection Layers"));
 
     let agent_card_v3: Value = serde_json::from_str(
         &ureq::get(&format!("{base}/.well-known/agent-card.json"))
@@ -2176,7 +2236,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 30);
+    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 33);
 
     // Honest v2 cutover readiness gate & Bonded P2P Desk smoke tests
     let cutover: Value = serde_json::from_str(
