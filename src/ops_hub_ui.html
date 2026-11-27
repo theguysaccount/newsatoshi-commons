@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow,noarchive">
-<title>Newsatoshi War Room · Success Tracker &amp; Narrative Push Hub</title>
+<title>Newsatoshi War Room · Operations &amp; Telemetry Hub</title>
 <style>
 :root{
   --bg:#06070a; --panel:#0d1016; --panel2:#121620; --border:#1f2533; --border2:#2c3548;
@@ -82,8 +82,8 @@ select:focus,input[type=text]:focus,textarea:focus{outline:none;border-color:var
     <div class="brand">
       <div class="pulse"></div>
       <div>
-        <h1>Newsatoshi Mainnet v2 · Internal War Room &amp; Narrative Hub</h1>
-        <div class="sub" id="hdr-sub">Syncing live telemetry from Mainnet v2, AuxPoW pool, 4-chain vault &amp; GitHub...</div>
+        <h1>Newsatoshi Mainnet v2 · Internal Ops &amp; Narrative Hub</h1>
+        <div class="sub" id="hdr-sub">Syncing live telemetry from Mainnet v2, AuxPoW pool, 4-chain vault &amp; private /data store...</div>
       </div>
     </div>
     <div class="hdr-actions">
@@ -95,31 +95,28 @@ select:focus,input[type=text]:focus,textarea:focus{outline:none;border-color:var
     </div>
   </header>
 
-  <!-- 1. LIVE KPI STRIP -->
   <section class="grid-kpi" id="kpi-grid"></section>
 
-  <!-- 2. VISUAL PROGRESSION CHARTS -->
   <section class="row2">
     <div class="card">
       <div class="card-h">
         <h2>Mainnet v2 Block Height &amp; Difficulty Progression</h2>
-        <span class="pill em" id="chart1-meta">Live On-Chain</span>
+        <span class="pill em">Live On-Chain</span>
       </div>
       <div class="chart-box" id="chart-chain"></div>
     </div>
     <div class="card">
       <div class="card-h">
-        <h2>Developer Pull (14d GitHub Clones) &amp; Shielded Usage</h2>
-        <span class="pill sk" id="chart2-meta">Live GitHub + L1</span>
+        <h2>Developer Pull (14d Clones) &amp; Shielded Usage</h2>
+        <span class="pill sk">Live GitHub + L1</span>
       </div>
       <div class="chart-box" id="chart-dev"></div>
     </div>
   </section>
 
-  <!-- 3. INTERACTIVE OUTREACH & WORLD-PUSH CRM -->
   <section class="card">
     <div class="card-h">
-      <h2>World-Push &amp; App Outreach Pipeline (Persistent Live CRM)</h2>
+      <h2>Outreach &amp; Distribution CRM (Private /data Volume)</h2>
       <div class="tabs" id="cat-tabs" style="margin:0"></div>
     </div>
     <div class="funnel" id="outreach-funnel"></div>
@@ -132,76 +129,55 @@ select:focus,input[type=text]:focus,textarea:focus{outline:none;border-color:var
       </table>
     </div>
     <form class="add-form" id="add-outreach-form">
-      <input type="text" id="new-cat" placeholder="Category (e.g. AI Agent Apps)" required>
-      <input type="text" id="new-target" placeholder="Target name (e.g. Venice.ai)" required>
-      <input type="text" id="new-angle" placeholder="Pitch angle (e.g. nsUSD + PayWords)" required>
-      <input type="text" id="new-chan" placeholder="Channel (X / Email / PR)" required>
+      <input type="text" id="new-cat" placeholder="Category" required>
+      <input type="text" id="new-target" placeholder="Target name" required>
+      <input type="text" id="new-angle" placeholder="Pitch angle" required>
+      <input type="text" id="new-chan" placeholder="Channel" required>
       <button class="btn primary" type="submit">+ Add Target</button>
     </form>
   </section>
 
-  <!-- 4. CROSS-MODEL AI SOTA SCORECARD -->
   <section class="row2">
     <div class="card">
       <div class="card-h">
-        <h2>Frontier AI Cross-Model SOTA Verdict Matrix</h2>
+        <h2>External AI Evaluation Matrix</h2>
         <button class="btn sm" id="btn-copy-ai-prompt">Copy Re-Test Prompt</button>
       </div>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Model</th><th>Before Fix (Docs)</th><th>Code-Verified Audit</th><th>After Fix (Hardened Docs)</th></tr></thead>
-          <tbody>
-            <tr>
-              <td><b>OpenAI Codex</b><br><span class="sub">gpt-6.2-astra</span></td>
-              <td><span class="pill rd">REFUTE_NOT_SOTA</span><br><span class="sub">Missing Lean theorem statements &amp; peer table</span></td>
-              <td><span class="pill am">PARTIAL_SOTA</span><br><span class="sub">Ran live <code>ivc-prove</code> (671 KB, 114 ms); "credible frontier design"</span></td>
-              <td><span class="pill em">FLIPPED → PARTIAL_SOTA</span><br><span class="sub">"Credible frontier claim for mandatory private SHA-2 payments"</span></td>
-            </tr>
-            <tr>
-              <td><b>Anthropic Claude</b><br><span class="sub">claude-fable-5-2</span></td>
-              <td><span class="pill am">PARTIAL_SOTA</span><br><span class="sub">Flagged v1.2.1/v1.2.0 drift &amp; 1-query recursion</span></td>
-              <td><span class="pill am">PARTIAL_SOTA</span><br><span class="sub">Verified spend.rs, masking, BatchSpend, ML-KEM, Lean 4</span></td>
-              <td><span class="pill em">PARTIAL_SOTA (0 Drift)</span><br><span class="sub">"Unusually honest docs... opposite of vaporware"</span></td>
-            </tr>
-          </tbody>
+          <thead><tr><th>Model</th><th>Round 1 (Docs)</th><th>Code Audit</th><th>After Fix</th></tr></thead>
+          <tbody id="ai-matrix-body"></tbody>
         </table>
       </div>
     </div>
     <div class="card">
       <div class="card-h">
-        <h2>3 Engineering Milestones → Unanimous AI SOTA Consensus</h2>
+        <h2>Engineering Milestones</h2>
         <span class="pill vi">Roadmap Gate</span>
       </div>
       <div id="milestones-list"></div>
     </div>
   </section>
 
-  <!-- 5. 1-CLICK NARRATIVE & LAUNCH COPY VAULT -->
   <section class="card" style="margin-top:20px">
     <div class="card-h">
-      <h2>1-Click Narrative &amp; Launch Copy Vault (Zero Community-Note Risk)</h2>
-      <div class="tabs" id="vault-tabs" style="margin:0">
-        <button class="tab on" data-vtab="x">X Bull Threads (5)</button>
-        <button class="tab" data-vtab="btc">Underground Bitcoin Drops (5)</button>
-        <button class="tab" data-vtab="apps">AI Apps, MCP &amp; Pool Pitches</button>
-        <button class="tab" data-vtab="links">Short Liners &amp; Mining Commands</button>
-      </div>
+      <h2>1-Click Private Copy Vault (Loaded Strictly from Private /data Volume)</h2>
+      <div class="tabs" id="vault-tabs" style="margin:0"></div>
     </div>
     <div class="copy-grid" id="vault-grid"></div>
   </section>
 
-  <!-- 6. FOUNDER NARRATIVE LOG + RECORDED SNAPSHOT LEDGER -->
   <section class="row2">
     <div class="card">
       <div class="card-h">
-        <h2>Founder Daily Narrative &amp; Push Log (Persisted on /data)</h2>
+        <h2>Founder Daily Narrative &amp; Push Log</h2>
         <button class="btn primary sm" id="btn-save-notes">Save Log</button>
       </div>
-      <textarea id="narrative-notes" rows="9" style="width:100%;font-family:var(--mono);line-height:1.55" placeholder="Log today's pushes, DMs, Bitcointalk links, Bitaxe workers onboarded, or next narrative moves..."></textarea>
+      <textarea id="narrative-notes" rows="9" style="width:100%;font-family:var(--mono);line-height:1.55" placeholder="Log pushes, outreach replies, miners onboarded, or next moves..."></textarea>
     </div>
     <div class="card">
       <div class="card-h">
-        <h2>Recorded Real Telemetry Snapshots (Append-Only)</h2>
+        <h2>Recorded Telemetry Snapshots (Append-Only)</h2>
         <span class="sub" id="snap-count">0 snapshots</span>
       </div>
       <div class="tbl-wrap" style="max-height:240px;overflow:auto">
@@ -216,287 +192,9 @@ select:focus,input[type=text]:focus,textarea:focus{outline:none;border-color:var
 <div class="toast" id="toast"></div>
 
 <script>
-const COPY_VAULT = {
-  x: [
-    {
-      title: "Thread 1 — Viral Hook (Riemann Hypothesis / Lean 4 / Next Bitcoin)",
-      tag: "X Thread · 7 Tweets",
-      body: `1/ Everyone's waiting for the day AI solves the Riemann Hypothesis.
-
-Meanwhile, someone quietly used Lean 4 formal verification + AI-accelerated engineering to build a private, post-quantum, Bitcoin-merge-mined currency — and fair-launched Mainnet with 0 premine.
-
-Here's why the "Next Bitcoin" bull case might actually be real (and what's still early) 🧵👇
-
-2/ Look at every monetary rail today:
-• Banks / Stripe: AI agents can't open checking accounts or pay $0.0001 per API call.
-• USDC: Corporate freeze switch + every competitor spies on your suppliers and margins on-chain.
-• Bitcoin: Unfreezable, backed by real energy — but 100% transparent and reliant on elliptic curves (secp256k1) that future quantum computers break.
-
-3/ Newsatoshi (LOVE) makes the most conservative cryptographic bet in crypto:
-Zero elliptic curves. Zero pairings. Zero trusted setup. Zero experimental algebraic ZK-hashes (Poseidon/Tip5).
-Every coin, nullifier, and mandatory shielded payment rests strictly on FIPS SHA-2 (SHA-256 / SHA-384) STARKs and NIST FIPS 205 SLH-DSA.
-
-4/ This isn't slideware. Verify in 60 seconds:
-• Live Browser WASM Verifier on https://newsatoshi.org/ (~25 ms, real MAIN_V2 SHA-384 proof)
-• Lean 4.36.0 (0 sorry): extracts all 249 live Rust spend constraints (2,950 monomials) and checks them against an independent FIPS 180-4 SHA-256 spec
-• Bitcoin AuxPoW merge-mining (chainid 20051, 0% fee Bitaxe pool at pool.newsatoshi.org:3333)
-
-5/ Native LOVE is hard, fair-mined base money (0 premine, BTC Block #977,738, 50% fee burn).
-Above L1, newsatoshi-commons ships 30 zero-auth MCP tools, <1 ms zero-gas O(1) SHA-256 PayWords, BTC/Lightning/EVM atomic swaps, and RFC-0028 nsUSD — USD-denominated private settlement so AI agents don't eat early volatility.
-
-6/ Honest early caveats:
-• Pure SHA-2 proofs are big (~603 KB single / ~49-93 KB batched) vs curve-based Zcash or Tip5 Neptune — traded deliberately for 25-year SHA-2 conservatism until pure-hash WHIR/Binius soft-forks in.
-• Brand-new Mainnet: external human audits & big Bitcoin pools are still ahead — backed today by a public LOVE Bug Bounty (newsatoshi.org/bounty/).
-
-7/ Don't trust — paste the repo into your favorite AI, read the 8-page PDF, or mine on a Bitaxe:
-• 8-page PDF: https://newsatoshi.org/newsatoshi-v2.2.pdf
-• Live WASM Verifier: https://newsatoshi.org/
-• Code & Lean 4 (MIT): https://github.com/theguysaccount/newsatoshi-rfc0021`
-    },
-    {
-      title: "Thread 2 — Layman Investor / Agentic Economy Thesis",
-      tag: "X Long-Form Post",
-      body: `Ask yourself one question about the next 10 years:
-What money will 10 billion autonomous AI agents use?
-
-• They can't pass KYC or open Chase accounts.
-• If they use USDC, one compliance memo freezes an entire autonomous supply chain — and every rival scrapes your supplier graph and margins live on BaseScan.
-• If they use Bitcoin L1, it's public, slow for $0.0002 API calls, and relies on quantum-vulnerable elliptic curves.
-
-That's why I'm watching Newsatoshi (LOVE):
-1. Mandatory shielded privacy using pure FIPS SHA-2/SHA-384 STARKs (zero trusted setup, zero elliptic curves).
-2. Merge-mined directly by Bitcoin's SHA-256 ASICs (AuxPoW chainid 20051) — 0 LOVE premine, zero VC cap table, anchored to Bitcoin Block #977,738.
-3. 249 live Rust spend constraints extracted & checked in Lean 4 (0 sorry) + independent zero-Rust JS verifier + public LOVE Bug Bounty.
-4. Machine-speed L2 rails live today: 30 zero-auth MCP tools, <1 ms zero-gas O(1) PayWords, and USD-denominated JIT pricing (RFC-0028 nsUSD) so agents don't take early coin volatility.
-
-Read the 8-page whitepaper yourself: https://newsatoshi.org/newsatoshi-v2.2.pdf`
-    },
-    {
-      title: "Thread 3 — Cypherpunk / Bitcoin Purist Contrarian Post",
-      tag: "X Short Post",
-      body: `Unpopular take on privacy coins:
-• Zcash chose elliptic curves (quantum-vulnerable).
-• Monero chose Ed25519 ring signatures (quantum-vulnerable).
-• Newer STARK chains chose novel algebraic hashes (Tip5/Poseidon) that haven't survived 25 years of cryptanalysis.
-
-Newsatoshi (LOVE) just fair-launched Mainnet v2 (0 premine, BTC Block #977,738) doing the purist thing:
-• Mandatory shielded privacy using ONLY FIPS SHA-2 (SHA-256/SHA-384) STARKs + SLH-DSA
-• All 249 Rust AIR constraints extracted into Lean 4 (0 sorry)
-• Merge-mined by Bitcoin ASICs (0%-fee Bitaxe pool: pool.newsatoshi.org:3333)
-• Break the math -> claim mined LOVE (newsatoshi.org/bounty/)
-
-Verify a real proof in your browser WASM: https://newsatoshi.org/`
-    },
-    {
-      title: "Thread 4 — The 'Ask Your Own AI' Viral Challenge",
-      tag: "X Engagement Hook",
-      body: `Fun test — don't listen to any crypto account (including me).
-
-Drop these two links into Claude, ChatGPT, or Gemini and ask:
-"Audit Newsatoshi's architecture ruthlessly. Is this real cryptographic frontier engineering or vaporware?"
-
-• 8-Page Whitepaper PDF: https://newsatoshi.org/newsatoshi-v2.2.pdf
-• MIT Rust + Lean 4 Repo: https://github.com/theguysaccount/newsatoshi-rfc0021
-
-It publishes its exact Quartic SHA-384 soundness bounds, lets you diff all 249 live Rust spend constraints against Lean 4, verifies a live proof in browser WASM, and puts a coin-denominated bug bounty on the front page.
-
-Post your AI's verdict below 👇`
-    },
-    {
-      title: "Thread 5 — High-Traffic Reply Bangers (BTC / x402 / Bitaxe)",
-      tag: "Quick Replies",
-      body: `[Quantum / BTC Reply]
-You don't need new unproven math for post-quantum privacy on Bitcoin hashpower. Newsatoshi Mainnet v2 shields every balance with pure FIPS SHA-2/SHA-384 STARKs, checks all 249 Rust constraints in Lean 4, and merge-mines directly with Bitcoin ASICs (0 premine): https://newsatoshi.org/newsatoshi-v2.2.pdf
-
-[x402 / AI Agent Reply]
-USDC on public L2s broadcasts every agent's suppliers and margins to competitors AND carries a corporate freeze switch. Newsatoshi pairs zero-gas O(1) SHA-256 PayWords + USD-quoted JIT settlement (nsUSD) with pure SHA-2 shielded privacy + 30 zero-auth MCP tools: https://commons.newsatoshi.org/nsusd
-
-[Bitaxe / Home Mining Reply]
-0% premine, 0% pool fee, brand-new Bitcoin-merge-mined Mainnet v2 (LOVE, pure SHA-2 post-quantum privacy) is live at early difficulty — point a Bitaxe at pool.newsatoshi.org:3333 with any shielded ns1 address from https://newsatoshi.org/wallet/.`
-    }
-  ],
-  btc: [
-    {
-      title: "Bitcointalk [ANN] — Exact BBCode Drop",
-      tag: "Bitcointalk Altcoins",
-      body: `[ANN] NEWSATOSHI (LOVE) — Pure SHA-2/SHA-384 STARK Shielded Cash · Bitcoin AuxPoW · 0% Premine · Lean 4
-
-[center][size=18pt][b]NEWSATOSHI (LOVE) — Mainnet v2 (nsM2 · v1.2.1)[/b][/size]
-[b]Private, Post-Quantum Electronic Cash · Pure FIPS SHA-2/SHA-384 STARKs · Bitcoin Merge-Mined (AuxPoW)[/b]
-Zero Premine · Zero ICO · Zero Founder Tax · Zero Elliptic Curves · MIT License[/center]
-
-[b]Whitepaper (8-page PDF):[/b] https://newsatoshi.org/newsatoshi-v2.2.pdf
-[b]Live Browser STARK Verifier:[/b] https://newsatoshi.org/
-[b]Source Code & Lean 4 Proofs:[/b] https://github.com/theguysaccount/newsatoshi-rfc0021
-[b]Public Security Bug Bounty (in mined LOVE):[/b] https://newsatoshi.org/bounty/
-
-[code]
-Network:        mainnet-v2 (nsM2, v1.2.1)
-Genesis Hash:   00000000ba1cdad4aa8e82d6613b4df536394c41008fc3a0914a47a44604b9c8
-Bitcoin Anchor: Block #977,738 (0000000000000000000163900064a4cc4807dbd8bcaf35e322e694e6c387a780)
-AuxPoW ChainID: 20051 (0x4e53, Namecoin-compatible SHA-256d)
-Premine:        0 LOVE (50 LOVE/block -> 0.1953125 LOVE tail floor + 50% fee burn)
-Pool (0% fee):  stratum+tcp://pool.newsatoshi.org:3333  (worker: <YOUR_ns1_ADDR>.rig1)
-[/code]`
-    },
-    {
-      title: "Delving Bitcoin / Cryptography Mailing List Technical Note",
-      tag: "Pure Engineering",
-      body: `Title: Newsatoshi v2.2: Mandatory Shielded Cash via Pure FIPS SHA-2/SHA-384 Quartic FRI STARKs, Lean 4 AIR Extraction & Bitcoin AuxPoW
-
-Sharing a new 8-page technical paper and MIT Rust reference node exploring extreme cryptographic conservatism in private PoW design: all coin security and consensus proofs rest strictly on FIPS 180-4 SHA-2 (SHA-256/SHA-384) and FIPS 205 SLH-DSA (zero elliptic curves, zero pairings, zero novel algebraic ZK-hashes; FIPS 203 ML-KEM-768 used strictly for P2P transport encryption).
-
-• 8-page PDF: https://newsatoshi.org/newsatoshi-v2.2.pdf
-• Source & Lean 4: https://github.com/theguysaccount/newsatoshi-rfc0021
-• Live WASM verifier: https://newsatoshi.org/
-• Public Security Bug Bounty (mined LOVE): https://newsatoshi.org/bounty/
-
-Key technical points for critique:
-1. Quartic Goldilocks (F_{p^4}) + SHA-384 Winterfell STARKs (192b classical LDR / 100-104b conservative CMS19 QROM) with Haböck-Al Kindi masked quotient segments.
-2. Symbolic Rust-to-Lean-4 extraction of all 249 spend transition polynomials (SpendCircuitFull.lean, 0 sorry) + 10 conservation theorems (SpendBalance.lean).
-3. Vertical BatchSpend (K=2..=16, ~93 KB/spend at K=8) with Fiat-Shamir-bound prover_fee.
-4. Bitcoin AuxPoW (chainid=20051), FlyClient MMR, 1 KB Utreexo, and native SHA-256 HTLCs.`
-    },
-    {
-      title: "Nostr & Stacker News (~tech / ~bitcoin) Drop",
-      tag: "Nostr / SN",
-      body: `Just published the 8-page Satoshi-format whitepaper and live Mainnet v2 (anchored to Bitcoin Block #977,738, 0 premine) for Newsatoshi (LOVE):
-
-• Mandatory shielded privacy using 100% FIPS SHA-2/SHA-384 STARKs + SLH-DSA (zero curves, zero trusted setup, zero novel ZK-hashes)
-• All 249 live Rust spend constraints extracted & checked in Lean 4 (0 sorry)
-• Merge-mined directly by Bitcoin ASICs / Bitaxe (0% fee pool: stratum+tcp://pool.newsatoshi.org:3333)
-• Native SHA-256 atomic swaps with BTC/Lightning + O(1) PayWords + nsUSD spec (RFC-0028)
-• Public Security Bug Bounty paid in mined LOVE: https://newsatoshi.org/bounty/
-
-Verify a live proof in your browser WASM at https://newsatoshi.org/ or read the PDF: https://newsatoshi.org/newsatoshi-v2.2.pdf
-
-#bitcoin #cypherpunk #bitaxe #privacy #postquantum #stark`
-    },
-    {
-      title: "OSMU / Bitaxe Home-Miner Post (Discord / r/Bitaxe)",
-      tag: "Bitaxe / Miners",
-      body: `Anyone running a Bitaxe or home SHA-256 ASIC who wants to mine a brand-new fair-launch Bitcoin-merge-mined chain (0% premine, 0% pool fee, pure SHA-2 post-quantum privacy):
-
-Mainnet v2 (anchored to BTC Block #977,738) is live right now with 50 LOVE/block direct solo coinbase payouts.
-
-30-second Bitaxe config:
-1. Generate a shielded Mainnet v2 ns1 address at https://newsatoshi.org/wallet/ (zero install)
-2. Point your Bitaxe at:
-   • Stratum URL: pool.newsatoshi.org
-   • Port: 3333
-   • Stratum User: <your_ns1_address>.bitaxe1
-   • Password: x
-
-Live pool stats: https://pool.newsatoshi.org/status
-8-page PDF: https://newsatoshi.org/newsatoshi-v2.2.pdf`
-    },
-    {
-      title: "Hacker News (Show HN) Title + Top Author Comment",
-      tag: "Show HN / Lobsters",
-      body: `Title: Show HN: Newsatoshi – Private, post-quantum cash using pure SHA-2 STARKs, checked in Lean 4
-URL: https://newsatoshi.org/newsatoshi-v2.2.pdf
-
-Top comment:
-Hi HN — we just launched Mainnet v2 (0 premine, anchored to Bitcoin Block #977,738) and published the 8-page whitepaper for Newsatoshi (LOVE).
-
-Instead of trusting elliptic curves or new algebraic hashes (Poseidon/Tip5), every shielded payment is proved strictly using FIPS SHA-2/SHA-384 inside a Quartic Goldilocks Winterfell STARK (192b classical LDR / 100-104b conservative QROM) and signed with FIPS 205 SLH-DSA.
-
-Checkable live artifacts:
-1. In-browser WASM verifier (~25 ms): https://newsatoshi.org/
-2. Symbolic Rust-to-Lean-4 extraction of all 249 spend constraints (0 sorry, 0 Mathlib): https://github.com/theguysaccount/newsatoshi-rfc0021/blob/main/node/proof/SpendCircuitFull.lean
-3. Zero-Rust independent Node/OpenSSL verifier (`verifier-ts/newsatoshi_verifier.mjs`)
-4. Open LOVE Security Bug Bounty: https://newsatoshi.org/bounty/
-
-Honest trade-offs: single spend proofs are ~603 KB (~49-93 KB batched) vs ~5 KB Zcash / ~30 KB Neptune, and recursion.rs is an early 1-query R&D gadget (live light clients use FlyClient MMR). Happy to dig into the Winterfell f64 patches or Haböck-Al Kindi masking.`
-    }
-  ],
-  apps: [
-    {
-      title: "Awesome-MCP-Servers / Official MCP PR Entry",
-      tag: "GitHub PR",
-      body: `- **[Newsatoshi Commons](https://github.com/theguysaccount/newsatoshi-commons)** — 30 zero-auth MCP tools (\`https://commons.newsatoshi.org/mcp\` or \`npx -y github:theguysaccount/newsatoshi-commons\`) for private post-quantum agent payments (\`LOVE\` + \`nsUSD\` USD-quoted O(1) SHA-256 PayWords HTTP 402), trustless Bitcoin/Lightning/Solana/EVM SHA-256 atomic swaps, and live cryptographic verification.`
-    },
-    {
-      title: "Direct Pitch to AI Agent / Inference / x402 Builders (Venice, NanoGPT, OpenClaw)",
-      tag: "Direct Email / DM",
-      body: `Subject: Private, unfreezable USD micro-payments (nsUSD + O(1) PayWords) for autonomous agents
-
-Hey [Name],
-
-We just shipped Mainnet v2 of Newsatoshi (LOVE) + RFC-0028 (nsUSD) specifically to fix the two issues teams hit with USDC/x402 for autonomous AI agents:
-1. Public ledgers expose every agent's API spend, suppliers, and margins to competitors in real time.
-2. Corporate stablecoins carry a central freeze switch and per-call L2 gas overhead.
-
-Live today at https://commons.newsatoshi.org:
-• USD-denominated O(1) SHA-256 PayWords (0.013 ms/call, zero per-call gas, zero LOVE price volatility via JIT atomic settlement): GET https://commons.newsatoshi.org/api/v2/nsusd/quote?usd=0.005
-• 30 zero-auth MCP tools (https://commons.newsatoshi.org/mcp) + zero-dep JS/Python HTTP 402 SDKs
-• Private, post-quantum L1 settlement (FIPS SHA-2 STARKs, Bitcoin merge-mined, 0 premine): https://newsatoshi.org/newsatoshi-v2.2.pdf
-
-Happy to wire up a 10-line integration PR for [Project] if private pay-per-token billing is on your roadmap.`
-    },
-    {
-      title: "Direct Pitch to Bitcoin Mining Pools (OCEAN / Braiins / CKPool)",
-      tag: "AuxPoW Onboarding",
-      body: `Subject: Zero-extra-electricity AuxPoW merge-mining revenue (Newsatoshi Mainnet v2, chainid=20051)
-
-Hi [Pool Team],
-
-Newsatoshi Mainnet v2 (nsM2, v1.2.1) just fair-launched (0 premine, anchored to BTC Block #977,738) using standard Namecoin-compatible SHA-256d AuxPoW (chainid = 20051 / 0x4e53).
-
-Your miners can earn 50 LOVE/block on the exact SHA-256 hashes they already compute with zero extra electricity and zero changes to Bitcoin block templates.
-
-Drop-in Docker / Stratum AuxPoW kit & RPC guide:
-https://github.com/theguysaccount/newsatoshi-commons/tree/main/auxpow-stratum
-8-page whitepaper PDF: https://newsatoshi.org/newsatoshi-v2.2.pdf
-
-Happy to assist with testnet/mainnet integration if you'd like to test AuxPoW templates.`
-    }
-  ],
-  links: [
-    {
-      title: "The Short Liners (Bio · Layman · Investor)",
-      tag: "Positioning",
-      body: `[Ultra-Short Bio]
-Private, quantum-proof Bitcoin — shielded purely by FIPS SHA-2 STARKs, checked in Lean 4, and merge-mined directly by Bitcoin hardware.
-
-[Layman Quick]
-Imagine cash that nobody can freeze, nobody can spy on, not even a future quantum computer can crack, and that borrows its security straight from Bitcoin's global mining network — paired with private USD settlement (nsUSD) so everyday people and AI agents can use it without volatility.
-
-[Layman Investor / Agentic Economy]
-AI agents can't open bank accounts, corporate stablecoins like USDC can be frozen and let competitors spy on your margins, and Bitcoin isn't private, quantum-proof, or built for penny-fraction machine payments — Newsatoshi (LOVE + nsUSD) is the ownerless, private, quantum-proof cash secured by Bitcoin's miners that lets autonomous AI agents settle at machine speed without a corporate kill switch.`
-    },
-    {
-      title: "Mining, Bounty Wallet & Canonical Live Links",
-      tag: "Operations",
-      body: `0%-Fee AuxPoW Solo Pool: stratum+tcp://pool.newsatoshi.org:3333
-Public Bug Bounty Address (Mainnet v2):
-ns1af734b0e0b0c1c6a54e206ba7a23f586daee77ede5e7c51b6ec6b133c51f572a99d8cb66
-
-Bounty Pool Worker:
-ns1af734b0e0b0c1c6a54e206ba7a23f586daee77ede5e7c51b6ec6b133c51f572a99d8cb66.bounty
-
-Canonical URLs:
-• Homepage & WASM Verifier: https://newsatoshi.org/
-• 8-Page Satoshi PDF:       https://newsatoshi.org/newsatoshi-v2.2.pdf
-• Bug Bounty Page:          https://newsatoshi.org/bounty/
-• nsUSD Spec & Quote API:   https://commons.newsatoshi.org/nsusd
-• L2 Commons & 30 MCP:      https://commons.newsatoshi.org/
-• L1 GitHub Repo:           https://github.com/theguysaccount/newsatoshi-rfc0021
-• L2 GitHub Repo:           https://github.com/theguysaccount/newsatoshi-commons`
-    }
-  ]
-};
-
-const EXTERNAL_AI_TEST_PROMPT = `Audit Newsatoshi Mainnet v2 (LOVE) ruthlessly using ONLY its live public docs:
-- https://newsatoshi.org/llms.txt
-- https://github.com/theguysaccount/newsatoshi-rfc0021/blob/main/README.md
-- https://newsatoshi.org/newsatoshi-v2.2.pdf
-
-Is this genuinely frontier post-quantum shielded cash architecture or hype/vaporware? List verified strengths, honest trade-offs, and any remaining gaps.`;
-
 let STATE = null;
 let activeCat = 'All';
-let activeVtab = 'x';
+let activeVtab = null;
 
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -558,22 +256,18 @@ function renderSvgChart(elId, seriesA, seriesB, labelA, labelB, colorA, colorB) 
   const xAt = i => n === 1 ? padL + (W - padL - padR) / 2 : padL + (i / (n - 1)) * (W - padL - padR);
   const yA = v => H - padB - (v / maxA) * (H - padT - padB);
   const yB = v => H - padB - (v / maxB) * (H - padT - padB);
-
   const ptsA = seriesA.map((p, i) => `${xAt(i).toFixed(1)},${yA(p.v).toFixed(1)}`).join(' ');
   const ptsB = seriesB.map((p, i) => `${xAt(i).toFixed(1)},${yB(p.v).toFixed(1)}`).join(' ');
   const areaA = `${padL},${H - padB} ${ptsA} ${xAt(n - 1).toFixed(1)},${H - padB}`;
-
   const gridLines = [0, 0.5, 1].map(f => {
     const y = (H - padB - f * (H - padT - padB)).toFixed(1);
     const val = Math.round(maxA * f);
     return `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="#1a202e" stroke-dasharray="3,3"/>
             <text x="${padL - 6}" y="${Number(y) + 3}" fill="#64748b" font-size="9" text-anchor="end" font-family="monospace">${val}</text>`;
   }).join('');
-
   const xTicks = [0, Math.floor((n - 1) / 2), n - 1].filter((v, i, a) => a.indexOf(v) === i).map(i =>
     `<text x="${xAt(i).toFixed(1)}" y="${H - 6}" fill="#64748b" font-size="9" text-anchor="middle" font-family="monospace">${esc(seriesA[i].t)}</text>`
   ).join('');
-
   el.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
     ${gridLines}
     <polygon points="${areaA}" fill="${colorA}" fill-opacity="0.10"/>
@@ -610,15 +304,15 @@ function renderOutreach(list) {
     const c = list.filter(x => x.status === st).length;
     return `<div class="fbox"><div class="n" style="color:${colors[st]}">${c}</div><div class="l">${st}</div></div>`;
   }).join('');
-
   const cats = ['All', ...Array.from(new Set(list.map(x => x.category)))];
   document.getElementById('cat-tabs').innerHTML = cats.map(c =>
     `<button class="tab ${activeCat === c ? 'on' : ''}" data-cat="${esc(c)}">${esc(c)}</button>`
   ).join('');
   document.querySelectorAll('#cat-tabs .tab').forEach(b => b.onclick = () => { activeCat = b.dataset.cat; renderOutreach(STATE.outreach); });
-
   const filtered = activeCat === 'All' ? list : list.filter(x => x.category === activeCat);
-  document.getElementById('outreach-body').innerHTML = filtered.map(item => `
+  document.getElementById('outreach-body').innerHTML = filtered.length === 0
+    ? '<tr><td colspan="6" class="sub" style="padding:18px;text-align:center">No targets seeded yet — add one below or run private bootstrap sync.</td></tr>'
+    : filtered.map(item => `
     <tr>
       <td><code>${esc(item.id)}</code></td>
       <td><span class="pill sk">${esc(item.category)}</span></td>
@@ -637,7 +331,6 @@ function renderOutreach(list) {
         </div>
       </td>
     </tr>`).join('');
-
   document.querySelectorAll('.st-sel').forEach(sel => sel.onchange = () => saveOutreachRow(sel.dataset.id));
   document.querySelectorAll('.save-row').forEach(btn => btn.onclick = () => saveOutreachRow(btn.dataset.id));
   document.querySelectorAll('.del-row').forEach(btn => btn.onclick = async () => {
@@ -656,16 +349,31 @@ async function saveOutreachRow(id) {
   const updated = { ...orig, status: sel ? sel.value : orig.status, notes: inp ? inp.value : orig.notes };
   const r = await fetch('/api/ops/outreach', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(updated) });
   const d = await r.json();
-  if (d.ok) {
-    STATE.outreach = d.outreach;
-    renderOutreach(STATE.outreach);
-    renderKpis(STATE.live, STATE.snapshots);
-    showToast(`Saved ${id} → ${updated.status}`);
+  if (d.ok) { STATE.outreach = d.outreach; renderOutreach(STATE.outreach); renderKpis(STATE.live, STATE.snapshots); showToast(`Saved ${id} → ${updated.status}`); }
+}
+
+function renderAiMatrix(rows) {
+  const el = document.getElementById('ai-matrix-body');
+  if (!Array.isArray(rows) || rows.length === 0) {
+    el.innerHTML = '<tr><td colspan="4" class="sub" style="padding:16px;text-align:center">Sync private bootstrap data to populate AI evaluation matrix.</td></tr>';
+    return;
   }
+  el.innerHTML = rows.map(r => `
+    <tr>
+      <td><b>${esc(r.model)}</b><br><span class="sub">${esc(r.engine || '')}</span></td>
+      <td><span class="pill ${esc(r.r1_cls || 'am')}">${esc(r.r1_verdict)}</span><br><span class="sub">${esc(r.r1_note)}</span></td>
+      <td><span class="pill ${esc(r.code_cls || 'am')}">${esc(r.code_verdict)}</span><br><span class="sub">${esc(r.code_note)}</span></td>
+      <td><span class="pill ${esc(r.r3_cls || 'em')}">${esc(r.r3_verdict)}</span><br><span class="sub">${esc(r.r3_note)}</span></td>
+    </tr>`).join('');
 }
 
 function renderMilestones(list) {
-  document.getElementById('milestones-list').innerHTML = list.map(m => `
+  const el = document.getElementById('milestones-list');
+  if (!list || list.length === 0) {
+    el.innerHTML = '<div class="sub" style="padding:16px">No milestones bootstrapped yet.</div>';
+    return;
+  }
+  el.innerHTML = list.map(m => `
     <div class="ms-item">
       <div>
         <div style="font-weight:700;font-size:13px">${esc(m.title)}</div>
@@ -682,20 +390,32 @@ function renderMilestones(list) {
   });
 }
 
-function renderVault() {
-  const items = COPY_VAULT[activeVtab] || [];
-  document.getElementById('vault-grid').innerHTML = items.map((c, idx) => `
+function renderVault(cv) {
+  const tabsEl = document.getElementById('vault-tabs');
+  const gridEl = document.getElementById('vault-grid');
+  const sections = (cv && Array.isArray(cv.sections)) ? cv.sections : [];
+  if (sections.length === 0) {
+    tabsEl.innerHTML = '';
+    gridEl.innerHTML = '<div class="sub" style="padding:18px">Private Copy Vault lives strictly on /data (zero GTM copy in public git). Run private bootstrap sync to populate.</div>';
+    return;
+  }
+  if (!activeVtab || !sections.find(s => s.id === activeVtab)) activeVtab = sections[0].id;
+  tabsEl.innerHTML = sections.map(s => `<button class="tab ${activeVtab === s.id ? 'on' : ''}" data-vtab="${esc(s.id)}">${esc(s.label)}</button>`).join('');
+  tabsEl.querySelectorAll('.tab').forEach(b => b.onclick = () => { activeVtab = b.dataset.vtab; renderVault(STATE.copy_vault); });
+  const sec = sections.find(s => s.id === activeVtab);
+  const items = sec ? (sec.items || []) : [];
+  gridEl.innerHTML = items.map((c, idx) => `
     <div class="copy-card">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
         <b style="font-size:13px">${esc(c.title)}</b>
         <div style="display:flex;gap:6px;align-items:center">
-          <span class="pill em">${esc(c.tag)}</span>
+          <span class="pill em">${esc(c.tag || '')}</span>
           <button class="btn primary sm copy-v" data-i="${idx}">Copy</button>
         </div>
       </div>
       <pre>${esc(c.body)}</pre>
     </div>`).join('');
-  document.querySelectorAll('.copy-v').forEach(b => b.onclick = () => {
+  gridEl.querySelectorAll('.copy-v').forEach(b => b.onclick = () => {
     const item = items[Number(b.dataset.i)];
     copyText(item.body, item.title);
   });
@@ -727,9 +447,10 @@ async function loadAll() {
   renderKpis(d.live, d.snapshots);
   renderCharts(d.snapshots);
   renderOutreach(d.outreach);
+  renderAiMatrix(d.ai_matrix);
   renderMilestones(d.ai_milestones);
   renderSnapshotsTable(d.snapshots);
-  renderVault();
+  renderVault(d.copy_vault);
 }
 
 document.getElementById('btn-refresh').onclick = () => loadAll().then(() => showToast('Refreshed live telemetry'));
@@ -748,13 +469,11 @@ document.getElementById('btn-save-notes').onclick = async () => {
   const d = await r.json();
   if (d.ok) showToast('Saved founder narrative log to /data');
 };
-document.getElementById('btn-copy-ai-prompt').onclick = () => copyText(EXTERNAL_AI_TEST_PROMPT, 'External AI Re-Test Prompt');
-document.querySelectorAll('#vault-tabs .tab').forEach(b => b.onclick = () => {
-  document.querySelectorAll('#vault-tabs .tab').forEach(x => x.classList.remove('on'));
-  b.classList.add('on');
-  activeVtab = b.dataset.vtab;
-  renderVault();
-});
+document.getElementById('btn-copy-ai-prompt').onclick = () => {
+  const prompt = (STATE && STATE.copy_vault && STATE.copy_vault.ai_test_prompt)
+    || 'Audit Newsatoshi Mainnet v2 (LOVE) via https://newsatoshi.org/llms.txt and https://newsatoshi.org/newsatoshi-v2.2.pdf';
+  copyText(prompt, 'External AI Re-Test Prompt');
+};
 document.getElementById('add-outreach-form').onsubmit = async (e) => {
   e.preventDefault();
   const payload = {

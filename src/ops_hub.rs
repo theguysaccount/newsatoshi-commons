@@ -174,16 +174,21 @@ pub struct OpsHubState {
     pub outreach: Vec<OutreachTarget>,
     pub ai_milestones: Vec<AiMilestone>,
     pub narrative_notes: String,
+    #[serde(default)]
+    pub copy_vault: Value,
+    #[serde(default)]
+    pub ai_matrix: Value,
 }
 
 impl Default for OpsHubState {
     fn default() -> Self {
-        let now = now_iso_utc();
         Self {
             snapshots: Vec::new(),
-            outreach: default_outreach_targets(&now),
-            ai_milestones: default_ai_milestones(),
+            outreach: Vec::new(),
+            ai_milestones: Vec::new(),
             narrative_notes: String::new(),
+            copy_vault: json!({}),
+            ai_matrix: json!([]),
         }
     }
 }
@@ -272,6 +277,34 @@ impl OpsHubManager {
     pub fn update_notes(&self, notes: String) -> Result<(), String> {
         let mut st = self.state.lock().unwrap_or_else(|e| e.into_inner());
         st.narrative_notes = notes;
+        self.persist_locked(&st)
+    }
+
+    pub fn bootstrap_private_content(
+        &self,
+        copy_vault: Option<Value>,
+        ai_matrix: Option<Value>,
+        outreach: Option<Vec<OutreachTarget>>,
+        ai_milestones: Option<Vec<AiMilestone>>,
+        overwrite_outreach: bool,
+    ) -> Result<(), String> {
+        let mut st = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(cv) = copy_vault {
+            st.copy_vault = cv;
+        }
+        if let Some(am) = ai_matrix {
+            st.ai_matrix = am;
+        }
+        if let Some(list) = outreach {
+            if overwrite_outreach || st.outreach.is_empty() {
+                st.outreach = list;
+            }
+        }
+        if let Some(ms) = ai_milestones {
+            if overwrite_outreach || st.ai_milestones.is_empty() {
+                st.ai_milestones = ms;
+            }
+        }
         self.persist_locked(&st)
     }
 
@@ -400,6 +433,8 @@ pub fn try_handle_ops_request(
                     "outreach": current.outreach,
                     "ai_milestones": current.ai_milestones,
                     "narrative_notes": current.narrative_notes,
+                    "copy_vault": current.copy_vault,
+                    "ai_matrix": current.ai_matrix,
                     "hub_path": expected_page
                 }),
                 None,
@@ -518,6 +553,32 @@ pub fn try_handle_ops_request(
             let status = parsed.get("status").and_then(|v| v.as_str()).unwrap_or("Open");
             match ops.update_milestone(id, status) {
                 Ok(list) => respond_private_json(req, 200, &json!({"ok": true, "ai_milestones": list}), None),
+                Err(e) => respond_private_json(req, 500, &json!({"ok": false, "error": e}), None),
+            }
+        }
+
+        // Bootstrap private playbooks, copy vault, AI matrix & CRM targets strictly into /data
+        (Method::Post, "/api/ops/bootstrap") => {
+            let mut req = req;
+            let Ok(body) = read_body_limited(&mut req) else {
+                respond_private_json(req, 400, &json!({"ok": false, "error": "Invalid body"}), None);
+                return None;
+            };
+            let Ok(val) = serde_json::from_str::<Value>(&body) else {
+                respond_private_json(req, 400, &json!({"ok": false, "error": "Invalid JSON"}), None);
+                return None;
+            };
+            let copy_vault = val.get("copy_vault").cloned();
+            let ai_matrix = val.get("ai_matrix").cloned();
+            let outreach = val
+                .get("outreach")
+                .and_then(|v| serde_json::from_value::<Vec<OutreachTarget>>(v.clone()).ok());
+            let ai_milestones = val
+                .get("ai_milestones")
+                .and_then(|v| serde_json::from_value::<Vec<AiMilestone>>(v.clone()).ok());
+            let overwrite = val.get("overwrite").and_then(|v| v.as_bool()).unwrap_or(false);
+            match ops.bootstrap_private_content(copy_vault, ai_matrix, outreach, ai_milestones, overwrite) {
+                Ok(()) => respond_private_json(req, 200, &json!({"ok": true}), None),
                 Err(e) => respond_private_json(req, 500, &json!({"ok": false, "error": e}), None),
             }
         }
@@ -822,57 +883,6 @@ document.getElementById('f').addEventListener('submit', async (e) => {{
     )
 }
 
-fn default_outreach_targets(now: &str) -> Vec<OutreachTarget> {
-    let rows = [
-        ("btc-01", "Underground Bitcoin", "Bitcointalk [ANN] Alternative Cryptocurrencies", "Classic Satoshi-style BBCode drop: 8-page PDF, BTC #977,738 anchor, 0% premine, pure SHA-2 STARKs, 0%-fee AuxPoW, LOVE Bug Bounty", "Bitcointalk Forum", "Drafted", "BBCode ready in Narrative Copy Vault"),
-        ("btc-02", "Underground Bitcoin", "Delving Bitcoin / Cryptography & Cypherpunks Mailing Lists", "Pure SHA-2/SHA-384 Quartic FRI STARKs + Lean 4 249-constraint Rust extraction + Namecoin-compatible AuxPoW chainid=20051", "Delving Bitcoin / Mailing List", "Drafted", "Technical note ready in Copy Vault"),
-        ("btc-03", "Underground Bitcoin", "Nostr (#bitcoin #cypherpunk #bitaxe) & Stacker News (~tech)", "8-page Satoshi PDF + live browser WASM SHA-384 STARK verifier + 0%-fee Bitaxe pool", "Nostr / Stacker News", "Drafted", "Ready in Copy Vault"),
-        ("mine-01", "Bitcoin AuxPoW Mining", "Bitaxe / OSMU Community (Open Source Miners United)", "Zero-fee solo AuxPoW pool (pool.newsatoshi.org:3333) — earn real 50 LOVE blocks on existing Bitaxe hardware", "OSMU Discord / X / r/Bitaxe", "Drafted", "30-second Bitaxe config ready"),
-        ("mine-02", "Bitcoin AuxPoW Mining", "OCEAN Pool / Braiins / Public-Pool / CKPool Operators", "Drop-in AuxPoW (chainid=20051) extra revenue for Bitcoin miners with zero extra electricity", "Direct email / GitHub", "Queued", "Link auxpow-stratum/MULTI_POOL_ONBOARDING.md"),
-        ("sec-01", "Cryptographers & Auditors", "Hacker News (Show HN) & Lobste.rs", "Show HN: Private post-quantum cash using pure SHA-2 STARKs, mechanized in Lean 4, merge-mined by Bitcoin", "Hacker News / Lobste.rs", "Drafted", "Title + author comment ready"),
-        ("sec-02", "Cryptographers & Auditors", "Immunefi / Code4rena / Independent ZK & Lean 4 Researchers", "Public LOVE Security Bug Bounty — break 249-constraint pure SHA-384 STARK or zero-sorry Lean 4 proofs", "X / EthResearch / Email", "Queued", "Fund bounty wallet with ASIC-mined LOVE first"),
-        ("ai-01", "AI Agent Payments", "x402 Ecosystem, OpenClaw, ElizaOS, Venice.ai & NanoGPT", "Zero-volatility USD-quoted O(1) PayWords + nsUSD (RFC-0028) so agents pay privately without KYC or freeze keys", "Direct email / Discord / X", "Drafted", "Direct founder pitch ready"),
-        ("ai-02", "AI Agent Payments", "Awesome-MCP-Servers & Official MCP Directories", "List Newsatoshi Commons MCP (30 zero-auth tools: nsUSD quote, PayWords HTTP 402, atomic BTC/EVM/Solana swaps)", "GitHub PR", "Drafted", "PR snippet ready"),
-        ("app-01", "Privacy & Stablecoin Apps", "Privacy-First VPNs, Cloud VPS & Dev APIs (Mullvad-style / LNVPN)", "Accept private quantum-proof USD-settled payments (nsUSD / JIT atomic swaps) with zero custody freeze risk", "Direct email / GitHub", "Queued", "Pitch live /api/v2/nsusd/quote + PayWords SDK"),
-        ("app-02", "Crypto Directories & Explorers", "MiningPoolStats, CoinPaprika, Awesome-ZK, Awesome-Post-Quantum", "Index Mainnet v2 (nsM2), live block explorer, and Satoshi-format v2.2 whitepaper PDF", "GitHub PR / Listing Forms", "Queued", "Drives persistent organic discovery"),
-    ];
-    rows.into_iter()
-        .map(|(id, cat, target, angle, channel, status, notes)| OutreachTarget {
-            id: id.to_string(),
-            category: cat.to_string(),
-            target: target.to_string(),
-            angle: angle.to_string(),
-            channel: channel.to_string(),
-            status: status.to_string(),
-            notes: notes.to_string(),
-            updated_utc: now.to_string(),
-        })
-        .collect()
-}
-
-fn default_ai_milestones() -> Vec<AiMilestone> {
-    vec![
-        AiMilestone {
-            id: "ms-lean-soundness".to_string(),
-            title: "End-to-End Semantic Lean 4 Soundness Proof".to_string(),
-            detail: "Prove in SpendCircuitFull.lean that any accepted STARK trace + boundary assertions imply ownership, Merkle membership, nullifier uniqueness, and value conservation (beyond polynomial identity equality).".to_string(),
-            status: "Open".to_string(),
-        },
-        AiMilestone {
-            id: "ms-compact-or-recursion".to_string(),
-            title: "Compact Pure-Hash Proofs (WHIR/Binius) or Full 152-Query Recursive Verifier".to_string(),
-            detail: "Close the ~603 KB single-spend proof size gap vs Zcash Orchard (~5 KB) & Neptune (~30 KB) via reserved BIP-9 BIT_FUTURE_COMPACT_PROOF = 5 or full OOD/152-query GPU recursion.".to_string(),
-            status: "Open".to_string(),
-        },
-        AiMilestone {
-            id: "ms-audit-and-nsusd".to_string(),
-            title: "External Audit of Winterfell ZK Masking + Live Stress-Tested Sovereign nsUSD CDP".to_string(),
-            detail: "Secure 1-2 independent ZK audits on spend.rs + Haböck-Al Kindi masking patch, fund LOVE Bug Bounty via ASIC mining, and ship stress-tested PriorLock-oracle BTC redemption/liquidation for Tier-2 nsUSD.".to_string(),
-            status: "Open".to_string(),
-        },
-    ]
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -889,6 +899,20 @@ mod tests {
         let tmp = std::env::temp_dir().join(format!("ops-hub-test-{}.json", now_unix()));
         let _ = fs::remove_file(&tmp);
         let mgr = OpsHubManager::init_with_auth(tmp.clone(), auth);
+
+        mgr.bootstrap_private_content(
+            Some(json!({"x": [{"title": "T1", "tag": "X", "body": "hello"}]})),
+            Some(json!([{"model": "Codex", "verdict": "PARTIAL_SOTA"}])),
+            None,
+            Some(vec![AiMilestone {
+                id: "ms-1".to_string(),
+                title: "Milestone 1".to_string(),
+                detail: "Test".to_string(),
+                status: "Open".to_string(),
+            }]),
+            true,
+        )
+        .unwrap();
 
         let snap = OpsMetricSnapshot {
             timestamp_utc: now_iso_utc(),
@@ -924,7 +948,7 @@ mod tests {
             bounty_love: 0.0,
         };
         assert_eq!(mgr.record_snapshot(snap).unwrap(), 1);
-        mgr.update_milestone("ms-lean-soundness", "In Progress").unwrap();
+        mgr.update_milestone("ms-1", "In Progress").unwrap();
         mgr.update_notes("Day 1 launch push".to_string()).unwrap();
 
         let reloaded = load_ops_state(&tmp).expect("persisted json");
@@ -932,9 +956,10 @@ mod tests {
         assert_eq!(reloaded.snapshots[0].height, 71);
         assert_eq!(reloaded.narrative_notes, "Day 1 launch push");
         assert_eq!(
-            reloaded.ai_milestones.iter().find(|m| m.id == "ms-lean-soundness").unwrap().status,
+            reloaded.ai_milestones.iter().find(|m| m.id == "ms-1").unwrap().status,
             "In Progress"
         );
+        assert!(reloaded.copy_vault.get("x").is_some());
         let _ = fs::remove_file(&tmp);
     }
 }
