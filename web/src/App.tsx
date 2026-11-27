@@ -37,7 +37,7 @@ import { SwapsMiningTab, type SwapHubSection } from './components/SwapsMiningTab
 import { WalletModal } from './components/WalletModal';
 import { Web4ForgeTab } from './components/Web4ForgeTab';
 import { truncateHash } from './components/ui/CopyButton';
-import { chainById, formatCompactToken } from './wallet/evm';
+import { chainById } from './wallet/evm';
 import { WalletProvider, useWallet } from './wallet/WalletContext';
 import type {
   AcquireParcelPayload,
@@ -62,7 +62,7 @@ interface ToastNotice {
 
 const PRIMARY_NAV: { id: PrimaryView; label: string }[] = [
   { id: 'overview', label: 'Overview' },
-  { id: 'bridge', label: 'Swap' },
+  { id: 'bridge', label: 'Bridge & Mine' },
   { id: 'build', label: 'Back & Build' },
   { id: 'protocol', label: 'Protocol' },
 ];
@@ -92,11 +92,11 @@ function readInitialSwapSection(): SwapHubSection {
   } catch {
     // ignore
   }
-  return 'swap';
+  return 'bridge';
 }
 
 function AppShell() {
-  const { evmAddress, evmChainId, balances, openModal } = useWallet();
+  const { evmAddress, evmChainId, openModal } = useWallet();
   const [view, setView] = useState<PrimaryView>(readInitialView);
   const [swapSection, setSwapSection] = useState<SwapHubSection>(readInitialSwapSection);
   const [protocolTab, setProtocolTab] = useState<ProtocolSubTab>('explorer');
@@ -417,6 +417,14 @@ function AppShell() {
             </button>
 
             <a
+              href="/nsusd"
+              className="hidden shrink-0 items-center gap-1 whitespace-nowrap text-[13px] font-medium text-sky-400/90 transition hover:text-sky-300 lg:inline-flex"
+            >
+              <span>nsUSD</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </a>
+
+            <a
               href="/bounty"
               className="hidden shrink-0 items-center gap-1 whitespace-nowrap text-[13px] font-medium text-emerald-400/90 transition hover:text-emerald-300 lg:inline-flex"
             >
@@ -456,11 +464,6 @@ function AppShell() {
                     {chainById(evmChainId)?.shortName ?? 'EVM'}
                   </span>
                   <span className="font-mono text-[11px]">{truncateHash(evmAddress, 5, 4)}</span>
-                  {balances.baseWloveWei > 0n && (
-                    <span className="hidden rounded-full bg-emerald-400/20 px-1.5 py-0.5 font-mono text-[10px] text-emerald-200 xl:inline">
-                      {formatCompactToken(balances.baseWloveWei, 18)} wLOVE
-                    </span>
-                  )}
                 </>
               ) : (
                 <>
@@ -585,15 +588,15 @@ function AppShell() {
           <div className="animate-fade-in py-10">
             <div className="mb-8 border-b border-white/[0.07] pb-6">
               <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-zinc-500">
-                Swap, Bridge &amp; Easy Setup
+                Native Mainnet v2 Bridge, nsUSD &amp; AuxPoW Mining
               </p>
               <h1 className="font-display mt-1.5 text-3xl tracking-tight text-zinc-50 sm:text-5xl">
-                Connect, Swap In, and Start in Seconds
+                Mine Real LOVE or Bridge Trustlessly
               </h1>
               <p className="mt-2 max-w-2xl text-sm text-zinc-400">
-                Swap ETH or USDC directly into Base wLOVE in one signature, back the 4-chain vault,
-                bridge trustlessly to native L1 LOVE, or set up AI agents and merge-mining with zero
-                manual form filling.
+                Point Bitcoin ASICs or a Bitaxe at our 0%-fee AuxPoW pool, compile zero-custody
+                SHA-256 atomic swaps into native Mainnet v2 LOVE, or route USD-denominated nsUSD
+                PayWords for AI agents.
               </p>
             </div>
             <SwapsMiningTab

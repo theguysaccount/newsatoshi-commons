@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { ArrowRight, ArrowUpRight, Check, ExternalLink, Layers, ShieldCheck } from 'lucide-react';
 import type { BackingProofSummary, PrimaryView, ProtocolSubTab, SeedStatusResponse } from '../types';
 import { formatL1IssuedLove } from '../api/normalize';
-import { InstantSwapCard } from './InstantSwapCard';
 import type { SwapHubSection } from './SwapsMiningTab';
 import { CopyButton, truncateHash } from './ui/CopyButton';
 
@@ -94,19 +93,6 @@ const CANONICAL_CONTRACTS = [
     sourcify: 'https://repo.sourcify.dev/8453/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987',
   },
   {
-    name: 'NewsatoshiBaseMirror (wLOVE)',
-    role: 'Independent Base ERC-20 discovery mirror (no on-chain L1↔EVM bridge; native L1 LOVE is separate & traded P2P via SHA-256 HTLCs) · LP NFT #6689936 burned',
-    address: '0x0A3ccFb3fF981a22A264Aa05CD8b77d06C2732A3',
-    badge: 'Base Uniswap V3 · Independent Mirror',
-    explorers: [
-      { label: 'Uniswap', url: 'https://app.uniswap.org/swap?chain=base&outputCurrency=0x0A3ccFb3fF981a22A264Aa05CD8b77d06C2732A3' },
-      { label: 'DEXScreener', url: 'https://dexscreener.com/base/0x08ddc8C3fc09ACdab6802a13B26631f47ABcB888' },
-      { label: 'GeckoTerminal', url: 'https://www.geckoterminal.com/base/pools/0x08ddc8c3fc09acdab6802a13b26631f47abcb888' },
-      { label: 'BaseScan', url: 'https://basescan.org/address/0x0A3ccFb3fF981a22A264Aa05CD8b77d06C2732A3' },
-    ],
-    sourcify: 'https://repo.sourcify.dev/8453/0x0A3ccFb3fF981a22A264Aa05CD8b77d06C2732A3',
-  },
-  {
     name: 'ERC-8004 On-Chain Agent Identity',
     role: 'L2 Identity · Registered across 4 mainnets: Base #1229992 · Arbitrum #1692 · Optimism #42519 · Polygon #715',
     address: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
@@ -121,7 +107,7 @@ const CANONICAL_CONTRACTS = [
   },
 ] as const;
 
-export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPageProps) {
+export function OverviewPage({ seed, backing, onNavigate }: OverviewPageProps) {
   const [snippetTab, setSnippetTab] = useState<SnippetTab>('mcp');
   const ms = seed?.mainnet_live ? seed.mainnet_status : null;
   const activeSnippet = SNIPPETS[snippetTab];
@@ -133,9 +119,9 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
         <div className="lg:col-span-7">
           <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-white/[0.09] bg-white/[0.025] px-3 py-1 text-[11px] font-medium tracking-wide text-zinc-400">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            <span className="font-mono uppercase text-zinc-200">L1 v1.2.0</span>
+            <span className="font-mono uppercase text-zinc-200">Mainnet v2 · L1 v1.2.1</span>
             <span className="text-zinc-600">·</span>
-            <span>Hourglass Architecture · L2 Agent &amp; Bridge Gateway</span>
+            <span>Native LOVE &amp; nsUSD Gateway</span>
           </div>
 
           <h1 className="font-display mt-6 text-[2.6rem] leading-[1.03] tracking-[-0.02em] text-zinc-50 sm:text-[3.85rem]">
@@ -144,12 +130,11 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
           </h1>
 
           <p className="mt-5 max-w-xl text-[15px] leading-[1.7] text-zinc-400 sm:text-[16px]">
-            <span className="font-mono text-[14px] text-zinc-200">Newsatoshi (LOVE)</span> keeps
-            Layer 1 radically small — default shielded privacy, pure SHA-2 cryptography, and
-            Bitcoin merge-mining (<span className="font-mono text-[13px] text-zinc-300">chainid 20051</span>).
-            Everything rich — 30 MCP tools, Native LOVE PayWords, multi-chain HTLC swaps, x402
-            USDC bridges, ERC-8004 identity, and Web4 agent toolkits — lives cleanly above the waist
-            on this gateway.
+            <span className="font-mono text-[14px] text-zinc-200">Newsatoshi (LOVE)</span> is
+            sovereign Layer-1 cash — default shielded privacy via pure FIPS SHA-2/SHA-384 STARKs,
+            mechanized in Lean 4, and merge-mined by Bitcoin ASICs (<span className="font-mono text-[13px] text-zinc-300">chainid 20051</span>).
+            Above the waist, this gateway delivers stable USD settlement (<span className="font-mono text-[13px] text-sky-300">nsUSD</span>),
+            30 zero-auth MCP tools, sub-millisecond PayWords, and trustless BTC/Lightning/EVM HTLC bridges.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -158,36 +143,113 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
               onClick={() => onNavigate('bridge', undefined, 'setup')}
               className="inline-flex items-center gap-2 rounded-full bg-zinc-50 px-5 py-2.5 text-[13px] font-semibold text-zinc-950 transition hover:bg-white cursor-pointer"
             >
-              <span>Bridge &amp; Merge-Mine</span>
+              <span>Mine Real LOVE</span>
               <ArrowRight className="h-4 w-4" />
             </button>
 
-            <button
-              type="button"
-              onClick={() => onNavigate('build')}
-              className="inline-flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.03] px-5 py-2.5 text-[13px] font-medium text-zinc-200 transition hover:border-white/[0.24] hover:bg-white/[0.06] cursor-pointer"
-            >
-              <span>L2 Agent Labs</span>
-            </button>
-
             <a
-              href="https://github.com/theguysaccount/newsatoshi-rfc0021/releases/tag/v1.2.0"
+              href="/whitepaper.pdf"
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-2.5 text-[13px] font-medium text-zinc-400 transition hover:text-zinc-100"
+              className="inline-flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.03] px-5 py-2.5 text-[13px] font-medium text-zinc-200 transition hover:border-white/[0.24] hover:bg-white/[0.06]"
             >
-              <span>L1 v1.2.0</span>
+              <span>Whitepaper PDF</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </a>
+
+            <a
+              href="/nsusd"
+              className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-4 py-2.5 text-[13px] font-medium text-sky-200 transition hover:bg-sky-500/20"
+            >
+              <span>nsUSD Stable Rail</span>
               <ArrowUpRight className="h-3.5 w-3.5" />
             </a>
           </div>
         </div>
 
         <div className="lg:col-span-5">
-          <InstantSwapCard
-            compact
-            onNotice={onNotice}
-            onOpenBridge={() => onNavigate('bridge', undefined, 'bridge')}
-          />
+          <div className="surface-card rounded-2xl border border-emerald-500/20 p-6 space-y-5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.1em] text-emerald-300">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                <span>Native Mainnet v2 · One Real LOVE</span>
+              </div>
+              <span className="rounded-full border border-white/[0.1] bg-white/[0.04] px-2.5 py-0.5 font-mono text-[10px] text-zinc-300">
+                0% Premine
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              <div className="rounded-xl border border-white/[0.07] bg-[#0a0a0d] p-3.5">
+                <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                  <span className="font-medium text-zinc-200">1. Mine Native LOVE (0% Fee Pool)</span>
+                  <CopyButton value="stratum+tcp://pool.newsatoshi.org:3333" />
+                </div>
+                <code className="mt-1.5 block truncate font-mono text-xs text-emerald-300">
+                  stratum+tcp://pool.newsatoshi.org:3333
+                </code>
+                <p className="mt-1 text-[11px] text-zinc-500">
+                  Point any Bitaxe or SHA-256 ASIC · direct shielded coinbase payouts (`50 LOVE/block`).
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-sky-500/20 bg-sky-500/[0.04] p-3.5">
+                <div className="flex items-center justify-between text-[11px] text-sky-200">
+                  <span className="font-medium">2. Price &amp; Settle in Stable USD (nsUSD)</span>
+                  <a href="/nsusd" className="inline-flex items-center gap-0.5 font-mono text-[10px] text-sky-300 hover:text-white">
+                    <span>RFC-0028</span>
+                    <ArrowUpRight className="h-3 w-3" />
+                  </a>
+                </div>
+                <div className="mt-1.5 flex items-center justify-between gap-2">
+                  <code className="truncate font-mono text-[11px] text-zinc-200">
+                    GET /api/v2/nsusd/quote?usd=0.01
+                  </code>
+                  <CopyButton value="https://commons.newsatoshi.org/api/v2/nsusd/quote?usd=0.01" />
+                </div>
+                <p className="mt-1 text-[11px] text-zinc-400">
+                  Zero-volatility USD quotes over O(1) PayWords + sovereign BTC-backed nsUSD roadmap.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-white/[0.07] bg-[#0a0a0d] p-3.5">
+                <div className="flex items-center justify-between text-[11px] text-zinc-300">
+                  <span className="font-medium">3. Verify Math or Claim Bug Bounty</span>
+                  <a href="/bounty" className="inline-flex items-center gap-0.5 font-mono text-[10px] text-emerald-300 hover:text-white">
+                    <span>/bounty</span>
+                    <ArrowUpRight className="h-3 w-3" />
+                  </a>
+                </div>
+                <p className="mt-1 text-[11px] text-zinc-500">
+                  Run the live browser SHA-384 STARK verifier on{' '}
+                  <a href="https://newsatoshi.org/" target="_blank" rel="noreferrer" className="text-zinc-300 underline hover:text-white">
+                    newsatoshi.org
+                  </a>{' '}
+                  or bridge trustlessly via BTC/Lightning/EVM SHA-256 HTLCs.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 pt-1 text-[11px]">
+              <button
+                type="button"
+                onClick={() => onNavigate('bridge', undefined, 'bridge')}
+                className="inline-flex items-center gap-1 font-medium text-zinc-200 hover:text-white cursor-pointer"
+              >
+                <span>Open Native L1 Atomic Bridge</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+              <a
+                href="https://newsatoshi.org/wallet/"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 font-mono text-emerald-300 hover:text-emerald-200"
+              >
+                <span>Shielded Wallet</span>
+                <ArrowUpRight className="h-3 w-3" />
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -297,7 +359,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] text-emerald-200 hover:bg-emerald-500/20"
               >
-                <span>newsatoshi-rfc0021 · v1.2.0</span>
+                <span>newsatoshi-rfc0021 · v1.2.1</span>
                 <ArrowUpRight className="h-3 w-3" />
               </a>
             </div>
@@ -360,7 +422,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 rounded-full border border-white/[0.1] bg-white/[0.04] px-2.5 py-0.5 font-mono text-[10px] text-zinc-300 hover:text-white"
               >
-                <span>newsatoshi-commons · v0.25.0</span>
+                <span>newsatoshi-commons · v0.28.0</span>
                 <ArrowUpRight className="h-3 w-3" />
               </a>
             </div>
@@ -431,26 +493,26 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <button
             type="button"
-            onClick={() => onNavigate('bridge', undefined, 'swap')}
+            onClick={() => onNavigate('bridge', undefined, 'bridge')}
             className="surface-card surface-card-hover group flex flex-col justify-between rounded-2xl p-6 text-left cursor-pointer"
           >
             <div>
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[11px] text-zinc-500">01</span>
                 <span className="rounded-full border border-white/[0.08] px-2.5 py-0.5 text-[10px] font-medium text-zinc-400">
-                  Liquidity &amp; Mining
+                  Native L1 &amp; Mining
                 </span>
               </div>
               <h3 className="mt-5 text-[17px] font-medium tracking-tight text-zinc-100">
-                Bridge, swap, or merge-mine
+                Bridge trustlessly or merge-mine
               </h3>
               <p className="mt-2 text-[13px] leading-relaxed text-zinc-400">
                 Compile zero-custody SHA-256 HTLC swaps across Bitcoin, Lightning, Solana, and 4
-                EVM chains, connect AuxPoW miners, or trade the independent Base wLOVE mirror.
+                EVM chains directly into native Mainnet v2 LOVE, or point AuxPoW miners at 0% fee.
               </p>
             </div>
             <div className="mt-7 inline-flex items-center gap-1.5 text-[13px] font-medium text-zinc-200 transition group-hover:text-white">
-              <span>Open Swaps &amp; Mining</span>
+              <span>Open Bridge &amp; Mining</span>
               <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
             </div>
           </button>
@@ -494,11 +556,11 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
                 </span>
               </div>
               <h3 className="mt-5 text-[17px] font-medium tracking-tight text-zinc-100">
-                Audit L1 state &amp; STARK proofs
+                Inspect Mainnet v2 &amp; STARK proofs
               </h3>
               <p className="mt-2 text-[13px] leading-relaxed text-zinc-400">
-                Inspect live canary &amp; testnet blocks, re-verify Winterfell STARK proofs, check
-                the honest v2 audit/pool launch gate, and review the Legal Airlock templates.
+                Inspect live Mainnet v2 blocks, re-verify Winterfell SHA-384 STARK proofs, explore
+                the LOVE Security Bug Bounty scope, and review the Legal Airlock templates.
               </p>
             </div>
             <div className="mt-7 inline-flex items-center gap-1.5 text-[13px] font-medium text-zinc-200 transition group-hover:text-white">

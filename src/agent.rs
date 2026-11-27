@@ -204,6 +204,7 @@ pub const WHITEPAPER_V2_2_MARKDOWN: &str = include_str!("../docs/NEWSATOSHI-2.2-
 pub const WHITEPAPER_V2_2_PDF: &[u8] = include_bytes!("../docs/newsatoshi-v2.2.pdf");
 pub const MANIFESTO_MARKDOWN: &str = include_str!("../docs/MANIFESTO.md");
 pub const BUG_BOUNTY_MARKDOWN: &str = include_str!("../docs/BUG_BOUNTY.md");
+pub const NSUSD_RFC_MARKDOWN: &str = include_str!("../docs/RFC-0028-NSUSD-SHIELDED-DOLLAR.md");
 pub const WHITEPAPER_LATEX: &str = include_str!("../docs/newsatoshi_2_1_whitepaper.tex");
 pub const LEAN_FORMAL_PROOF: &str = include_str!("../formal/NewsatoshiCovenants.lean");
 
@@ -439,6 +440,35 @@ fn wrap_public_html(
 /// (`/docs`, `/developers`, `/about`, `/contact`, `/privacy`).
 pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<(&'static str, String)> {
     match slug {
+        "/nsusd" => {
+            if wants_md {
+                Some(("text/markdown; charset=utf-8", NSUSD_RFC_MARKDOWN.to_string()))
+            } else {
+                let html = wrap_public_html(
+                    base_url,
+                    "/nsusd",
+                    "nsUSD — Private, Post-Quantum Dollar Settlement on Newsatoshi (RFC-0028)",
+                    "Zero-volatility private USD settlement for humans and AI agents on Newsatoshi: Tier-1 JIT x402 PayWords + Tier-2 sovereign BTC-backed over-collateralized nsUSD with PriorLock bonded oracles and zero corporate freeze switch.",
+                    "<h1><code>nsUSD</code> &mdash; Private, Post-Quantum Dollar Settlement (<code>RFC-0028</code>)</h1>\n\
+                     <p><strong>Stable USD pricing for everyday commerce &amp; AI agents &mdash; backed by Newsatoshi pure SHA-384 STARK privacy and zero algorithmic death-spiral risk.</strong></p>\n\
+                     <p>Artifacts: <a href=\"/nsusd.md\">Full RFC-0028 Spec (.md)</a> &middot; <a href=\"/api/v2/nsusd/quote?usd=0.01\">Live USD Quote JSON API</a> &middot; <a href=\"https://newsatoshi.org/nsusd/\">Terminal Edition</a> &middot; <a href=\"/whitepaper.pdf\">Satoshi-Format Whitepaper PDF</a></p>\n\
+                     <h2>Tier 1 &mdash; Live Today (Zero L1 Fork, Zero Volatility)</h2>\n\
+                     <ul>\n\
+                       <li><strong>USD-Denominated JIT <code>x402</code> + <code>O(1)</code> PayWords:</strong> Quote any API or service strictly in USD (e.g. <code>$0.0005/call</code>), stream micro-payments off-chain in microseconds with zero per-call gas, and settle atomically via zero-custody Bitcoin/Lightning/EVM/L1 SHA-256 HTLCs.</li>\n\
+                       <li><strong><code>nsUSD-B</code> (Transparently Labeled Bridged Dollar):</strong> 1:1 redeemable deposit/withdrawal escrow for USDC/USDS/DAI giving immediate private transfers inside Newsatoshi L2 while keeping bridge reserve risk explicitly separated from sovereign <code>nsUSD</code>.</li>\n\
+                     </ul>\n\
+                     <h2>Tier 2 &mdash; Sovereign Unfreezable <code>nsUSD</code> (Zero Corporate Freeze Switch)</h2>\n\
+                     <ul>\n\
+                       <li><strong>Over-Collateralized Bitcoin First (<code>&gt;= 150%</code> CR):</strong> Backed by native BTC (plus native Mainnet v2 <code>LOVE &gt;= 250%</code> CR once deep spot liquidity matures) &mdash; never an undercollateralized algorithmic peg.</li>\n\
+                       <li><strong><code>PriorLock</code> Bonded Median Oracle (RFC-0021):</strong> Price reporters bond real <code>LOVE</code> behind BTC/USD quotes; manipulated prices are slashed <code>50%</code> to the challenger and <code>50%</code> permanently burned.</li>\n\
+                       <li><strong>Hard <code>$1.00</code> Redemption Floor + BIP-9 Multi-Asset L1 Notes:</strong> Permissionless collateral redemption holds the peg via arbitrage, and future soft-fork <code>BIT_MULTI_ASSET_NOTES = 7</code> lets <code>LOVE</code> and <code>nsUSD</code> share one shielded L1 STARK anonymity set with zero Genesis restart.</li>\n\
+                     </ul>\n\
+                     <h2>Try the Live USD Quote Endpoint</h2>\n\
+                     <pre>curl -sS https://commons.newsatoshi.org/api/v2/nsusd/quote?usd=0.01</pre>",
+                );
+                Some(("text/html; charset=utf-8", html))
+            }
+        }
         "/bounty" => {
             if wants_md {
                 Some(("text/markdown; charset=utf-8", BUG_BOUNTY_MARKDOWN.to_string()))

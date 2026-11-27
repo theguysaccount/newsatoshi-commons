@@ -649,7 +649,7 @@ fn handle_request(mut req: Request, state: &AppState) {
 
     if method == Method::Head {
         let head_ct = match path.as_str() {
-            "/" | "/index.html" | "/whitepaper" | "/manifesto" | "/bounty" | "/docs" | "/developers" | "/about" | "/contact" | "/privacy" => {
+            "/" | "/index.html" | "/whitepaper" | "/manifesto" | "/bounty" | "/nsusd" | "/docs" | "/developers" | "/about" | "/contact" | "/privacy" => {
                 if wants_markdown(&req) {
                     Some("text/markdown; charset=utf-8")
                 } else {
@@ -667,7 +667,7 @@ fn handle_request(mut req: Request, state: &AppState) {
                 Some("text/plain; charset=utf-8")
             }
             "/sitemap.xml" => Some("application/xml; charset=utf-8"),
-            "/llms.txt" | "/llms-full.txt" | "/whitepaper.md" | "/whitepaper-v2.1.md" | "/manifesto.md" | "/bounty.md" | "/skills/newsatoshi-agent-payments/SKILL.md" => {
+            "/llms.txt" | "/llms-full.txt" | "/whitepaper.md" | "/whitepaper-v2.1.md" | "/manifesto.md" | "/bounty.md" | "/nsusd.md" | "/skills/newsatoshi-agent-payments/SKILL.md" => {
                 Some("text/markdown; charset=utf-8")
             }
             "/.well-known/api-catalog" => Some("application/linkset+json; charset=utf-8"),
@@ -687,6 +687,7 @@ fn handle_request(mut req: Request, state: &AppState) {
             | "/api/seed"
             | "/api/network/metrics"
             | "/api/backing/summary"
+            | "/api/v2/nsusd/quote"
             | "/api/web4/charters"
             | "/api/web4/services"
             | "/api/web4/bounties"
@@ -777,6 +778,69 @@ fn handle_request(mut req: Request, state: &AppState) {
                 crate::agent::BUG_BOUNTY_MARKDOWN.to_string(),
             );
         }
+        (Method::Get, "/nsusd.md") => {
+            respond_text(
+                req,
+                200,
+                "text/markdown; charset=utf-8",
+                crate::agent::NSUSD_RFC_MARKDOWN.to_string(),
+            );
+        }
+        (Method::Get, "/api/v2/nsusd/quote") => {
+            let usd = query_param(&raw_url, "usd")
+                .and_then(|v| v.parse::<f64>().ok())
+                .filter(|v| v.is_finite() && *v > 0.0)
+                .unwrap_or(0.01)
+                .clamp(0.000001, 1_000_000.0);
+            let micro_usd_ticks = (usd * 1_000_000.0).round().max(1.0) as u64;
+            let seed = state.get_seed_snapshot(false);
+            let backing = state.get_backing_summary(false);
+            let payload = serde_json::json!({
+                "ok": true,
+                "spec": "RFC-0028",
+                "asset": "nsUSD",
+                "usd_amount": (micro_usd_ticks as f64) / 1_000_000.0,
+                "micro_usd_ticks": micro_usd_ticks,
+                "payword_unit_usd": 0.000001,
+                "volatility_exposure": "0% (USD-denominated JIT atomic settlement)",
+                "tier_1_live_rails": [
+                    {
+                        "rail": "PAYWORDS_USD_JIT",
+                        "latency": "< 1 ms (1 SHA-256 hash/call)",
+                        "gas_per_call": 0,
+                        "settlement": ["BTC_BIP199_HTLC", "LIGHTNING_BOLT11", "EVM_4CHAIN_HTLC", "NATIVE_LOVE_MAINNET_V2"]
+                    },
+                    {
+                        "rail": "X402_V2_USDC_ONRAMP",
+                        "networks": ["eip155:8453", "eip155:42161", "eip155:137"],
+                        "discovery": "/.well-known/x402"
+                    }
+                ],
+                "tier_2_sovereign_nsusd": {
+                    "status": "SPECIFIED_BIP9_READY",
+                    "primary_collateral": "BTC (>= 150% CR, 120% liquidation)",
+                    "secondary_collateral": "Native Mainnet v2 LOVE (>= 250% CR after deep spot liquidity)",
+                    "algorithmic_unbacked_mint": false,
+                    "freeze_switch": false,
+                    "oracle": "PriorLock (RFC-0021) bonded median oracle (50% challenger slash / 50% burn)",
+                    "redemption_floor": "$1.00 direct collateral redemption",
+                    "l1_soft_fork_bit": "BIT_MULTI_ASSET_NOTES = 7 (zero Genesis restart)"
+                },
+                "live_mainnet_v2": {
+                    "height": seed.mainnet_status.as_ref().map(|s| s.height),
+                    "difficulty": seed.mainnet_status.as_ref().map(|s| s.difficulty),
+                    "genesis": "00000000ba1cdad4aa8e82d6613b4df536394c41008fc3a0914a47a44604b9c8"
+                },
+                "live_backing_vault_honest": {
+                    "vault_address": backing.canonical_vault_address,
+                    "total_eth": backing.total_eth_formatted,
+                    "total_usdc": backing.total_usdc_formatted,
+                    "deposits": backing.total_vault_deposits
+                },
+                "docs_url": "https://commons.newsatoshi.org/nsusd"
+            });
+            respond_json(req, 200, &payload);
+        }
         (Method::Get, "/whitepaper.tex") => {
             respond_text(
                 req,
@@ -793,7 +857,7 @@ fn handle_request(mut req: Request, state: &AppState) {
                 LEAN_FORMAL_PROOF.to_string(),
             );
         }
-        (Method::Get, "/whitepaper" | "/manifesto" | "/bounty" | "/docs" | "/developers" | "/about" | "/contact" | "/privacy") => {
+        (Method::Get, "/whitepaper" | "/manifesto" | "/bounty" | "/nsusd" | "/docs" | "/developers" | "/about" | "/contact" | "/privacy") => {
             let base_url = infer_base_url(&req);
             if let Some((ct, body)) = render_public_page(&path, &base_url, wants_markdown(&req)) {
                 let mut resp = Response::from_string(body)

@@ -515,10 +515,10 @@ docker compose up -d`;
     --endpoint https://commons.newsatoshi.org/api/telemetry`;
 
   const TABS: { id: SwapHubSection; label: string }[] = [
-    { id: 'swap', label: 'Instant Swap' },
-    { id: 'back', label: '1-Click Back' },
-    { id: 'bridge', label: 'Bridge to L1' },
-    { id: 'setup', label: 'Easy Setup & Mine' },
+    { id: 'bridge', label: 'Native L1 Atomic Bridge' },
+    { id: 'setup', label: 'Mine Real LOVE & MCP' },
+    { id: 'back', label: '4-Chain Backing Vault' },
+    { id: 'swap', label: 'Legacy Base Mirror (Not L1)' },
   ];
 
   return (
@@ -561,6 +561,18 @@ docker compose up -d`;
       {/* TAB 1 (DEFAULT): INSTANT 1-CLICK SWAP (ZERO FORM FILLING)              */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {section === 'swap' && (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3 text-xs text-amber-200/90">
+            <strong className="text-amber-100">Note: wLOVE is NOT native Mainnet v2 LOVE.</strong>{' '}
+            It is an independent legacy ERC-20 token on Base with no automated L1↔EVM bridge. For real shielded Mainnet v2 <code className="font-mono">LOVE</code>, use{' '}
+            <button type="button" onClick={() => setSection('bridge')} className="underline hover:text-white cursor-pointer">
+              Native L1 Atomic Bridge
+            </button>{' '}
+            or{' '}
+            <button type="button" onClick={() => setSection('setup')} className="underline hover:text-white cursor-pointer">
+              0%-Fee Bitaxe Mining
+            </button>.
+          </div>
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
           <div className="lg:col-span-6 xl:col-span-5">
             <InstantSwapCard
@@ -726,6 +738,7 @@ docker compose up -d`;
               </div>
             </div>
           </div>
+        </div>
         </div>
       )}
 
