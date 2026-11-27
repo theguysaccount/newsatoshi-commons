@@ -49,10 +49,21 @@ pub fn estimate_paywords_cost_savings(
 
     let gross_monthly_usd = (monthly_calls as f64) * price_per_call_usd;
 
-    // Published Stripe standard card pricing: 2.9% + $0.30 per individual charge.
+    // Published Stripe standard card pricing: 2.9% + $0.30 per individual charge ($0.50 USD minimum).
     let stripe_fee_usd = (monthly_calls as f64) * (price_per_call_usd * 0.029 + 0.30);
     let stripe_effective_pct = if gross_monthly_usd > 0.0 {
         (stripe_fee_usd / gross_monthly_usd) * 100.0
+    } else {
+        0.0
+    };
+
+    // Even if calls are aggregated into one Stripe card charge per settlement batch (requires
+    // custodial prepaid credit when batch < $0.50 USD minimum):
+    let settlement_batches = monthly_calls.div_ceil(batch);
+    let stripe_batched_fee_usd =
+        (gross_monthly_usd * 0.029) + (settlement_batches as f64) * 0.30;
+    let stripe_batched_effective_pct = if gross_monthly_usd > 0.0 {
+        (stripe_batched_fee_usd / gross_monthly_usd) * 100.0
     } else {
         0.0
     };
@@ -67,14 +78,18 @@ pub fn estimate_paywords_cost_savings(
     };
 
     // Newsatoshi O(1) SHA-256 PayWords settled via NewsatoshiPayWordChannel on Base Mainnet:
-    // Empirically measured gas on Base: ~65,000 fixed + ~720 gas per SHA-256 step (claim(7) = 96,449 gas;
-    // claim(1000) = 783,140 gas). At conservative 0.01 gwei Base gas and $2,500/ETH:
-    let settlement_batches = monthly_calls.div_ceil(batch);
+    // Empirically measured execution gas on Base: ~65,000 fixed + ~720 gas per SHA-256 step
+    // (live BaseScan claim(7) = 96,449 gas; Foundry claim(1000) = 783,140 gas).
+    // One-time channel open (~115,000 gas) + Base variable L1 data fee (~<$0.002/tx) are also reported explicitly.
     let gas_per_claim: u64 = 65_000 + 720 * batch;
     let eth_price_usd = 2_500.0_f64;
     let base_gas_gwei = 0.01_f64;
     let usd_per_settlement_tx = (gas_per_claim as f64) * (base_gas_gwei * 1e-9) * eth_price_usd;
-    let paywords_monthly_fee_usd = (settlement_batches as f64) * usd_per_settlement_tx;
+    let estimated_base_l1_data_fee_usd = 0.001_f64;
+    let estimated_one_time_open_tx_usd =
+        (115_000.0 * (base_gas_gwei * 1e-9) * eth_price_usd) + estimated_base_l1_data_fee_usd;
+    let paywords_monthly_fee_usd =
+        (settlement_batches as f64) * (usd_per_settlement_tx + estimated_base_l1_data_fee_usd);
     let paywords_effective_pct = if gross_monthly_usd > 0.0 {
         (paywords_monthly_fee_usd / gross_monthly_usd) * 100.0
     } else {
@@ -82,9 +97,15 @@ pub fn estimate_paywords_cost_savings(
     };
 
     let savings_vs_stripe_usd = (stripe_fee_usd - paywords_monthly_fee_usd).max(0.0);
+    let savings_vs_stripe_batched_usd = (stripe_batched_fee_usd - paywords_monthly_fee_usd).max(0.0);
     let savings_vs_x402_usd = (per_call_x402_fee_usd - paywords_monthly_fee_usd).max(0.0);
     let fee_reduction_vs_stripe_pct = if stripe_fee_usd > 0.0 {
         ((stripe_fee_usd - paywords_monthly_fee_usd) / stripe_fee_usd) * 100.0
+    } else {
+        0.0
+    };
+    let fee_reduction_vs_stripe_batched_pct = if stripe_batched_fee_usd > 0.0 {
+        ((stripe_batched_fee_usd - paywords_monthly_fee_usd) / stripe_batched_fee_usd) * 100.0
     } else {
         0.0
     };
@@ -103,15 +124,22 @@ pub fn estimate_paywords_cost_savings(
             "gross_monthly_revenue_usd": round2(gross_monthly_usd)
         },
         "assumptions_transparent": {
-            "stripe_formula": "2.9% + $0.30 per individual charge",
+            "stripe_per_call_formula": "2.9% + $0.30 per call (note: Stripe's $0.50 USD minimum charge makes sub-$0.50 per-call card billing unavailable without custodial prepaid accounts)",
+            "stripe_batched_formula": "2.9% + $0.30 per aggregated settlement batch (e.g. $0.329 on a single $1.00 batch of 1,000 x $0.001 calls)",
             "per_call_x402_formula": "$0.001 per-call Base L2 tx gas + facilitator overhead",
-            "newsatoshi_paywords_formula": "0% protocol fee; measured Base claim() gas (65,000 + 720 * batch) at 0.01 gwei & $2,500 ETH"
+            "newsatoshi_paywords_formula": "0% protocol fee; measured Base claim() execution gas (65,000 + 720 * batch) at 0.01 gwei & $2,500 ETH + $0.001 estimated Base L1 data fee per settlement tx (one-time channel open ~115k gas reported separately)"
         },
         "comparison": {
             "stripe_cards": {
                 "monthly_fees_usd": round2(stripe_fee_usd),
                 "effective_fee_pct": round4(stripe_effective_pct),
                 "net_retained_usd": round2(gross_monthly_usd - stripe_fee_usd)
+            },
+            "stripe_batched_prepaid": {
+                "monthly_fees_usd": round2(stripe_batched_fee_usd),
+                "effective_fee_pct": round4(stripe_batched_effective_pct),
+                "net_retained_usd": round2(gross_monthly_usd - stripe_batched_fee_usd),
+                "note": "Requires custodial prepaid balance + minimum $0.50 USD charge"
             },
             "per_call_base_x402_usdc": {
                 "monthly_fees_usd": round2(per_call_x402_fee_usd),
@@ -120,10 +148,12 @@ pub fn estimate_paywords_cost_savings(
             },
             "newsatoshi_paywords_base_usdc": {
                 "protocol_fee_bps": 0,
-                "per_call_verification": "1 SHA-256 hash (~0.013 ms, $0.000000 gas)",
+                "per_call_verification": "1 SHA-256 hash (~0.0039 ms WebCrypto, $0.000000 gas)",
                 "monthly_settlement_txs": settlement_batches,
                 "estimated_gas_per_claim_tx": gas_per_claim,
                 "estimated_usd_per_claim_tx": round6(usd_per_settlement_tx),
+                "estimated_base_l1_data_fee_per_tx_usd": estimated_base_l1_data_fee_usd,
+                "estimated_one_time_channel_open_usd": round6(estimated_one_time_open_tx_usd),
                 "monthly_fees_usd": round4(paywords_monthly_fee_usd),
                 "effective_fee_pct": round6(paywords_effective_pct),
                 "net_retained_usd": round2(gross_monthly_usd - paywords_monthly_fee_usd)
@@ -133,6 +163,9 @@ pub fn estimate_paywords_cost_savings(
             "monthly_savings_vs_stripe_usd": round2(savings_vs_stripe_usd),
             "annual_savings_vs_stripe_usd": round2(savings_vs_stripe_usd * 12.0),
             "fee_reduction_vs_stripe_pct": round4(fee_reduction_vs_stripe_pct),
+            "monthly_savings_vs_stripe_batched_usd": round2(savings_vs_stripe_batched_usd),
+            "annual_savings_vs_stripe_batched_usd": round2(savings_vs_stripe_batched_usd * 12.0),
+            "fee_reduction_vs_stripe_batched_pct": round4(fee_reduction_vs_stripe_batched_pct),
             "monthly_savings_vs_per_call_x402_usd": round2(savings_vs_x402_usd),
             "annual_savings_vs_per_call_x402_usd": round2(savings_vs_x402_usd * 12.0),
             "fee_reduction_vs_per_call_x402_pct": round4(fee_reduction_vs_x402_pct)

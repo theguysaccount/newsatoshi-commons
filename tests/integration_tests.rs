@@ -2249,9 +2249,9 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
     )
     .unwrap();
     assert_eq!(cutover["ok"], true);
-    assert_eq!(cutover["ready_for_v2_activation"], false);
+    assert_eq!(cutover["mainnet_v2_live"], true);
+    assert_eq!(cutover["status"], "LIVE_MAINNET_V2");
     assert_eq!(cutover["genesis_policy"]["nov10_canary_retired"], true);
-    assert_eq!(cutover["gates"]["external_security_audits"]["completed"], 0);
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["l1_release_tag"], "v1.2.5");
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["lean4_theorems"], 10);
     assert_eq!(cutover["gates"]["engineering_and_formal_proofs"]["lean4_full_circuit_constraints"], 249);

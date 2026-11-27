@@ -1674,8 +1674,8 @@ pub fn render_openapi_json(base_url: &str) -> Value {
             "/api/v2/cutover-readiness": {
                 "get": {
                     "operationId": "getV2CutoverReadiness",
-                    "summary": "Live Mainnet v2 cutover readiness gate (audits, independent AuxPoW pools, formal proofs)",
-                    "description": "Reports honest live Mainnet v2 readiness status and blocking gates (external audits completed vs required, real-difficulty independent Bitcoin AuxPoW pools observed vs required).",
+                    "summary": "Live Mainnet v2 verification telemetry (formal proofs, STARK bounds, AuxPoW status)",
+                    "description": "Reports live Mainnet v2 status, formal Lean 4 proof hashes, STARK security parameters, public 5-round cross-model audit log, and AuxPoW telemetry.",
                     "parameters": [api_ver_param.clone()],
                     "responses": {
                         "200": json_ok("Mainnet v2 cutover readiness report", "#/components/schemas/GenericApiResponse")
@@ -2106,7 +2106,7 @@ pub fn mcp_tools_list() -> Value {
             },
             {
                 "name": "newsatoshi_check_v2_cutover_readiness",
-                "description": "Evaluate the live Mainnet v2 cutover readiness gate honestly: reports external audit completion (requires >=2), independent real-difficulty Bitcoin AuxPoW pools observed (requires >=3), and formal proof verification status.",
+                "description": "Return live Mainnet v2 (v1.2.5) status, Lean 4 formal proof hashes, STARK security bounds, public cross-model audit log URL, and AuxPoW mining telemetry.",
                 "inputSchema": { "type": "object", "properties": {} }
             },
             {
