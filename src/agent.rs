@@ -785,7 +785,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
         "\
 # Newsatoshi Commons & Agent Transaction Interface ({proto})
 
-> **The Hourglass Architecture:** Newsatoshi (`LOVE`) keeps **Layer 1 (`v1.2.0-mainnet-rc1`)** radically small — private, quantum-proof electronic cash secured by Bitcoin merge-mining (`chainid = 20051`) and built strictly on SHA-2 (256-bit Quartic Goldilocks FRI at `100–104` conservative QROM bits, full 249-constraint Lean 4 circuit proof, real pure-SHA-2 STARK-in-STARK IVC verifier, zero elliptic curves, zero trusted setup, zero L1 launchpads or subjective juries). **This gateway (`commons.newsatoshi.org`) lives above the waist at Layer 2** — providing 30 zero-auth MCP tools, Native `LOVE` PayWords + `x402 v2` USDC bridge on-ramps, zero-custody BTC/Lightning/Solana/EVM HTLC atomic swaps, `ERC-8004` identity, Web4 charters, off-chain mission launchpads, zkTLS P2P verification, and A2A escrow hooks.
+> **The Hourglass Architecture:** Newsatoshi (`LOVE`) keeps **Layer 1 (`v1.2.0`)** radically small — private, quantum-proof electronic cash secured by Bitcoin merge-mining (`chainid = 20051`) and built strictly on SHA-2 (256-bit Quartic Goldilocks FRI at `100–104` conservative QROM bits, full 249-constraint Lean 4 circuit proof, real pure-SHA-2 STARK-in-STARK IVC verifier, zero elliptic curves, zero trusted setup, zero L1 launchpads or subjective juries). **This gateway (`commons.newsatoshi.org`) lives above the waist at Layer 2** — providing 30 zero-auth MCP tools, Native `LOVE` PayWords + `x402 v2` USDC bridge on-ramps, zero-custody BTC/Lightning/Solana/EVM HTLC atomic swaps, `ERC-8004` identity, Web4 charters, off-chain mission launchpads, zkTLS P2P verification, and A2A escrow hooks.
 
 ## When to use Newsatoshi Commons
 - Use `{base_url}/mcp` or `{base_url}/api/*` when an agent needs to **check live Newsatoshi Mainnet/Testnet state**, **bridge BTC/Lightning/Solana/Base into LOVE trustlessly**, **issue or verify HTTP 402 PayWord micropayments**, or **cryptographically verify Winterfell STARK covenant proofs and L1 hash-locks**.
@@ -801,7 +801,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 - Commons Treasury Balance: `{bal} LOVE` (`nonce={nonce}`, `parcels={parcels}`, `kwh={kwh}`, `starks={starks}`)
 
 ## Agent Interfaces (Zero Auth Required for All Reads, Compilers & Verifiers)
-- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **30 live tools** (including 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.0-mainnet-rc1` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
+- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **30 live tools** (including 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.0` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
 - **Zero-Install Stdio MCP Bridge & CLI (Node 18+, Zero Dependencies):** `npx -y github:theguysaccount/newsatoshi-commons` (`inspect`, `btc-fees`, `decode-bolt11`, `quote-base`, `verify-tx`, `payword-demo`, or stdio MCP `serve`).
 - [Native LOVE PayWord & x402 v2 Discovery]({base_url}/.well-known/x402): 4 live monetized endpoints settling primarily in **native `LOVE`** (`<1ms` zero-gas SHA-256 PayWords / `PriorLock`), with Base/Arbitrum/Polygon USDC (`x402 v2`, `$0.001`) supported as outer bridge on-ramps (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).
 - [MCP Server Card]({base_url}/.well-known/mcp/server-card.json) & [MCP Registry Manifest]({base_url}/server.json): Standard MCP discovery cards (`org.newsatoshi.commons/newsatoshi-commons`).
@@ -826,7 +826,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 ## Source & Releases
 - Repository: https://github.com/theguysaccount/newsatoshi-commons
 - Installable Agent Skill: `skills/newsatoshi-agent-payments/SKILL.md`
-- Minimalist Layer-1 Narrow Waist (`v1.2.0-mainnet-rc1`: Private, SHA-2-only, >=100-bit QROM, Bitcoin AuxPoW merge-mined settlement floor): https://github.com/theguysaccount/newsatoshi-rfc0021
+- Minimalist Layer-1 Narrow Waist (`v1.2.0`: Private, SHA-2-only, >=100-bit QROM, Bitcoin AuxPoW merge-mined settlement floor): https://github.com/theguysaccount/newsatoshi-rfc0021
 ",
         proto = state.protocol_version,
         backing_vault = CANONICAL_BACKING_VAULT,
@@ -894,7 +894,7 @@ Available MCP tools (30 live tools — zero API keys required):
 - `newsatoshi_inspect_mission_launchpad` — Legacy `/api/mission` query helper (L1 `v1.0.0-core` exposes unified `/api/prior?id=...` instead)
 - `newsatoshi_format_swarm_task_claim` — Compute deterministic `nsMISSTASK` & `nsMISSCLAIM` signing digests for off-chain/L2 agent swarm coordinators
 - `newsatoshi_verify_zktls_proof` — Cryptographically verify real `reclaim_v1` (EIP-191 secp256k1 ecrecover), `tlsnotary_v1` (Ed25519/secp256k1 + Merkle selective redaction), or `newsatoshi_pq_notary_v1` (FIPS 205 SLH-DSA) zkTLS proofs for off-chain/P2P verification
-- `newsatoshi_check_v2_cutover_readiness` — Honest live `v1.2.0-mainnet-rc1` Mainnet v2 cutover gate checking external audits (0/2), real-difficulty independent Bitcoin AuxPoW pools (0/3), and honest formal/STARK bounds
+- `newsatoshi_check_v2_cutover_readiness` — Honest live `v1.2.0` Mainnet v2 cutover gate checking external audits (0/2), real-difficulty independent Bitcoin AuxPoW pools (0/3), and honest formal/STARK bounds
 - `newsatoshi_compile_bonded_p2p_offer` — Compile a zero-custody `PriorLock`-backed zkTLS P2P Fiat/USDC <-> LOVE market-maker quote (100%+ stake coverage required)
 
 Stdio MCP Bridge (for stdio-only hosts such as Claude Desktop, Cursor, Cline, or shell scripts):

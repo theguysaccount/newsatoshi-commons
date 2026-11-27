@@ -2,14 +2,14 @@ use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub const DEFAULT_SEED_STATUS_URL: &str = "https://newsatoshi-seed.fly.dev/status";
-pub const DEFAULT_MAINNET_SEED_STATUS_URL: &str = "https://newsatoshi.org/mainnet/status";
+pub const DEFAULT_MAINNET_SEED_STATUS_URL: &str = "https://newsatoshi-seed-v2.fly.dev/status";
 pub const MAINNET_GENESIS_HASH: &str =
-    "000000006ba30cc3c86ecaabcb962287e9d5fd0877c27f4b33661b4d1d3033f7";
+    "00000000ba1cdad4aa8e82d6613b4df536394c41008fc3a0914a47a44604b9c8";
 pub const TESTNET_GENESIS_HASH: &str =
     "00000fd814d823a0bc64a84135868402998cff81e28a85b2bede5f1125d0a394";
 pub const AUXPOW_CHAIN_ID: u32 = 20051;
 pub const MAINNET_BLOCK_REWARD_LOVE: u64 = 50;
-pub const MAINNET_P2P_PORT: u16 = 8444;
+pub const MAINNET_P2P_PORT: u16 = 8445;
 pub const TESTNET_P2P_PORT: u16 = 18444;
 
 /// Single block entry inside the `recent` array of `/status`.
@@ -128,22 +128,22 @@ pub struct MainnetInfo {
 impl MainnetInfo {
     pub fn verified_v0_1_0() -> Self {
         Self {
-            network: "mainnet".to_string(),
+            network: "mainnet-v2".to_string(),
             genesis: MAINNET_GENESIS_HASH.to_string(),
             height: 0,
             auxpow_chainid: AUXPOW_CHAIN_ID,
             block_reward_love: MAINNET_BLOCK_REWARD_LOVE,
             p2p_port: MAINNET_P2P_PORT,
-            note: "Newsatoshi v0.1.0 mainnet genesis (50 LOVE/block, AuxPoW chainid 20051, bits 1d00ffff; seeds do not self-mine mainnet).".to_string(),
+            note: "Newsatoshi v1.2.0 Mainnet v2 (nsM2) canonical genesis anchored to Bitcoin #977,738 (50 LOVE/block, AuxPoW chainid 20051, bits 1d00ffff, zero premine; seeds do not self-mine).".to_string(),
         }
     }
 
     pub fn from_live_status(s: &SeedStatus) -> Self {
         let note = if s.height == 0 {
-            "Live Newsatoshi v0.1.0 mainnet node online at genesis height 0 (no premine; awaiting external SHA-256 / Bitcoin AuxPoW miners on chainid 20051).".to_string()
+            "Live Newsatoshi v1.2.0 Mainnet v2 (nsM2) online at canonical Bitcoin #977,738 genesis height 0 (zero premine; awaiting external SHA-256 / Bitcoin AuxPoW miners on chainid 20051).".to_string()
         } else {
             format!(
-                "Live Newsatoshi v{} mainnet active at height #{} (AuxPoW chainid {}, {} peers, {} locks).",
+                "Live Newsatoshi v{} Mainnet v2 active at height #{} (AuxPoW chainid {}, {} peers, {} locks).",
                 s.version, s.height, s.auxpow_chainid, s.peers, s.locks
             )
         };

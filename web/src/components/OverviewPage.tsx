@@ -133,7 +133,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
         <div className="lg:col-span-7">
           <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-white/[0.09] bg-white/[0.025] px-3 py-1 text-[11px] font-medium tracking-wide text-zinc-400">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            <span className="font-mono uppercase text-zinc-200">L1 v1.2.0-mainnet-rc1</span>
+            <span className="font-mono uppercase text-zinc-200">L1 v1.2.0</span>
             <span className="text-zinc-600">·</span>
             <span>Hourglass Architecture · L2 Agent &amp; Bridge Gateway</span>
           </div>
@@ -171,12 +171,12 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
             </button>
 
             <a
-              href="https://github.com/theguysaccount/newsatoshi-rfc0021/releases/tag/v1.2.0-mainnet-rc1"
+              href="https://github.com/theguysaccount/newsatoshi-rfc0021/releases/tag/v1.2.0"
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 px-3 py-2.5 text-[13px] font-medium text-zinc-400 transition hover:text-zinc-100"
             >
-              <span>L1 v1.2.0-mainnet-rc1</span>
+              <span>L1 v1.2.0</span>
               <ArrowUpRight className="h-3.5 w-3.5" />
             </a>
           </div>
@@ -200,10 +200,10 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
             className="group p-5 text-left transition hover:bg-white/[0.02] cursor-pointer sm:p-6"
           >
             <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-[0.08em] text-zinc-500">
-              <span>v0.1.0 Canary</span>
-              <span className="inline-flex items-center gap-1.5 font-mono text-[10px] text-amber-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
-                {ms ? 'Pre-Launch' : 'Syncing'}
+              <span>Mainnet v2 (nsM2)</span>
+              <span className="inline-flex items-center gap-1.5 font-mono text-[10px] text-emerald-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                {ms ? 'Live' : 'Syncing'}
               </span>
             </div>
             <div className="mt-2.5 font-mono text-2xl font-medium tracking-tight text-zinc-100 tabular-nums">
@@ -211,8 +211,8 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
             </div>
             <div className="mt-1.5 text-xs text-zinc-500">
               {ms
-                ? `Diff ${ms.difficulty.toFixed(0)} · ${formatL1IssuedLove(ms.issued)} LOVE · retired for v2 genesis`
-                : 'AuxPoW chainid 20051 · Canary'}
+                ? `Diff ${ms.difficulty.toFixed(0)} · ${formatL1IssuedLove(ms.issued)} LOVE · BTC #977,738 genesis`
+                : 'AuxPoW chainid 20051 · Mainnet v2'}
             </div>
           </button>
 
@@ -299,7 +299,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] text-emerald-200 hover:bg-emerald-500/20"
               >
-                <span>newsatoshi-rfc0021 · v1.2.0-mainnet-rc1</span>
+                <span>newsatoshi-rfc0021 · v1.2.0</span>
                 <ArrowUpRight className="h-3 w-3" />
               </a>
             </div>
@@ -362,7 +362,7 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 rounded-full border border-white/[0.1] bg-white/[0.04] px-2.5 py-0.5 font-mono text-[10px] text-zinc-300 hover:text-white"
               >
-                <span>newsatoshi-commons · v0.24.0</span>
+                <span>newsatoshi-commons · v0.25.0</span>
                 <ArrowUpRight className="h-3 w-3" />
               </a>
             </div>

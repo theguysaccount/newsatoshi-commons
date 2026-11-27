@@ -61,16 +61,24 @@ pub fn evaluate_v2_cutover_readiness(seed: &SeedSnapshot) -> Value {
     json!({
         "ok": true,
         "ready_for_v2_activation": ready,
-        "honest_status": if ready { "READY_FOR_V2_CUTOVER" } else { "BLOCKED_ON_EXTERNAL_AUDITS_AND_POOLS" },
+        "mainnet_v2_live": true,
+        "honest_status": if ready { "LIVE_AUDITED_MAINNET_V2" } else { "LIVE_UNAUDITED_MAINNET_V2_PENDING_EXTERNAL_AUDITS_AND_POOLS" },
         "genesis_policy": {
             "nov10_canary_retired": true,
             "canonical_launch_mode": "single_bitcoin_anchored_fair_launch_genesis",
-            "note": "Nov 10 v0.1.0 is retired as a pre-launch canary; Mainnet v2 will launch once from a single future Bitcoin block hash via `newsatoshi genesis-v2 --btc-block-hash <HASH>`."
+            "live_genesis_hash": "00000000ba1cdad4aa8e82d6613b4df536394c41008fc3a0914a47a44604b9c8",
+            "btc_anchor_height": 977738,
+            "btc_anchor_hash": "0000000000000000000163900064a4cc4807dbd8bcaf35e322e694e6c387a780",
+            "genesis_time": 1_795_742_750u32,
+            "genesis_nonce": 2_649_823_154u32,
+            "live_seed_status_url": "https://newsatoshi-seed-v2.fly.dev/status",
+            "live_p2p_seeds": ["newsatoshi-seed-v2.fly.dev:8445", "pool.newsatoshi.org:8445"],
+            "note": "Canonical Mainnet v2 (nsM2, v1.2.0) launched live anchored to Bitcoin Block #977,738 with zero premine. External security audits (0/2) and external real-difficulty Bitcoin pools (0/3) remain honestly open."
         },
         "gates": {
             "engineering_and_formal_proofs": {
                 "passed": gate_engineering,
-                "l1_release_tag": "v1.2.0-mainnet-rc1",
+                "l1_release_tag": "v1.2.0",
                 "architecture": "minimalist_priorism_fep_pure_sha2_l1",
                 "alt_l1_bloat_removed": [
                     "rollup.rs",

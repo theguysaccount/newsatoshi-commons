@@ -1,17 +1,22 @@
 #!/usr/bin/env sh
 set -eu
 
-mkdir -p /data
+mkdir -p /data/v2
 
 # Ephemeral local-only loopback RPC credential (never exposed outside container)
 RPC_PASS=$(openssl rand -hex 24)
 RPC_AUTH="auxpow:${RPC_PASS}"
 
-echo "[newsatoshi-pool] starting Newsatoshi Mainnet node (datadir=/data, rpc=127.0.0.1:19556)..."
+P2P_VK=$(/usr/local/bin/newsatoshi --net "${NS_NETWORK:-mainnet-v2}" --datadir /data/v2 p2p-key)
+echo "[newsatoshi-pool] Mainnet v2 (nsM2) NSPQ2 SLH-DSA p2p-key: ${P2P_VK}"
+echo "[newsatoshi-pool] starting Newsatoshi Mainnet v2 node (datadir=/data/v2, p2p=:8445, rpc=127.0.0.1:19556)..."
 /usr/local/bin/newsatoshi \
-  --net "${NS_NETWORK:-mainnet}" \
-  --datadir /data \
+  --net "${NS_NETWORK:-mainnet-v2}" \
+  --datadir /data/v2 \
   node \
+  --port 8445 \
+  --external "${PUBLIC_STRATUM_HOST:-pool.newsatoshi.org}:8445" \
+  --peer newsatoshi-seed-v2.internal:8445 \
   --rpc 19556 \
   --rpcbind 127.0.0.1 \
   --rpcauth "${RPC_AUTH}" \

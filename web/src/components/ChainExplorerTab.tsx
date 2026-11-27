@@ -32,11 +32,11 @@ function formatBlockTime(unix: number): string {
 const MIGRATION_PHASES = [
   {
     phase: 'Layer 1 (Narrow Waist)',
-    title: 'v1.2.0-mainnet-rc1 Minimalist SHA-2 Settlement Floor',
+    title: 'v1.2.0 Minimalist SHA-2 Settlement Floor',
     status: 'IMPLEMENTED' as const,
     summary:
       'Pure SHA-2 shielded cash (256-bit Quartic Goldilocks FRI at 100–104 conservative QROM bits with patched upstream f64 canonicalization, zero elliptic curves, zero novel ZK-hashes), all 249 spend AIR constraints mechanized in Lean 4 (0 sorry), real pure-SHA-2 STARK-in-STARK IVC verifier, Bitcoin AuxPoW (chainid 20051) + panic-free Day-14 ASERT ramp, BatchSpend K=2..16 (6.5x at K=8, incentive-compatible prover_fee), O(log N) Merkleized state, NSPQ1/NSPQ2 SLH-DSA pinned PQ P2P, FlyClient MMR, 50% fee burn, PayWord channels, and minimal PriorLock.',
-    specs: ['v1.2.0-mainnet-rc1', '100-104b QROM', '249 Lean AIR + IVC'],
+    specs: ['v1.2.0', '100-104b QROM', '249 Lean AIR + IVC'],
   },
   {
     phase: 'Layer 2 (Above Waist)',
@@ -56,11 +56,11 @@ const MIGRATION_PHASES = [
   },
   {
     phase: 'Mainnet v2 Genesis',
-    title: 'Single Bitcoin-Anchored Fair Launch (Canary Retired)',
-    status: 'PRE-LAUNCH' as const,
+    title: 'LIVE — Bitcoin #977,738 Fair-Launch Genesis (nsM2)',
+    status: 'IMPLEMENTED' as const,
     summary:
-      'The Nov 10 v0.1.0 canary is retired ahead of one clean Bitcoin-block-anchored Mainnet v2 genesis (`newsatoshi genesis-v2 --btc-block-hash <FUTURE_HASH>`), proving zero secret premine or instamine.',
-    specs: ['One Canonical Genesis', 'Day-1 ASERT Ramp', 'Zero Premine'],
+      'Canonical Mainnet v2 (v1.2.0) launched live with zero premine at Genesis 00000000ba1cdad4… anchored to Bitcoin block #977,738 (`newsatoshi --net mainnet-v2 node`, seeds `newsatoshi-seed-v2.fly.dev:8445` & `pool.newsatoshi.org:8445`). External audits (0/2) and external pools (0/3) remain open.',
+    specs: ['BTC #977,738', 'Day-1 ASERT Ramp', 'Zero Premine'],
   },
 ];
 

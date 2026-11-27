@@ -1,17 +1,16 @@
-# Single-container public Newsatoshi Mainnet AuxPoW Solo-Mining Pool (Fly.io)
-# Runs verified upstream newsatoshi-0.1.0 Mainnet node + zero-fee per-miner direct-payout Stratum v1 server.
+# Single-container public Newsatoshi Mainnet v2 (nsM2, v1.2.0) AuxPoW Solo-Mining Pool + IPv4 P2P Seed (Fly.io)
+# Runs canonical v1.2.0 Mainnet v2 node + zero-fee per-miner direct-payout Stratum v1 server.
 
 FROM rust:bookworm AS node-builder
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl unzip ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
-RUN curl -fsSL https://newsatoshi.org/newsatoshi-0.1.0-src.zip -o newsatoshi-0.1.0-src.zip \
-    && echo "3d022302f4120a446dc2cc505dcf51036d832e1d68d3855c0afc38aacb396134  newsatoshi-0.1.0-src.zip" | sha256sum -c - \
-    && unzip -q newsatoshi-0.1.0-src.zip \
-    && cd newsatoshi-0.1.0/node \
-    && cargo build --release --locked
+ARG NS_REF=v1.2.0
+RUN git clone --depth 1 --branch "${NS_REF}" https://github.com/theguysaccount/newsatoshi-rfc0021.git . \
+    && cd node \
+    && cargo build --release --bin newsatoshi
 
 FROM debian:bookworm-slim
 
@@ -20,12 +19,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY --from=node-builder /src/newsatoshi-0.1.0/node/target/release/newsatoshi /usr/local/bin/newsatoshi
+COPY --from=node-builder /src/node/target/release/newsatoshi /usr/local/bin/newsatoshi
 COPY stratum_auxpow.py /app/stratum_auxpow.py
 COPY entrypoint-fly.sh /app/entrypoint-fly.sh
 RUN chmod +x /app/entrypoint-fly.sh /usr/local/bin/newsatoshi
 
 VOLUME ["/data"]
-EXPOSE 3333 8080 8444
+EXPOSE 3333 8080 8445
 
 ENTRYPOINT ["/app/entrypoint-fly.sh"]

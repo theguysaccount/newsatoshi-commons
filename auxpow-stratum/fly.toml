@@ -5,7 +5,7 @@ primary_region = "iad"
   dockerfile = "Dockerfile.fly"
 
 [env]
-  NS_NETWORK = "mainnet"
+  NS_NETWORK = "mainnet-v2"
   PUBLIC_STRATUM_HOST = "pool.newsatoshi.org"
   COINBASE_TAG = "/pool.newsatoshi.org/"
   POLL_INTERVAL = "2.0"
@@ -13,6 +13,17 @@ primary_region = "iad"
 [mounts]
   source = "newsatoshi_pool_data"
   destination = "/data"
+
+# Public Post-Quantum P2P Port (nsM2 IPv4 + IPv6 seed: pool.newsatoshi.org:8445)
+[[services]]
+  protocol = "tcp"
+  internal_port = 8445
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 8445
 
 # Public Stratum v1 Raw TCP for Bitaxe / NerdQAxe / Antminer / CGMiner
 [[services]]
@@ -51,4 +62,4 @@ primary_region = "iad"
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "512mb"
+  memory = "1gb"
