@@ -695,7 +695,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
             if wants_md {
                 let md = format!(
                     "# About Newsatoshi Commons\n\n\
-                     Newsatoshi Commons (`{base_url}`) is an open-source, MIT-licensed public verification gateway and protocol toolkit built for the **Newsatoshi (`LOVE`)** post-quantum Layer-1 network.\n\n\
+                     Newsatoshi Commons (`{base_url}`) is a source-available (`PolyForm-Noncommercial-1.0.0`) public verification gateway and protocol toolkit built for the **Newsatoshi (`LOVE`)** post-quantum Layer-1 network (non-commercial use, auditing & research permitted; commercial use requires a separate commercial license).\n\n\
                      ## Architecture & Design Principles\n\
                      - **Zero Custody & Zero Server Keys:** Production runs in strict `--verify-only` mode with zero private signing keys on server hardware.\n\
                      - **Post-Quantum Cryptography End-to-End:** Uses NIST FIPS 205 SLH-DSA, stateful XMSS Merkle-Lamport trees, pure-SHA-256 PayWord hash-chains, and Winterfell 0.13 transparent STARK proofs with zero trusted setup.\n\
@@ -710,7 +710,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                     "About Newsatoshi Commons",
                     "Mission, zero-custody verify-only architecture, post-quantum cryptography, and open-source transparency of Newsatoshi Commons.",
                     "<h1>About Newsatoshi Commons</h1>\n\
-                     <p>Newsatoshi Commons is an open-source, MIT-licensed cryptographic verification gateway and developer toolkit built for the <strong>Newsatoshi (<code>LOVE</code>)</strong> post-quantum Layer-1 cryptocurrency. Its mission is to make permissionless, quantum-resistant machine money directly usable by autonomous AI agents, Bitcoin merge-miners, multi-chain liquidity makers, and real-world physical infrastructure.</p>\n\
+                     <p>Newsatoshi Commons is a source-available (<code>PolyForm-Noncommercial-1.0.0</code>) cryptographic verification gateway and developer toolkit built for the <strong>Newsatoshi (<code>LOVE</code>)</strong> post-quantum Layer-1 cryptocurrency. Non-commercial auditing, verification, and research are freely permitted; commercial use requires a separate license (see <code>COMMERCIAL_LICENSE.md</code>).</p>\n\
                      <h2>Zero-Custody, Verify-Only Architecture</h2>\n\
                      <p>The live public deployment at <code>commons.newsatoshi.org</code> runs in strict <code>--verify-only</code> mode and holds zero private signing keys on server disks or memory. All land deed attestations and physical energy telemetry packets are signed offline using NIST FIPS 205 SLH-DSA or stateful XMSS keys and verified cryptographically alongside Winterfell 0.13 transparent STARK proofs.</p>\n\
                      <h2>Verifiable Open Source</h2>\n\
@@ -1264,7 +1264,7 @@ pub fn render_openapi_json(base_url: &str) -> Value {
                 "email": "commons@newsatoshi.org"
             },
             "license": {
-                "name": "MIT",
+                "name": "PolyForm-Noncommercial-1.0.0",
                 "url": "https://github.com/theguysaccount/newsatoshi-commons/blob/main/LICENSE"
             },
             "x-versioning-policy": format!("{base_url}/docs#versioning"),

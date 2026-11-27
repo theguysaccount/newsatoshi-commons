@@ -1,19 +1,20 @@
-# `newsatoshi-commons` — Layer 2 Agent Commerce, `nsUSD` Private Dollar & Atomic Bridge Gateway (`v0.28.0`)
+# `newsatoshi-commons` — Layer 2 Agent Commerce, `nsUSD` Private Dollar & Atomic Bridge Gateway (`v0.28.2`)
 
 [![CI](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml/badge.svg)](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml)
 [![Mainnet v2](https://img.shields.io/badge/Mainnet%20v2-LIVE%20%C2%B7%20BTC%20%23977%2C738-10b981)](https://commons.newsatoshi.org)
-[![MCP](https://img.shields.io/badge/MCP-30%20Zero--Auth%20Tools-38bdf8)](https://commons.newsatoshi.org/mcp)
-[![nsUSD](https://img.shields.io/badge/Stable%20Rail-nsUSD%20%2B%20USD%20x402%20PayWords-f59e0b)](https://commons.newsatoshi.org/nsusd)
+[![MCP](https://img.shields.io/badge/MCP-33%20Zero--Auth%20Tools-38bdf8)](https://commons.newsatoshi.org/mcp)
+[![nsUSD](https://img.shields.io/badge/Stable%20Rail-nsUSD%20%2B%20L2%20STARK%20Perfection-f59e0b)](https://commons.newsatoshi.org/l2)
 [![Bug Bounty](https://img.shields.io/badge/Security%20Bounty-Paid%20in%20Mined%20LOVE-ef4444)](https://commons.newsatoshi.org/bounty)
-[![License: MIT](https://img.shields.io/badge/License-MIT-zinc)](LICENSE)
+[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-amber)](LICENSE)
 
-**The open-source Layer-2 gateway for Newsatoshi (`LOVE`) Mainnet v2 — bringing private USD-denominated machine payments (`nsUSD` + `O(1)` PayWords), 30 zero-auth MCP tools, trustless 4-chain SHA-256 atomic swaps, and Bitcoin AuxPoW merge-mining to humans and autonomous AI agents.**
+**The source-available (noncommercial) Layer-2 gateway for Newsatoshi (`LOVE`) Mainnet v2 — bringing private USD-denominated machine payments (`nsUSD` + `O(1)` PayWords), L2 STARK rollup & escape-hatch verification, 13-theorem Lean 4 solvency proofs, 33 zero-auth MCP tools, trustless 4-chain SHA-256 atomic swaps, and Bitcoin AuxPoW merge-mining to humans and autonomous AI agents.**
 
-- **Live Verify-Only Gateway (0 Server Private Keys):** [commons.newsatoshi.org](https://commons.newsatoshi.org)
+- **Live Verify-Only Gateway (0 Server Private Keys):** [commons.newsatoshi.org](https://commons.newsatoshi.org) · **L2 Perfection:** [commons.newsatoshi.org/l2](https://commons.newsatoshi.org/l2)
 - **Satoshi-Format 8-Page Whitepaper PDF:** [commons.newsatoshi.org/whitepaper.pdf](https://commons.newsatoshi.org/whitepaper.pdf)
-- **`nsUSD` Private Stablecoin Spec & Live USD Quote API:** [commons.newsatoshi.org/nsusd](https://commons.newsatoshi.org/nsusd) · `GET /api/v2/nsusd/quote?usd=0.01`
+- **`nsUSD` Private Stablecoin Engine & Stress Suite:** [commons.newsatoshi.org/nsusd](https://commons.newsatoshi.org/nsusd) · `GET /api/v2/nsusd/state` · [Lean 4 Kernel](formal/NsUsdAndL2Perfection.lean)
 - **Public Security Bug Bounty (Fair-Mined `LOVE`):** [commons.newsatoshi.org/bounty](https://commons.newsatoshi.org/bounty)
-- **Layer-1 Consensus Repo (`v1.2.1`):** [theguysaccount/newsatoshi-rfc0021](https://github.com/theguysaccount/newsatoshi-rfc0021)
+- **Layer-1 Consensus Repo (`v1.2.2`):** [theguysaccount/newsatoshi-rfc0021](https://github.com/theguysaccount/newsatoshi-rfc0021)
+- **License:** [PolyForm Noncommercial License 1.0.0](LICENSE) (non-commercial research, auditing & personal use permitted; see [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for commercial licensing)
 
 ---
 
