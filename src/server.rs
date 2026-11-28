@@ -646,7 +646,13 @@ fn respond_unauthorized(req: Request) {
 fn handle_request(req: Request, state: &AppState) {
     let method = req.method().clone();
     let raw_url = req.url().to_string();
-    let path = raw_url.split('?').next().unwrap_or(&raw_url).to_string();
+    let raw_path = raw_url.split('?').next().unwrap_or(&raw_url);
+    let path = if raw_path.len() > 1 {
+        let trimmed = raw_path.trim_end_matches('/');
+        if trimmed.is_empty() { "/".to_string() } else { trimmed.to_string() }
+    } else {
+        raw_path.to_string()
+    };
 
     if method == Method::Options {
         respond_empty(req, 204);
@@ -678,6 +684,7 @@ fn handle_request(req: Request, state: &AppState) {
             "/install.sh" => Some("text/x-shellscript; charset=utf-8"),
             "/sdk/newsatoshi-402.mjs" => Some("application/javascript; charset=utf-8"),
             "/sdk/newsatoshi-402.py" => Some("text/x-python; charset=utf-8"),
+            "/sdk/newsatoshi-402.d.ts" => Some("text/typescript; charset=utf-8"),
             "/robots.txt"
             | "/.well-known/mcp-registry-auth"
             | "/.well-known/402index-verify.txt"
