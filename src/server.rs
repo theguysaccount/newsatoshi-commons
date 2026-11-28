@@ -99,6 +99,10 @@ struct AppState {
     state_file: PathBuf,
     nsusd_engine: Mutex<crate::nsusd::NsUsdEngine>,
     nsusd_state_file: PathBuf,
+    factory_registry: Mutex<crate::sovereign_factory::SovereignFactoryRegistry>,
+    factory_state_file: PathBuf,
+    order_vault: Mutex<crate::proof_of_order::ProofOfOrderVault>,
+    order_state_file: PathBuf,
     seed_client: SeedStatusClient,
     mainnet_seed_client: Option<SeedStatusClient>,
     seed_cache: Mutex<Option<CachedSeed>>,
@@ -111,23 +115,31 @@ struct AppState {
     started_at: Instant,
 }
 
-fn load_nsusd_state(path: &Path) -> crate::nsusd::NsUsdEngine {
+fn load_json_or_default<T: serde::de::DeserializeOwned + Default>(path: &Path) -> T {
     fs::read_to_string(path)
         .ok()
-        .and_then(|s| serde_json::from_str::<crate::nsusd::NsUsdEngine>(&s).ok())
+        .and_then(|s| serde_json::from_str::<T>(&s).ok())
         .unwrap_or_default()
 }
 
-fn save_nsusd_state(path: &Path, engine: &crate::nsusd::NsUsdEngine) {
+fn save_json_atomic<T: serde::Serialize>(path: &Path, val: &T) {
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    if let Ok(json_str) = serde_json::to_string_pretty(engine) {
+    if let Ok(json_str) = serde_json::to_string_pretty(val) {
         let tmp = path.with_extension("json.tmp");
         if fs::write(&tmp, json_str).is_ok() {
             let _ = fs::rename(&tmp, path);
         }
     }
+}
+
+fn load_nsusd_state(path: &Path) -> crate::nsusd::NsUsdEngine {
+    load_json_or_default(path)
+}
+
+fn save_nsusd_state(path: &Path, engine: &crate::nsusd::NsUsdEngine) {
+    save_json_atomic(path, engine);
 }
 
 impl AppState {
@@ -244,11 +256,21 @@ pub fn spawn_server(config: ServerConfig) -> Result<RunningServer, String> {
     let ops_hub = OpsHubManager::init(&config.state_file);
     let nsusd_state_file = config.state_file.with_file_name("nsusd-ledger.json");
     let nsusd_engine = load_nsusd_state(&nsusd_state_file);
+    let factory_state_file = config.state_file.with_file_name("sovereign-factory.json");
+    let factory_registry: crate::sovereign_factory::SovereignFactoryRegistry =
+        load_json_or_default(&factory_state_file);
+    let order_state_file = config.state_file.with_file_name("order-vault.json");
+    let order_vault: crate::proof_of_order::ProofOfOrderVault =
+        load_json_or_default(&order_state_file);
     let state = Arc::new(AppState {
         engine: Mutex::new(engine),
         state_file: config.state_file,
         nsusd_engine: Mutex::new(nsusd_engine),
         nsusd_state_file,
+        factory_registry: Mutex::new(factory_registry),
+        factory_state_file,
+        order_vault: Mutex::new(order_vault),
+        order_state_file,
         seed_client: SeedStatusClient::new(config.seed_url, Duration::from_secs(5)),
         mainnet_seed_client,
         seed_cache: Mutex::new(None),
@@ -346,11 +368,21 @@ pub fn run_server_blocking(config: ServerConfig) -> Result<(), String> {
     let ops_hub = OpsHubManager::init(&config.state_file);
     let nsusd_state_file = config.state_file.with_file_name("nsusd-ledger.json");
     let nsusd_engine = load_nsusd_state(&nsusd_state_file);
+    let factory_state_file = config.state_file.with_file_name("sovereign-factory.json");
+    let factory_registry: crate::sovereign_factory::SovereignFactoryRegistry =
+        load_json_or_default(&factory_state_file);
+    let order_state_file = config.state_file.with_file_name("order-vault.json");
+    let order_vault: crate::proof_of_order::ProofOfOrderVault =
+        load_json_or_default(&order_state_file);
     let state = Arc::new(AppState {
         engine: Mutex::new(engine),
         state_file: config.state_file,
         nsusd_engine: Mutex::new(nsusd_engine),
         nsusd_state_file,
+        factory_registry: Mutex::new(factory_registry),
+        factory_state_file,
+        order_vault: Mutex::new(order_vault),
+        order_state_file,
         seed_client: SeedStatusClient::new(config.seed_url, Duration::from_secs(5)),
         mainnet_seed_client,
         seed_cache: Mutex::new(None),
@@ -746,6 +778,8 @@ fn handle_request(req: Request, state: &AppState) {
             | "/api/v2/nsusd/quote"
             | "/api/v2/nsusd/state"
             | "/api/v2/l2/status"
+            | "/api/v2/factory/state"
+            | "/api/v2/order/state"
             | "/api/v2/x402/paywall-kit"
             | "/api/v2/paywords/cost-savings"
             | "/api/v2/paywords/channel-kit"
@@ -1015,6 +1049,358 @@ fn handle_request(req: Request, state: &AppState) {
                     }
                     Err(e) => respond_json(req, 422, &json!({ "ok": false, "error": e })),
                 }
+            }
+        }
+        (Method::Get, "/api/v2/factory/state") => {
+            let summary = {
+                let reg = state
+                    .factory_registry
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner());
+                reg.summary_json()
+            };
+            let seed = state.get_seed_snapshot(false);
+            respond_json(
+                req,
+                200,
+                &json!({
+                    "ok": true,
+                    "factory": summary,
+                    "live_mainnet_v2_height": seed.mainnet_status.as_ref().map(|s| s.height),
+                    "endpoints": {
+                        "launch_stablecoin": "POST /api/v2/factory/stablecoin",
+                        "launch_l2": "POST /api/v2/factory/l2",
+                        "simulate_sandbox": "POST /api/v2/factory/simulate"
+                    }
+                }),
+            );
+        }
+        (Method::Post, "/api/v2/factory/stablecoin") => {
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let parsed: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+            let ticker = parsed.get("ticker").and_then(|v| v.as_str()).unwrap_or("");
+            let name = parsed.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            let peg = parsed
+                .get("peg_currency")
+                .and_then(|v| v.as_str())
+                .unwrap_or("USD");
+            let issuer_name = parsed
+                .get("issuer_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let issuer_pk = parsed
+                .get("issuer_pubkey_hex")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let model_str = parsed
+                .get("backing_model")
+                .and_then(|v| v.as_str())
+                .unwrap_or("regulated_bank_reserve");
+            let viewing_key = parsed
+                .get("regulator_viewing_key_enabled")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+            let chains: Vec<String> = parsed
+                .get("settlement_chains")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+            match crate::sovereign_factory::StablecoinBackingModel::parse(model_str) {
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+                Ok(backing_model) => {
+                    let res = {
+                        let mut reg = state
+                            .factory_registry
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner());
+                        let r = reg.launch_stablecoin(
+                            crate::sovereign_factory::LaunchStablecoinInput {
+                                ticker,
+                                name,
+                                peg_currency: peg,
+                                issuer_name,
+                                issuer_pubkey_hex: issuer_pk,
+                                backing_model,
+                                regulator_viewing_key_enabled: viewing_key,
+                                settlement_chains: chains,
+                            },
+                        );
+                        if r.is_ok() {
+                            save_json_atomic(&state.factory_state_file, &*reg);
+                        }
+                        r.map(|spec| (spec, hex::encode(reg.registry_root())))
+                    };
+                    match res {
+                        Ok((spec, root_hex)) => respond_json(
+                            req,
+                            200,
+                            &json!({
+                                "ok": true,
+                                "persisted": true,
+                                "stablecoin": spec,
+                                "registry_root_hex": root_hex
+                            }),
+                        ),
+                        Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+                    }
+                }
+            }
+        }
+        (Method::Post, "/api/v2/factory/l2") => {
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let parsed: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+            let slug = parsed.get("slug").and_then(|v| v.as_str()).unwrap_or("");
+            let name = parsed.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            let op_name = parsed
+                .get("operator_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let op_pk = parsed
+                .get("operator_pubkey_hex")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let delay = parsed
+                .get("escape_hatch_delay_blocks")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(72);
+            let assets: Vec<u32> = parsed
+                .get("settled_asset_ids")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|x| x.as_u64().map(|n| n as u32))
+                        .collect()
+                })
+                .unwrap_or_default();
+            let seed = state.get_seed_snapshot(false);
+            let l1_height = seed.mainnet_status.as_ref().map(|s| s.height).unwrap_or(0);
+            let l1_tip = seed
+                .mainnet_status
+                .as_ref()
+                .map(|s| s.tip.clone())
+                .unwrap_or_else(|| {
+                    "00000000ba1cdad4aa8e82d6613b4df536394c41008fc3a0914a47a44604b9c8".to_string()
+                });
+            let res = {
+                let mut reg = state
+                    .factory_registry
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner());
+                let r = reg.launch_sovereign_l2(crate::sovereign_factory::LaunchL2Input {
+                    slug,
+                    name,
+                    operator_name: op_name,
+                    operator_pubkey_hex: op_pk,
+                    settled_asset_ids: assets,
+                    escape_hatch_delay_blocks: delay,
+                    l1_tip_hex: &l1_tip,
+                    l1_height,
+                });
+                if r.is_ok() {
+                    save_json_atomic(&state.factory_state_file, &*reg);
+                }
+                r.map(|spec| (spec, hex::encode(reg.registry_root())))
+            };
+            match res {
+                Ok((spec, root_hex)) => {
+                    let kit = crate::sovereign_factory::build_l2_deployment_kit(&spec);
+                    respond_json(
+                        req,
+                        200,
+                        &json!({
+                            "ok": true,
+                            "persisted": true,
+                            "sovereign_l2": spec,
+                            "deployment_kit": kit,
+                            "registry_root_hex": root_hex
+                        }),
+                    );
+                }
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/v2/factory/simulate") => {
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let parsed: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+            let ticker = parsed
+                .get("ticker")
+                .and_then(|v| v.as_str())
+                .unwrap_or("BANKUSD");
+            let issuer = parsed
+                .get("issuer_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Founding Reserve Bank");
+            let model_str = parsed
+                .get("backing_model")
+                .and_then(|v| v.as_str())
+                .unwrap_or("regulated_bank_reserve");
+            let l2_slug = parsed
+                .get("l2_slug")
+                .and_then(|v| v.as_str())
+                .unwrap_or("founding-bank-l2");
+            let seed = state.get_seed_snapshot(false);
+            let l1_height = seed.mainnet_status.as_ref().map(|s| s.height).unwrap_or(0);
+            let l1_tip = seed
+                .mainnet_status
+                .as_ref()
+                .map(|s| s.tip.as_str())
+                .unwrap_or("00000000ba1cdad4aa8e82d6613b4df536394c41008fc3a0914a47a44604b9c8");
+            match crate::sovereign_factory::StablecoinBackingModel::parse(model_str).and_then(
+                |m| {
+                    crate::sovereign_factory::run_factory_sandbox_simulation(
+                        ticker, issuer, m, l2_slug, l1_height, l1_tip,
+                    )
+                },
+            ) {
+                Ok(report) => respond_json(req, 200, &report),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Get, "/api/v2/order/state") => {
+            let summary = {
+                let vault = state
+                    .order_vault
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner());
+                vault.summary_json()
+            };
+            respond_json(
+                req,
+                200,
+                &json!({
+                    "ok": true,
+                    "vault": summary,
+                    "endpoints": {
+                        "record_miner_pledge": "POST /api/v2/order/pledge",
+                        "submit_good_deed_claim": "POST /api/v2/order/claim",
+                        "simulate_sandbox": "POST /api/v2/order/simulate"
+                    }
+                }),
+            );
+        }
+        (Method::Post, "/api/v2/order/pledge") => {
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let parsed: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+            let miner_label = parsed
+                .get("miner_label")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let pledge_bps = parsed
+                .get("pledge_bps")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(1_000) as u16;
+            let deposit_sats = parsed
+                .get("vault_deposit_sats")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let l1_txid = parsed.get("l1_txid_hex").and_then(|v| v.as_str());
+            let res = {
+                let mut vault = state
+                    .order_vault
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner());
+                let r = vault.record_miner_pledge(miner_label, pledge_bps, deposit_sats, l1_txid);
+                if r.is_ok() {
+                    save_json_atomic(&state.order_state_file, &*vault);
+                }
+                r.map(|p| (p, hex::encode(vault.order_root())))
+            };
+            match res {
+                Ok((pledge, root_hex)) => respond_json(
+                    req,
+                    200,
+                    &json!({
+                        "ok": true,
+                        "persisted": true,
+                        "pledge": pledge,
+                        "order_root_hex": root_hex
+                    }),
+                ),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/v2/order/claim") => {
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let parsed: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+            let cat_str = parsed
+                .get("category")
+                .and_then(|v| v.as_str())
+                .unwrap_or("zktls_civic_good_deed");
+            let handle = parsed
+                .get("claimant_handle")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let recipient = parsed
+                .get("recipient_ns1")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let summary = parsed.get("summary").and_then(|v| v.as_str()).unwrap_or("");
+            let digest = parsed
+                .get("proof_digest_hex")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let reward_sats = parsed
+                .get("requested_reward_sats")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(100_000_000);
+            let bond_sats = parsed
+                .get("bond_love_sats")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(crate::proof_of_order::MIN_CLAIM_BOND_SATS);
+            let now_unix = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            match crate::proof_of_order::GoodDeedCategory::parse(cat_str) {
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+                Ok(category) => {
+                    let res = {
+                        let mut vault = state
+                            .order_vault
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner());
+                        let r = vault.submit_deed_claim(
+                            crate::proof_of_order::SubmitDeedClaimInput {
+                                category,
+                                claimant_handle: handle,
+                                recipient_ns1: recipient,
+                                summary,
+                                proof_digest_hex: digest,
+                                requested_reward_sats: reward_sats,
+                                bond_love_sats: bond_sats,
+                                challenge_window_secs: None,
+                                now_unix,
+                            },
+                        );
+                        if r.is_ok() {
+                            save_json_atomic(&state.order_state_file, &*vault);
+                        }
+                        r.map(|c| (c, hex::encode(vault.order_root())))
+                    };
+                    match res {
+                        Ok((claim, root_hex)) => respond_json(
+                            req,
+                            200,
+                            &json!({
+                                "ok": true,
+                                "persisted": true,
+                                "claim": claim,
+                                "order_root_hex": root_hex
+                            }),
+                        ),
+                        Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+                    }
+                }
+            }
+        }
+        (Method::Post, "/api/v2/order/simulate") => {
+            match crate::proof_of_order::run_order_sandbox_simulation() {
+                Ok(report) => respond_json(req, 200, &report),
+                Err(e) => respond_json(req, 500, &json!({ "ok": false, "error": e })),
             }
         }
         (Method::Get, "/api/v2/x402/paywall-kit") => {
