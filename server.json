@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "org.newsatoshi.commons/newsatoshi-commons",
   "title": "Newsatoshi Commons — Universal Interop, Stablecoin/L2 Factory, Good-Deed Vault & Private x402 MCP",
-  "description": "52 zero-auth tools: ERC-7683, 11-rail HTLCs, ISO 20022, Stablecoin/L2 Factory, Proof-of-Order & PayWords.",
-  "version": "0.37.0",
+  "description": "54 zero-auth tools: RFC-0030 Cyber-Economy SLAs, ERC-7683, 11-rail HTLCs, ISO 20022, Factory, Good Deeds & PayWords.",
+  "version": "0.38.0",
   "websiteUrl": "https://commons.newsatoshi.org",
   "repository": {
     "url": "https://github.com/theguysaccount/newsatoshi-commons",

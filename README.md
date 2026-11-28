@@ -1,14 +1,15 @@
-# `newsatoshi-commons` — Universal Interop, Stablecoin/L2 Factory, Proof-of-Order & `O(1)` PayWords Gateway (`v0.37.0`)
+# `newsatoshi-commons` — 5-Layer Cyber Economy Standard, Universal Interop, Stablecoin/L2 Factory & `O(1)` PayWords (`v0.38.0`)
 
 [![CI](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml/badge.svg)](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml)
 [![Mainnet v2](https://img.shields.io/badge/Mainnet%20v2-LIVE%20%C2%B7%20v1.2.5%20%C2%B7%20BTC%20%23977%2C738-10b981)](https://newsatoshi.org)
-[![MCP](https://img.shields.io/badge/MCP-52%20Zero--Auth%20Tools-38bdf8)](https://commons.newsatoshi.org/mcp)
+[![MCP](https://img.shields.io/badge/MCP-54%20Zero--Auth%20Tools-38bdf8)](https://commons.newsatoshi.org/mcp)
 [![Glama MCP](https://glama.ai/mcp/connectors/org.newsatoshi.commons/newsatoshi-commons/badges/score.svg)](https://glama.ai/mcp/connectors/org.newsatoshi.commons/newsatoshi-commons)
 [![PayWords](https://img.shields.io/badge/PayWords-Base%20%C2%B7%20Optimism%20%C2%B7%20Arbitrum%20(0%25%20Fee)-f59e0b)](https://newsatoshi.org/paywords/)
 [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-amber)](LICENSE)
 
 **Zero-custody, zero-protocol-fee cross-chain interoperability, branded stablecoin & sovereign STARK L2 infrastructure, Proof-of-Order good-deed mining, and `O(1)` PayWords rails for autonomous AI agents, regulated banks, Bitcoin merge-miners, and post-quantum Newsatoshi (`LOVE`) Mainnet v2.**
 
+- **Autonomous Cyber-Economy Clearinghouse (RFC-0030):** [newsatoshi.org/economy](https://newsatoshi.org/economy/) (Verifiable Agent-to-Agent SLA Escrow, Hierarchical Swarm DAG Revenue Splits, 50/50 Anti-Hallucination Slashing, Foundry-verified `NewsatoshiAgentClearinghouse.sol`, 11 zero-sorry Lean 4.36 theorems at [`formal/InteropAndOrderTheorems.lean`](formal/InteropAndOrderTheorems.lean))
 - **Universal Interop Hub:** [newsatoshi.org/interop](https://newsatoshi.org/interop/) (Live 6-Chain Parallel RPC Matrix, ERC-7683 EIP-712 Intents, 11-Rail SHA-256 HTLCs incl. Cosmos IBC & Sui/Aptos Move, ISO 20022 `pacs.008` Bank XML Bridge, 5-Protocol AI Agent Envelope)
 - **Stablecoin & Sovereign L2 Factory (0% Fee):** [newsatoshi.org/build](https://newsatoshi.org/build/) · **Proof-of-Order Good-Deed Mining:** [newsatoshi.org/order](https://newsatoshi.org/order/) · **Story:** [newsatoshi.org/story](https://newsatoshi.org/story/)
 - **Cross-Chain Connectivity Hub:** [newsatoshi.org/connect](https://newsatoshi.org/connect/) · **PayWords Studio:** [newsatoshi.org/paywords](https://newsatoshi.org/paywords/) · **Fair Launchpad:** [newsatoshi.org/launchpad](https://newsatoshi.org/launchpad/) · **nsUSD:** [newsatoshi.org/nsusd](https://newsatoshi.org/nsusd/)

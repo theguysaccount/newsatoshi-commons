@@ -1721,3 +1721,19 @@ def get_order_vault_state(base_url: str = DEFAULT_COMMONS_URL, opener=None) -> D
 
 def simulate_proof_of_order(base_url: str = DEFAULT_COMMONS_URL, opener=None) -> Dict[str, Any]:
     return _commons_json_request("/api/v2/order/simulate", method="POST", body={}, base_url=base_url, opener=opener)
+
+
+def get_economy_state(base_url: str = DEFAULT_COMMONS_URL, opener=None) -> Dict[str, Any]:
+    return _commons_json_request("/api/v2/economy/state", base_url=base_url, opener=opener)
+
+
+def create_cyber_sla(params: Dict[str, Any], base_url: str = DEFAULT_COMMONS_URL, opener=None) -> Dict[str, Any]:
+    return _commons_json_request("/api/v2/economy/sla", method="POST", body=params, base_url=base_url, opener=opener)
+
+
+def compile_swarm_dag_split(params: Dict[str, Any], base_url: str = DEFAULT_COMMONS_URL, opener=None) -> Dict[str, Any]:
+    return _commons_json_request("/api/v2/economy/dag-split", method="POST", body=params, base_url=base_url, opener=opener)
+
+
+def simulate_cyber_economy(base_url: str = DEFAULT_COMMONS_URL, opener=None) -> Dict[str, Any]:
+    return _commons_json_request("/api/v2/economy/simulate", method="POST", body={}, base_url=base_url, opener=opener)

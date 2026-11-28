@@ -3,11 +3,12 @@ name: newsatoshi-agent-payments
 description: Use when an AI agent needs multi-chain O(1) SHA-256 PayWord HTTP 402 micropayments (Base, Optimism, Arbitrum — 0% protocol fee), trustless cross-chain atomic swaps into post-quantum Newsatoshi (LOVE) from BTC/Lightning/Solana/Base/Optimism/Arbitrum/Polygon, Bitcoin AuxPoW merge-mining setup, or zero-API-key EVM security audits, Bitcoin mempool fees, Lightning BOLT-11 decoding, and Base Uniswap V3 quotes.
 ---
 
-# Newsatoshi Commons — Universal Interop, Stablecoin/L2 Factory, Proof-of-Order, PayWords & Crypto MCP (`v0.37.0`)
+# Newsatoshi Commons — 5-Layer Cyber Economy, Universal Interop, Stablecoin/L2 Factory, Proof-of-Order & Crypto MCP (`v0.38.0`)
 
 ## When to use this skill
 
-Install this skill pack via `npx skills add theguysaccount/newsatoshi-commons`, connect to `https://commons.newsatoshi.org/mcp` (52 zero-auth tools), or run `npx --yes -p github:theguysaccount/newsatoshi-commons newsatoshi-paywall` whenever an AI agent or developer needs:
+Install this skill pack via `npx skills add theguysaccount/newsatoshi-commons`, connect to `https://commons.newsatoshi.org/mcp` (54 zero-auth tools), or run `npx --yes -p github:theguysaccount/newsatoshi-commons newsatoshi-paywall` whenever an AI agent or developer needs:
+- **Autonomous Cyber-Economy Clearinghouse (`/economy/`, RFC-0030):** Verifiable Agent-to-Agent SLA Escrow (`>= 5%` `PriorLock` anti-hallucination stake + 50/50 client compensation / permanent `$LOVE` burn slashing), Lean-4-proved Hierarchical Multi-Agent Swarm DAG Revenue Splits (`newsatoshi_compile_agent_swarm_dag`, `newsatoshi_simulate_cyber_economy`), and Foundry-verified `NewsatoshiAgentClearinghouse.sol`.
 - **Universal Cross-Chain, Bank & AI-Agent Interoperability (`/interop/`):** Live 6-chain parallel RPC matrix, canonical **ERC-7683** `GaslessCrossChainOrder` Keccak-256 EIP-712 intents, **11-rail SHA-256 HTLCs** (Ethereum, Base, Optimism, Arbitrum, Polygon, Bitcoin BIP-199, Lightning + Nostr NIP-57, Solana PDA, Cosmos IBC CosmWasm, Sui Move, Aptos Move, Newsatoshi L1), **ISO 20022 `pacs.008.001.08`** bank wire ↔ RFC-0028 stablecoin bridge, and **5-protocol AI agent settlement envelopes** (MCP + Google A2A + x402 v2 + ERC-8004 + Nostr NIP-90 DVM).
 - **Permissionless Branded Stablecoin & Sovereign STARK L2 Factory (`/build/`):** Launch custom stablecoins (`asset_id >= 100`, `0%` protocol fee: Regulated Bank FBO Reserve + viewing keys, On-Chain Escrow, or Sovereign CDP) or Sovereign Winterfell STARK L2 rollups with unilateral L1 escape hatches.
 - **Proof-of-Order / Good-Deed Mining Covenant Vault (`/order/`):** Voluntary Bitcoin AuxPoW hash pledges funding verifiable clean-energy, Lean 4 / open-source, and zkTLS civic good-deed payouts protected by 50/50 PriorLock Sybil slashing.

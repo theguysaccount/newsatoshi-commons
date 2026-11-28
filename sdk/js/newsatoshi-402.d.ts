@@ -167,3 +167,7 @@ export function getOrderVaultState(options?: CommonsClientOptions): Promise<Reco
 export function recordAuxPowPledge(params: Record<string, unknown>, options?: CommonsClientOptions): Promise<Record<string, unknown>>;
 export function submitGoodDeedClaim(params: Record<string, unknown>, options?: CommonsClientOptions): Promise<Record<string, unknown>>;
 export function simulateProofOfOrder(options?: CommonsClientOptions): Promise<Record<string, unknown>>;
+export function getEconomyState(options?: CommonsClientOptions): Promise<Record<string, unknown>>;
+export function createCyberSla(params: Record<string, unknown>, options?: CommonsClientOptions): Promise<Record<string, unknown>>;
+export function compileSwarmDagSplit(params: Record<string, unknown>, options?: CommonsClientOptions): Promise<Record<string, unknown>>;
+export function simulateCyberEconomy(options?: CommonsClientOptions): Promise<Record<string, unknown>>;

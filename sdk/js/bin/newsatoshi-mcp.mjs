@@ -425,6 +425,26 @@ async function runCli(argv) {
     return;
   }
 
+  if (cmd === "dag-split") {
+    const [, swarm_id = "autonomous-swarm-01", budgetStr = "100000000"] = argv;
+    const settlement_asset = parseFlag(argv, "--asset", "NSUSD");
+    const res = unwrapToolResult(
+      await client.callTool("newsatoshi_compile_agent_swarm_dag", {
+        swarm_id,
+        settlement_asset,
+        total_budget_units: Number(budgetStr),
+      })
+    );
+    console.log(JSON.stringify(res, null, 2));
+    return;
+  }
+
+  if (cmd === "simulate-economy") {
+    const res = unwrapToolResult(await client.callTool("newsatoshi_simulate_cyber_economy", {}));
+    console.log(JSON.stringify(res, null, 2));
+    return;
+  }
+
   throw new Error(`Unknown command "${cmd}". Run "newsatoshi-mcp help" for usage.`);
 }
 

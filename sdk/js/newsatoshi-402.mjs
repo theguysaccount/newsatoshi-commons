@@ -2361,3 +2361,19 @@ export async function submitGoodDeedClaim(params, { baseUrl = DEFAULT_COMMONS_UR
 export async function simulateProofOfOrder({ baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
   return commonsJsonRequest("/api/v2/order/simulate", { method: "POST", body: {}, baseUrl, fetchImpl });
 }
+
+export async function getEconomyState({ baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest("/api/v2/economy/state", { baseUrl, fetchImpl });
+}
+
+export async function createCyberSla(params, { baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest("/api/v2/economy/sla", { method: "POST", body: params || {}, baseUrl, fetchImpl });
+}
+
+export async function compileSwarmDagSplit(params, { baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest("/api/v2/economy/dag-split", { method: "POST", body: params || {}, baseUrl, fetchImpl });
+}
+
+export async function simulateCyberEconomy({ baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest("/api/v2/economy/simulate", { method: "POST", body: {}, baseUrl, fetchImpl });
+}
