@@ -208,6 +208,7 @@ pub const NSUSD_RFC_MARKDOWN: &str = include_str!("../docs/RFC-0028-NSUSD-SHIELD
 pub const WHITEPAPER_LATEX: &str = include_str!("../docs/newsatoshi_2_1_whitepaper.tex");
 pub const LEAN_FORMAL_PROOF: &str = include_str!("../formal/NewsatoshiCovenants.lean");
 pub const LEAN_NSUSD_L2_PROOF: &str = include_str!("../formal/NsUsdAndL2Perfection.lean");
+pub const LEAN_INTEROP_ORDER_PROOF: &str = include_str!("../formal/InteropAndOrderTheorems.lean");
 
 /// Computes strictly real, live derived network & AuxPoW merge-mining metrics from
 /// live Newsatoshi Mainnet and Testnet `/status` snapshots (zero fabricated figures).
@@ -354,6 +355,7 @@ pub fn render_sitemap_xml(base_url: &str) -> String {
         ("/manifesto", "0.9", "weekly"),
         ("/formal/NewsatoshiCovenants.lean", "0.9", "weekly"),
         ("/formal/NsUsdAndL2Perfection.lean", "0.9", "weekly"),
+        ("/formal/InteropAndOrderTheorems.lean", "0.9", "weekly"),
         ("/developers", "0.9", "daily"),
         ("/about", "0.8", "weekly"),
         ("/contact", "0.7", "monthly"),
