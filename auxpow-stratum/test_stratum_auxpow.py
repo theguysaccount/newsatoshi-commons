@@ -106,11 +106,16 @@ class AuxPowStratumTests(unittest.TestCase):
                 cfg = await recv()
                 self.assertTrue(cfg["result"]["version-rolling"])
 
-                # 2. Subscribe -> receives subscribe result, set_difficulty, and mining.notify
+                # 2. Subscribe -> clean subscribe result (no premature notify before authorize)
                 await send({"id": 2, "method": "mining.subscribe", "params": ["bitaxe-test/1.0"]})
                 sub = await recv()
                 en1_hex = sub["result"][1]
                 self.assertEqual(len(en1_hex), 8)
+
+                # 3. Authorize -> receives authorize result, then set_difficulty and mining.notify
+                await send({"id": 3, "method": "mining.authorize", "params": ["bitaxe.rig1", "x"]})
+                auth = await recv()
+                self.assertTrue(auth["result"])
                 diff_msg = await recv()
                 self.assertEqual(diff_msg["method"], "mining.set_difficulty")
                 notify = await recv()
@@ -118,11 +123,6 @@ class AuxPowStratumTests(unittest.TestCase):
                 job_id, prevhash, coinb1_hex, coinb2_hex, branch_hex, ver_hex, nbits_hex, ntime_hex, _ = notify[
                     "params"
                 ]
-
-                # 3. Authorize
-                await send({"id": 3, "method": "mining.authorize", "params": ["bitaxe.rig1", "x"]})
-                auth = await recv()
-                self.assertTrue(auth["result"])
 
                 # 4. Grind real SHA-256d share meeting regtest target
                 en2_hex = "00000001"
@@ -221,6 +221,57 @@ class AuxPowStratumTests(unittest.TestCase):
                 await tcp_server.wait_closed()
 
         asyncio.run(run_flow())
+
+
+    def test_password_diff_and_suggest_difficulty(self) -> None:
+        self.assertEqual(sa.parse_password_difficulty("d=4096"), 4096.0)
+        self.assertEqual(sa.parse_password_difficulty("x,d=65536"), 65536.0)
+        self.assertIsNone(sa.parse_password_difficulty("x"))
+        self.assertIsNone(sa.parse_password_difficulty("d=-5"))
+
+        async def run_diff_flow() -> None:
+            # High network difficulty (~100,000) so suggested_diff=4096 is honored directly
+            hard_target_int = sa.difficulty_to_target(100_000.0)
+            fake_rpc = FakeAuxRpc(hard_target_int.to_bytes(32, "little").hex())
+            srv = sa.AuxPowStratumServer(ns_rpc=fake_rpc, poll_interval=60.0)
+            srv.refresh_template_sync()
+            tcp_server = await asyncio.start_server(srv.handle_stratum_client, "127.0.0.1", 0)
+            port = tcp_server.sockets[0].getsockname()[1]
+            try:
+                reader, writer = await asyncio.open_connection("127.0.0.1", port)
+
+                async def send(obj):
+                    writer.write((json.dumps(obj) + "\n").encode("utf-8"))
+                    await writer.drain()
+
+                async def recv():
+                    line = await asyncio.wait_for(reader.readline(), timeout=5.0)
+                    return json.loads(line.decode("utf-8"))
+
+                await send({"id": 1, "method": "mining.subscribe", "params": ["mrr-test/1.0"]})
+                sub = await recv()
+                self.assertEqual(sub["id"], 1)
+
+                await send({"id": 2, "method": "mining.suggest_difficulty", "params": [4096]})
+                res2 = await recv()
+                self.assertTrue(res2["result"])
+
+                await send({"id": 3, "method": "mining.authorize", "params": ["rig1", "x,d=16384"]})
+                res3 = await recv()
+                self.assertTrue(res3["result"])
+                d2 = await recv()
+                self.assertEqual(d2["method"], "mining.set_difficulty")
+                self.assertEqual(d2["params"][0], 16384.0)
+                n2 = await recv()
+                self.assertEqual(n2["method"], "mining.notify")
+
+                writer.close()
+                await writer.wait_closed()
+            finally:
+                tcp_server.close()
+                await tcp_server.wait_closed()
+
+        asyncio.run(run_diff_flow())
 
 
 if __name__ == "__main__":
