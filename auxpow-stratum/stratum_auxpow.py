@@ -491,6 +491,9 @@ class AuxPowStratumServer:
             )
             parent_nbits = 0x1701F0A3
             parent_ntime = int(time.time())
+            # Include one canonical sibling hash so ASIC firmwares that dislike empty merkle_branch=[]
+            # (some WhatsMiner btminer builds) hash normally; AuxPoW verifies merkle_branch(cb, branch, 0).
+            merkle_branch = [sha256d(b"newsatoshi-auxpow-v2")]
             p2pkh_script = (
                 self.btc_payout_script
                 if len(self.btc_payout_script) >= 20
@@ -755,7 +758,7 @@ class AuxPowStratumServer:
                     if "subscribe-extranonce" in extensions:
                         res["subscribe-extranonce"] = True
                     print(
-                        f"[auxpow-stratum] configure cid={extranonce1} req={extensions} res={res}",
+                        f"[auxpow-stratum] configure cid={extranonce1} req={extensions} ext={ext_params} res={res}",
                         flush=True,
                     )
                     await self._send_json(writer, {"id": req_id, "result": res, "error": None})
