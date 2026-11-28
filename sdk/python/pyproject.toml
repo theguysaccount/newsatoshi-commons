@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "newsatoshi-402"
-version = "0.30.0"
-description = "Zero-dependency post-quantum HTTP 402 PayWord (L1 LOVE + Live Base Mainnet USDC PayWordChannel & FairCurvePool), x402, zero-API-key EVM/BTC/BOLT-11/Uniswap V3 crypto tools, and Streamable HTTP MCP client/middleware for Newsatoshi"
+version = "0.33.0"
+description = "Zero-dependency multi-chain HTTP 402 PayWord & AI Agent AutoPaySession SDK (Base, Optimism, Arbitrum + Newsatoshi L1), 4-chain SHA-256 HTLC atomic swaps, Universal Payment URIs, and Streamable HTTP MCP client"
 readme = "../../README.md"
 requires-python = ">=3.9"
 license = { text = "PolyForm-Noncommercial-1.0.0" }

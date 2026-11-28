@@ -1,0 +1,22 @@
+manifestVersion: 1
+id: newsatoshi-auxpow-miner
+category: bitcoin
+name: Newsatoshi BTC+LOVE AuxPoW Merge-Miner
+version: "1.2.5"
+tagline: Earn 50 LOVE/block alongside Bitcoin at $0 extra electricity (AuxPoW chainid=20051)
+description: >-
+  Connects directly to your Umbrel Bitcoin Node (bitcoind) and runs a canonical
+  Newsatoshi Mainnet v2 (v1.2.5) verifying node plus a zero-fee Stratum v1 AuxPoW
+  merge-mining bridge. Point your home Bitaxe, NerdQAxe, Antminer, or WhatsMiner at
+  stratum+tcp://umbrel.local:3333 to simultaneously solo-mine Bitcoin AND merge-mine
+  post-quantum Newsatoshi (LOVE) using the Namecoin 0xfabe6d6d AuxPoW tag at zero extra power.
+developer: Newsatoshi Commons
+website: https://newsatoshi.org/connect/
+dependencies:
+  - bitcoin
+repo: https://github.com/theguysaccount/newsatoshi-commons
+support: https://github.com/theguysaccount/newsatoshi-commons/issues
+port: 3334
+path: /status
+defaultUsername: ""
+defaultPassword: ""

@@ -14,6 +14,7 @@ pub const OPTIMISM_USDC_ADDRESS: &str = "0x0b2C639c533813f4Aa9D7837CAf62653d097F
 pub const ARBITRUM_USDC_ADDRESS: &str = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
 pub const POLYGON_USDC_ADDRESS: &str = "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359";
 pub const SDK_JS_SOURCE: &str = include_str!("../sdk/js/newsatoshi-402.mjs");
+pub const SDK_DTS_SOURCE: &str = include_str!("../sdk/js/newsatoshi-402.d.ts");
 pub const SDK_PY_SOURCE: &str = include_str!("../sdk/python/newsatoshi_402.py");
 pub const BASE_PAYWORD_CHANNEL_ADDRESS: &str = "0x971BA814Df91c20DcA3aDd870C2B55d643965C50";
 /// Live Sourcify exact_match NewsatoshiPayWordChannel deployed identically at nonce 4 on Optimism (10) & Arbitrum One (42161).
@@ -808,10 +809,16 @@ pub fn build_crosschain_connectivity_directory(base_url: &str) -> Value {
             "channel_kit_compiler": format!("{base_url}/api/v2/paywords/channel-kit"),
             "live_channel_inspector": format!("{base_url}/api/v2/evm/channel"),
             "live_htlc_inspector": format!("{base_url}/api/v2/evm/htlc"),
+            "universal_payment_uri_compiler": format!("{base_url}/api/v2/interop/payment-uri"),
+            "reserve_price_rfq_compiler": format!("{base_url}/api/v2/swaps/rfq"),
             "mcp_endpoint": format!("{base_url}/mcp"),
-            "mcp_tools_count": 43,
+            "mcp_tools_count": 45,
             "zero_dep_js_sdk": "https://newsatoshi.org/sdk/newsatoshi-402.mjs",
+            "typescript_types": "https://newsatoshi.org/sdk/newsatoshi-402.d.ts",
             "zero_dep_python_sdk": "https://newsatoshi.org/sdk/newsatoshi-402.py",
+            "npm_install": "npm install github:theguysaccount/newsatoshi-commons",
+            "pip_install": "pip install \"git+https://github.com/theguysaccount/newsatoshi-commons.git#subdirectory=sdk/python\"",
+            "umbrel_merge_mine_kit": "https://github.com/theguysaccount/newsatoshi-commons/tree/main/auxpow-stratum/umbrel",
             "frameworks": ["cloudflare_worker", "express", "fastapi", "agent_fetch_js", "agent_python"],
             "x402_standard_proposal": "https://github.com/x402-foundation/x402/issues/4494"
         }
@@ -1411,6 +1418,275 @@ pub fn inspect_live_evm_htlc(chain: &str, swap_id_hex: &str) -> Result<Value, St
     decode_evm_htlc_swap_words(meta.slug, &raw, &clean)
 }
 
+fn pct_encode_query(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char);
+            }
+            _ => {
+                out.push('%');
+                out.push_str(&format!("{b:02X}"));
+            }
+        }
+    }
+    out
+}
+
+/// Build standards-compliant cross-chain payment URIs (EIP-681, BIP-21, Lightning BOLT-11,
+/// Solana Pay, and Newsatoshi Mainnet v2 `newsatoshi:` URI) plus HTTP 402 PayWords metadata.
+pub fn build_universal_payment_uri(
+    rail: &str,
+    recipient: &str,
+    amount: f64,
+    asset: Option<&str>,
+    memo: Option<&str>,
+    payment_hash_hex: Option<&str>,
+) -> Result<Value, String> {
+    if !amount.is_finite() || amount <= 0.0 || amount > 1_000_000_000.0 {
+        return Err("amount must be finite and in (0, 1_000_000_000]".into());
+    }
+    let rec = recipient.trim();
+    if rec.is_empty() || rec.len() > 2048 {
+        return Err("recipient address or invoice is required".into());
+    }
+    let memo_str = memo.map(str::trim).filter(|s| !s.is_empty());
+    let hash_clean = payment_hash_hex
+        .map(strip_hex)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_ascii_lowercase());
+    if let Some(ref h) = hash_clean {
+        if h.len() != 64 || !h.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err("payment_hash_hex must be 64 hex characters (32-byte SHA-256)".into());
+        }
+    }
+
+    let r = rail.trim().to_ascii_lowercase();
+    let asset_up = asset.unwrap_or("").trim().to_ascii_uppercase();
+    const SOLANA_USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+    let evm_uri = |chain_slug: &str, chain_id: u64, usdc: &str, native: &str| -> Value {
+        let use_usdc = asset_up.is_empty() || asset_up == "USDC";
+        if use_usdc {
+            let raw = (amount * 1_000_000.0).round() as u128;
+            json!({
+                "rail": chain_slug,
+                "standard": "EIP-681 (ERC-20 USDC)",
+                "chain_id": chain_id,
+                "asset": "USDC",
+                "amount": amount,
+                "amount_base_units": raw.to_string(),
+                "uri": format!("ethereum:{usdc}@{chain_id}/transfer?address={rec}&uint256={raw}")
+            })
+        } else {
+            let wei = (amount * 1e18).round() as u128;
+            json!({
+                "rail": chain_slug,
+                "standard": "EIP-681 (Native)",
+                "chain_id": chain_id,
+                "asset": native,
+                "amount": amount,
+                "amount_base_units": wei.to_string(),
+                "uri": format!("ethereum:{rec}@{chain_id}?value={wei}")
+            })
+        }
+    };
+
+    if r == "all" {
+        let mut ns_uri = format!("newsatoshi:{rec}?amount={amount}&net=mainnet-v2");
+        if let Some(ref h) = hash_clean {
+            ns_uri.push_str(&format!("&hash={h}"));
+        }
+        if let Some(m) = memo_str {
+            ns_uri.push_str(&format!("&memo={}", pct_encode_query(m)));
+        }
+        return Ok(json!({
+            "ok": true,
+            "mode": "universal_multi_rail_bundle",
+            "amount": amount,
+            "asset_preference": if asset_up.is_empty() { "USDC / Native" } else { &asset_up },
+            "uris": {
+                "base": evm_uri("base", 8453, BASE_USDC_ADDRESS, "ETH"),
+                "optimism": evm_uri("optimism", 10, OPTIMISM_USDC_ADDRESS, "ETH"),
+                "arbitrum": evm_uri("arbitrum", 42161, ARBITRUM_USDC_ADDRESS, "ETH"),
+                "polygon": evm_uri("polygon", 137, POLYGON_USDC_ADDRESS, "POL"),
+                "bitcoin": {
+                    "rail": "bitcoin",
+                    "standard": "BIP-21",
+                    "asset": "BTC",
+                    "uri": match memo_str {
+                        Some(m) => format!("bitcoin:{rec}?amount={amount}&label={}", pct_encode_query(m)),
+                        None => format!("bitcoin:{rec}?amount={amount}"),
+                    }
+                },
+                "solana": {
+                    "rail": "solana",
+                    "standard": "Solana Pay",
+                    "asset": if asset_up == "SOL" { "SOL" } else { "USDC" },
+                    "uri": if asset_up == "SOL" {
+                        match memo_str {
+                            Some(m) => format!("solana:{rec}?amount={amount}&memo={}", pct_encode_query(m)),
+                            None => format!("solana:{rec}?amount={amount}"),
+                        }
+                    } else {
+                        match memo_str {
+                            Some(m) => format!("solana:{rec}?amount={amount}&spl-token={SOLANA_USDC_MINT}&memo={}", pct_encode_query(m)),
+                            None => format!("solana:{rec}?amount={amount}&spl-token={SOLANA_USDC_MINT}"),
+                        }
+                    }
+                },
+                "newsatoshi": {
+                    "rail": "newsatoshi",
+                    "standard": "NEWSATOSHI-URI/1.0 (Mainnet v2 Shielded)",
+                    "asset": "LOVE",
+                    "uri": ns_uri
+                }
+            },
+            "paywords_http_402_contracts": {
+                "base": BASE_PAYWORD_CHANNEL_ADDRESS,
+                "optimism": MULTICHAIN_PAYWORD_CHANNEL_ADDRESS,
+                "arbitrum": MULTICHAIN_PAYWORD_CHANNEL_ADDRESS
+            }
+        }));
+    }
+
+    let entry = match r.as_str() {
+        "base" | "eip155:8453" => evm_uri("base", 8453, BASE_USDC_ADDRESS, "ETH"),
+        "optimism" | "op" | "eip155:10" => evm_uri("optimism", 10, OPTIMISM_USDC_ADDRESS, "ETH"),
+        "arbitrum" | "arb" | "eip155:42161" => evm_uri("arbitrum", 42161, ARBITRUM_USDC_ADDRESS, "ETH"),
+        "polygon" | "pol" | "eip155:137" => evm_uri("polygon", 137, POLYGON_USDC_ADDRESS, "POL"),
+        "bitcoin" | "btc" => json!({
+            "rail": "bitcoin",
+            "standard": "BIP-21",
+            "asset": "BTC",
+            "amount": amount,
+            "uri": match memo_str {
+                Some(m) => format!("bitcoin:{rec}?amount={amount}&label={}", pct_encode_query(m)),
+                None => format!("bitcoin:{rec}?amount={amount}"),
+            }
+        }),
+        "lightning" | "ln" | "bolt11" => json!({
+            "rail": "lightning",
+            "standard": "BOLT-11 / BIP-21 Lightning",
+            "asset": "BTC-LN",
+            "uri": format!("lightning:{}", rec.trim_start_matches("lightning:").trim_start_matches("LIGHTNING:"))
+        }),
+        "solana" | "sol" => {
+            let is_sol = asset_up == "SOL";
+            let mut uri = format!("solana:{rec}?amount={amount}");
+            if !is_sol {
+                uri.push_str(&format!("&spl-token={SOLANA_USDC_MINT}"));
+            }
+            if let Some(m) = memo_str {
+                uri.push_str(&format!("&memo={}", pct_encode_query(m)));
+            }
+            json!({
+                "rail": "solana",
+                "standard": "Solana Pay",
+                "asset": if is_sol { "SOL" } else { "USDC" },
+                "amount": amount,
+                "uri": uri
+            })
+        }
+        "newsatoshi" | "love" | "ns" => {
+            let mut uri = format!("newsatoshi:{rec}?amount={amount}&net=mainnet-v2");
+            if let Some(ref h) = hash_clean {
+                uri.push_str(&format!("&hash={h}"));
+            }
+            if let Some(m) = memo_str {
+                uri.push_str(&format!("&memo={}", pct_encode_query(m)));
+            }
+            json!({
+                "rail": "newsatoshi",
+                "standard": "NEWSATOSHI-URI/1.0 (Mainnet v2 Shielded)",
+                "asset": "LOVE",
+                "amount": amount,
+                "uri": uri
+            })
+        }
+        other => {
+            return Err(format!(
+                "unsupported rail '{other}': use all, base, optimism, arbitrum, polygon, bitcoin, lightning, solana, or newsatoshi"
+            ));
+        }
+    };
+
+    Ok(json!({
+        "ok": true,
+        "payment": entry
+    }))
+}
+
+/// Compile a permissionless Reserve-Price RFQ / Sealed-Bid SHA-256 HTLC Manifest that protects
+/// organic `LOVE` price discovery (seller sets a firm minimum floor price; zero thin-AMM dumping).
+pub fn compile_reserve_price_rfq(
+    love_amount: f64,
+    min_reserve_price_usd: f64,
+    settlement_rail: &str,
+    seller_settlement_address: &str,
+    expiry_hours: u64,
+) -> Result<Value, String> {
+    if !love_amount.is_finite() || love_amount <= 0.0 || love_amount > 21_000_000.0 {
+        return Err("love_amount must be finite and in (0, 21_000_000]".into());
+    }
+    if !min_reserve_price_usd.is_finite() || min_reserve_price_usd <= 0.0 || min_reserve_price_usd > 1_000_000.0 {
+        return Err("min_reserve_price_usd must be finite and > 0".into());
+    }
+    let addr = seller_settlement_address.trim();
+    if addr.is_empty() || addr.len() > 256 {
+        return Err("seller_settlement_address is required".into());
+    }
+    let hours = expiry_hours.clamp(1, 720);
+    let rail_norm = settlement_rail.trim().to_ascii_lowercase();
+    let (rail_label, htlc_ref, asset_sym) = match rail_norm.as_str() {
+        "base_usdc" | "base" => ("Base Mainnet USDC", CANONICAL_EVM_HTLC_ADDRESS, "USDC"),
+        "optimism_usdc" | "optimism" => ("Optimism Mainnet USDC", CANONICAL_EVM_HTLC_ADDRESS, "USDC"),
+        "arbitrum_usdc" | "arbitrum" => ("Arbitrum One USDC", CANONICAL_EVM_HTLC_ADDRESS, "USDC"),
+        "polygon_usdc" | "polygon" => ("Polygon PoS USDC", CANONICAL_EVM_HTLC_ADDRESS, "USDC"),
+        "btc_onchain" | "bitcoin" => ("Bitcoin On-Chain BIP-199 P2WSH", "BIP-199 P2WSH (OP_SHA256)", "BTC"),
+        "lightning_bolt11" | "lightning" => ("Bitcoin Lightning BOLT-11", "BOLT-11 SHA-256 HTLC", "BTC-LN"),
+        "solana_usdc" | "solana" => ("Solana SPL-USDC PDA HTLC", "Solana PDA SHA-256 HTLC", "USDC"),
+        other => {
+            return Err(format!(
+                "unsupported settlement_rail '{other}': use base_usdc, optimism_usdc, arbitrum_usdc, polygon_usdc, btc_onchain, lightning_bolt11, or solana_usdc"
+            ));
+        }
+    };
+
+    let min_total_usd = round6(love_amount * min_reserve_price_usd);
+    let min_usdc_raw = (min_total_usd * 1_000_000.0).round() as u128;
+    let canonical = format!(
+        "NS_RFQ_V1|love={love_amount:.8}|min_usd={min_reserve_price_usd:.6}|rail={rail_norm}|seller={addr}|hours={hours}"
+    );
+    let rfq_id = hex::encode(crate::crypto::sha256(canonical.as_bytes()));
+
+    Ok(json!({
+        "ok": true,
+        "rfq_id": format!("0x{rfq_id}"),
+        "price_discovery_mode": "seller_reserve_floor_rfq_no_amm_dumping",
+        "why_this_protects_price_discovery": "Zero thin-liquidity AMM slippage and zero subsidized maker floor. Seller locks LOVE strictly AFTER a competing buyer locks >= min_total_usd into a trustless SHA-256 HTLC.",
+        "terms": {
+            "love_amount": love_amount,
+            "min_reserve_price_usd_per_love": min_reserve_price_usd,
+            "min_total_usd": min_total_usd,
+            "min_settlement_usdc_base_units": if asset_sym == "USDC" { Some(min_usdc_raw.to_string()) } else { None },
+            "settlement_rail": rail_norm,
+            "settlement_rail_label": rail_label,
+            "settlement_asset": asset_sym,
+            "htlc_contract_or_script": htlc_ref,
+            "seller_settlement_address": addr,
+            "rfq_expiry_hours": hours
+        },
+        "atomic_execution_sequence": [
+            "1. Seller broadcasts this signed Reserve-Price RFQ (zero LOVE locked upfront; zero downward price anchoring).",
+            "2. Competing buyer submits a bid >= min_total_usd and locks settlement funds FIRST into the SHA-256 HTLC (longer timelock: e.g. 24h) using buyer-chosen payment_hash = SHA256(preimage).",
+            "3. Seller verifies the buyer's on-chain HTLC lock via newsatoshi_inspect_evm_htlc / mempool, then locks love_amount on Newsatoshi Mainnet v2 (`newsatoshi --net mainnet-v2 lock <LOVE> --hash <payment_hash> --to <buyer_ns1> --timeout 72`).",
+            "4. Buyer claims LOVE on Mainnet v2, revealing preimage atomically so seller claims >= min_total_usd on the settlement rail."
+        ]
+    }))
+}
+
 /// Read all live Fair Bonding Curves deployed via `NewsatoshiFairCurveFactory`
 /// (`0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933`) directly from Base Mainnet RPC (15s TTL cache).
 pub fn fetch_live_base_fair_curves(force_refresh: bool) -> Result<Value, String> {
@@ -1704,7 +1980,33 @@ mod tests {
         let dir = build_crosschain_connectivity_directory("https://commons.newsatoshi.org");
         assert_eq!(dir["ok"], true);
         assert_eq!(dir["paywords_multichain_evm"].as_array().unwrap().len(), 3);
-        assert_eq!(dir["agent_payment_implementation"]["mcp_tools_count"], 43);
+        assert_eq!(dir["agent_payment_implementation"]["mcp_tools_count"], 45);
+        assert!(SDK_DTS_SOURCE.contains("createAutoPayFetch"));
+
+        let uri_all = build_universal_payment_uri(
+            "all",
+            "0x1744535521EB420be9700475400455a4Ad0EBEa2",
+            25.5,
+            Some("USDC"),
+            Some("Invoice 42"),
+            None,
+        )
+        .unwrap();
+        assert_eq!(uri_all["ok"], true);
+        assert!(uri_all["uris"]["base"]["uri"].as_str().unwrap().contains("ethereum:0x833589"));
+        assert!(uri_all["uris"]["solana"]["uri"].as_str().unwrap().contains("spl-token=EPjFWdd5"));
+
+        let rfq = compile_reserve_price_rfq(
+            100.0,
+            25.0,
+            "base_usdc",
+            "0x1744535521EB420be9700475400455a4Ad0EBEa2",
+            48,
+        )
+        .unwrap();
+        assert_eq!(rfq["ok"], true);
+        assert_eq!(rfq["terms"]["min_total_usd"], 2500.0);
+        assert_eq!(rfq["price_discovery_mode"], "seller_reserve_floor_rfq_no_amm_dumping");
 
         let op_words = format!(
             "0x{:0>64}{:0>64}{:0>64}{}{}{:064x}{:064x}{:064x}{:064x}{:064x}",

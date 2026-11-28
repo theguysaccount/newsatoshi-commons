@@ -882,7 +882,9 @@ pub fn render_mcp_server_card_json(base_url: &str) -> Value {
             "newsatoshi_inspect_base_payword_channel",
             "newsatoshi_get_crosschain_connectivity",
             "newsatoshi_inspect_multichain_payword_channel",
-            "newsatoshi_inspect_evm_htlc"
+            "newsatoshi_inspect_evm_htlc",
+            "newsatoshi_build_universal_payment_uri",
+            "newsatoshi_compile_reserve_price_rfq"
         ],
         "resources": [
             "newsatoshi://llms.txt",
@@ -962,7 +964,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 - Commons Treasury Balance: `{bal} LOVE` (`nonce={nonce}`, `parcels={parcels}`, `kwh={kwh}`, `starks={starks}`)
 
 ## Agent Interfaces (Zero Auth Required for All Reads, Compilers & Verifiers)
-- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **43 live tools** (including live 3-chain Base/Optimism/Arbitrum `O(1)` SHA-256 PayWordChannel + 4-chain EVM SHA-256 HTLC live RPC inspectors, cost-savings & Cloudflare/Express/FastAPI/AI-Agent setup kit, Cross-Chain Connectivity Directory, dilution-proof Fair Bonding-Curve Launchpad simulator, 60-second private `x402`/`nsUSD` paywall middleware generator, live Base USDC vault escrow verifier, `nsUSD` Dual-Tier stablecoin engine + stress suite, L2 Perfection Layer STARK batch benchmark, 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.5` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
+- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **45 live tools** (including Universal Multi-Chain Payment URIs, Reserve-Price RFQ HTLC swaps, live 3-chain Base/Optimism/Arbitrum `O(1)` SHA-256 PayWordChannel + 4-chain EVM SHA-256 HTLC live RPC inspectors, cost-savings & Cloudflare/Express/FastAPI/AI-Agent setup kit, Cross-Chain Connectivity Directory, dilution-proof Fair Bonding-Curve Launchpad simulator, 60-second private `x402`/`nsUSD` paywall middleware generator, live Base USDC vault escrow verifier, `nsUSD` Dual-Tier stablecoin engine + stress suite, L2 Perfection Layer STARK batch benchmark, 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.5` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
 - **Zero-Install Stdio MCP Bridge & CLI (Node 18+, Zero Dependencies):** `npx -y github:theguysaccount/newsatoshi-commons` (`inspect`, `btc-fees`, `decode-bolt11`, `quote-base`, `verify-tx`, `payword-demo`, or stdio MCP `serve`).
 - [Native LOVE PayWord & x402 v2 Discovery]({base_url}/.well-known/x402): 4 live monetized endpoints settling primarily in **native `LOVE`** (`<1ms` zero-gas SHA-256 PayWords / `PriorLock`), with Base/Arbitrum/Polygon USDC (`x402 v2`, `$0.001`) supported as outer bridge on-ramps (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).
 - [MCP Server Card]({base_url}/.well-known/mcp/server-card.json) & [MCP Registry Manifest]({base_url}/server.json): Standard MCP discovery cards (`org.newsatoshi.commons/newsatoshi-commons`).
@@ -1026,7 +1028,7 @@ Add to Claude Desktop, Cursor, Codex, Antigravity, or any Streamable HTTP MCP ho
   }}
 }}
 ```
-Available MCP tools (43 live tools — zero API keys required):
+Available MCP tools (45 live tools — zero API keys required):
 - `crypto_inspect_evm_contract` — Live multi-chain EVM smart contract security audit (bytecode, EIP-1967 proxy/admin slots, `owner()` admin risk, ERC-20 metadata, Sourcify v2 exact-match verification across Ethereum, Base, Arbitrum, Optimism & Polygon)
 - `crypto_bitcoin_mempool_oracle` — Live Bitcoin chain tip, recommended sat/vB fee tiers (`fastest`, `30m`, `60m`, `economy`), and mempool backlog
 - `crypto_decode_bolt11_invoice` — Pure-Rust BOLT-11 Lightning invoice decoder (network, sats/msats, payment hash, expiry, description)
@@ -1070,6 +1072,8 @@ Available MCP tools (43 live tools — zero API keys required):
 - `newsatoshi_get_crosschain_connectivity` — Live Cross-Chain & Agent Connectivity Directory: 3-chain Sourcify-verified `NewsatoshiPayWordChannel` (`Base`, `Optimism`, `Arbitrum`), 4-chain SHA-256 `NewsatoshiHtlc` atomic swaps + BTC/Lightning/Solana swap compilers, Bitcoin AuxPoW merge-mining & 0%-fee Stratum pool endpoints, and zero-dep JS/Python AI Agent auto-pay SDKs + live HTTP 402 sandbox
 - `newsatoshi_inspect_multichain_payword_channel` — Inspect any live `NewsatoshiPayWordChannel` across **Base**, **Optimism**, or **Arbitrum** directly via JSON-RPC (`payer`, `recipient`, `token`, `current_root`, `claimed_steps`, `remaining_steps`, and USDC balance)
 - `newsatoshi_inspect_evm_htlc` — Inspect any live SHA-256 `NewsatoshiHtlc` (`0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987`) atomic swap across **Base**, **Optimism**, **Arbitrum**, or **Polygon** directly via JSON-RPC (`status`, `sender`, `recipient`, `amount`, `payment_hash`, `timelock`, and revealed 32-byte `preimage`)
+- `newsatoshi_build_universal_payment_uri` — Generate standards-compliant wallet/agent payment URIs across **Base / Optimism / Arbitrum / Polygon (EIP-681)**, **Bitcoin (BIP-21)**, **Lightning (BOLT-11)**, **Solana Pay**, and **Newsatoshi Mainnet v2 (`newsatoshi:`)** from one call
+- `newsatoshi_compile_reserve_price_rfq` — Compile a permissionless seller-defined Reserve-Price RFQ SHA-256 HTLC manifest protecting organic `LOVE` price discovery (zero thin-AMM dumping; buyer locks settlement rail first at `>= min_reserve_price_usd`)
 
 Stdio MCP Bridge (for stdio-only hosts such as Claude Desktop, Cursor, Cline, or shell scripts):
 ```json
@@ -2286,6 +2290,37 @@ pub fn mcp_tools_list() -> Value {
                         "swap_id": { "type": "string", "description": "0x-prefixed 32-byte HTLC swap ID" }
                     }
                 }
+            },
+            {
+                "name": "newsatoshi_build_universal_payment_uri",
+                "description": "Build standards-compliant cross-chain payment URIs (EIP-681 for Base/Optimism/Arbitrum/Polygon USDC or native gas, BIP-21 Bitcoin, Lightning BOLT-11, Solana Pay, and newsatoshi: Mainnet v2) for wallets, QR codes, and AI agents.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["recipient", "amount"],
+                    "properties": {
+                        "rail": { "type": "string", "enum": ["all", "base", "optimism", "arbitrum", "polygon", "bitcoin", "lightning", "solana", "newsatoshi"], "description": "Target rail or 'all' for a multi-rail bundle (default: all)" },
+                        "recipient": { "type": "string", "description": "Destination address or BOLT-11 invoice" },
+                        "amount": { "type": "number", "description": "Payment amount in human units (e.g. 5.0 for 5 USDC)" },
+                        "asset": { "type": "string", "description": "Optional asset override (USDC, ETH, POL, BTC, SOL, LOVE)" },
+                        "memo": { "type": "string", "description": "Optional invoice/order label" },
+                        "payment_hash_hex": { "type": "string", "description": "Optional 32-byte SHA-256 HTLC hash for Newsatoshi L1" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_compile_reserve_price_rfq",
+                "description": "Compile a permissionless Reserve-Price RFQ SHA-256 HTLC manifest protecting organic LOVE price discovery (seller sets firm USD reserve floor; buyer locks settlement rail first; zero thin-AMM dumping).",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["love_amount", "min_reserve_price_usd", "seller_settlement_address"],
+                    "properties": {
+                        "love_amount": { "type": "number", "description": "Amount of Mainnet v2 LOVE offered" },
+                        "min_reserve_price_usd": { "type": "number", "description": "Seller's firm minimum USD reserve price per LOVE" },
+                        "settlement_rail": { "type": "string", "enum": ["base_usdc", "optimism_usdc", "arbitrum_usdc", "polygon_usdc", "btc_onchain", "lightning_bolt11", "solana_usdc"], "description": "Settlement rail (default: base_usdc)" },
+                        "seller_settlement_address": { "type": "string", "description": "Seller's destination address on the settlement rail" },
+                        "expiry_hours": { "type": "integer", "description": "RFQ validity window in hours (1..720, default: 24)" }
+                    }
+                }
             }
         ]
     })
@@ -2965,6 +3000,39 @@ pub fn handle_mcp_jsonrpc(
                         .ok_or_else(|| "missing required 'swap_id'".to_string());
                     sid.and_then(|id| crate::paywords_launchpad::inspect_live_evm_htlc(chain, id))
                 }
+                "newsatoshi_build_universal_payment_uri" => {
+                    let rail = args.get("rail").and_then(|v| v.as_str()).unwrap_or("all");
+                    let recipient = args
+                        .get("recipient")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let amount = args.get("amount").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    let asset = args.get("asset").and_then(|v| v.as_str());
+                    let memo = args.get("memo").and_then(|v| v.as_str());
+                    let hash = args.get("payment_hash_hex").and_then(|v| v.as_str());
+                    crate::paywords_launchpad::build_universal_payment_uri(
+                        rail, recipient, amount, asset, memo, hash,
+                    )
+                }
+                "newsatoshi_compile_reserve_price_rfq" => {
+                    let love_amt = args.get("love_amount").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    let min_price = args
+                        .get("min_reserve_price_usd")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.0);
+                    let rail = args
+                        .get("settlement_rail")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("base_usdc");
+                    let seller = args
+                        .get("seller_settlement_address")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let hours = args.get("expiry_hours").and_then(|v| v.as_u64()).unwrap_or(24);
+                    crate::paywords_launchpad::compile_reserve_price_rfq(
+                        love_amt, min_price, rail, seller, hours,
+                    )
+                }
                 other => Err(format!("unknown MCP tool '{other}'")),
             };
 
@@ -3070,6 +3138,6 @@ mod tests {
             &client,
             None,
         );
-        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 43);
+        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 45);
     }
 }

@@ -720,6 +720,8 @@ fn handle_request(req: Request, state: &AppState) {
             | "/api/v2/base/channel"
             | "/api/v2/evm/channel"
             | "/api/v2/evm/htlc"
+            | "/api/v2/interop/payment-uri"
+            | "/api/v2/swaps/rfq"
             | "/api/web4/charters"
             | "/api/web4/services"
             | "/api/web4/bounties"
@@ -1101,6 +1103,45 @@ fn handle_request(req: Request, state: &AppState) {
                     &json!({ "ok": false, "error": "missing required query param 'swap_id' or 'id' (0x-prefixed 32-byte hash)" }),
                 ),
             }
+        }
+        (Method::Post, "/api/v2/interop/payment-uri") => {
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let p: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+            let rail = p.get("rail").and_then(|v| v.as_str()).unwrap_or("all");
+            let recipient = p.get("recipient").and_then(|v| v.as_str()).unwrap_or("");
+            let amount = p.get("amount").and_then(|v| v.as_f64()).unwrap_or(1.0);
+            let asset = p.get("asset").and_then(|v| v.as_str());
+            let memo = p.get("memo").and_then(|v| v.as_str());
+            let hash = p.get("payment_hash_hex").and_then(|v| v.as_str());
+            match crate::paywords_launchpad::build_universal_payment_uri(
+                rail, recipient, amount, asset, memo, hash,
+            ) {
+                Ok(v) => respond_json(req, 200, &v),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/v2/swaps/rfq") => {
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let p: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+            let love_amt = p.get("love_amount").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let min_price = p.get("min_reserve_price_usd").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let rail = p.get("settlement_rail").and_then(|v| v.as_str()).unwrap_or("base_usdc");
+            let seller = p.get("seller_settlement_address").and_then(|v| v.as_str()).unwrap_or("");
+            let hours = p.get("expiry_hours").and_then(|v| v.as_u64()).unwrap_or(24);
+            match crate::paywords_launchpad::compile_reserve_price_rfq(
+                love_amt, min_price, rail, seller, hours,
+            ) {
+                Ok(v) => respond_json(req, 200, &v),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Get, "/sdk/newsatoshi-402.d.ts") => {
+            respond_text(
+                req,
+                200,
+                "text/typescript; charset=utf-8",
+                crate::paywords_launchpad::SDK_DTS_SOURCE.to_string(),
+            );
         }
         (Method::Get, "/sdk/newsatoshi-402.mjs") => {
             respond_text(

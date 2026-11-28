@@ -1,0 +1,56 @@
+# Umbrel 1-Click Dual Bitcoin + Newsatoshi (LOVE) AuxPoW Merge-Mining Sidecar
+# Connects automatically to Umbrel's built-in Bitcoin Core RPC container (`bitcoin_bitcoind_1:8332`).
+# Point any Bitaxe / NerdQAxe / Antminer / WhatsMiner at: stratum+tcp://umbrel.local:3333
+version: "3.7"
+
+services:
+  newsatoshi-node:
+    build:
+      context: ..
+      dockerfile: Dockerfile.node
+    restart: on-failure
+    command:
+      - "--net"
+      - "mainnet-v2"
+      - "--datadir"
+      - "/data"
+      - "node"
+      - "--peer"
+      - "newsatoshi-seed-v2.fly.dev:8445@b024aaeafa0e4ca384b99483c28c3bedde45a5461a560063b283766414dfbbcc"
+      - "--peer"
+      - "pool.newsatoshi.org:8445"
+      - "--rpc"
+      - "19556"
+      - "--rpcbind"
+      - "0.0.0.0"
+      - "--rpcauth"
+      - "auxpow:${APP_PASSWORD:-newsatoshi-umbrel-local}"
+      - "--status"
+      - "8080"
+      - "--statusbind"
+      - "0.0.0.0"
+    volumes:
+      - ${APP_DATA_DIR:-./data}:/data
+
+  app_proxy:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: on-failure
+    depends_on:
+      - newsatoshi-node
+    environment:
+      STRATUM_BIND: "0.0.0.0"
+      STRATUM_PORT: "3333"
+      STATUS_PORT: "3334"
+      NS_RPC_URL: "http://newsatoshi-node:19556/"
+      NS_RPC_AUTH: "auxpow:${APP_PASSWORD:-newsatoshi-umbrel-local}"
+      NS_PAYOUT_ADDRESS: "${NS_PAYOUT_ADDRESS:-}"
+      BTC_RPC_URL: "http://${APP_BITCOIN_NODE_IP:-bitcoin_bitcoind_1}:${APP_BITCOIN_RPC_PORT:-8332}/"
+      BTC_RPC_AUTH: "${APP_BITCOIN_RPC_USER:-umbrel}:${APP_BITCOIN_RPC_PASS:-}"
+      BTC_PAYOUT_SCRIPT_HEX: "${BTC_PAYOUT_SCRIPT_HEX:-51}"
+      COINBASE_TAG: "/umbrel-btc+love-auxpow/"
+      POLL_INTERVAL: "1.5"
+    ports:
+      - "3333:3333"
+      - "3334:3334"

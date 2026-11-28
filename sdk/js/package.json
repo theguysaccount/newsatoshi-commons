@@ -1,11 +1,15 @@
 {
   "name": "@newsatoshi/402",
-  "version": "0.30.0",
-  "description": "Zero-dependency post-quantum HTTP 402 PayWord middleware (L1 LOVE + Live Base Mainnet USDC PayWordChannel & FairCurvePool), stdio MCP bridge, zero-API-key EVM/BTC/BOLT-11/Uniswap V3 tools, and Streamable HTTP MCP client for Newsatoshi.",
+  "version": "0.33.0",
+  "description": "Zero-dependency multi-chain HTTP 402 PayWord SDK (Base, Optimism, Arbitrum + Newsatoshi L1), 1-line AI Agent createAutoPayFetch, Universal Payment URIs, stdio MCP bridge, and zero-API-key crypto tools.",
   "type": "module",
   "main": "./newsatoshi-402.mjs",
+  "types": "./newsatoshi-402.d.ts",
   "exports": {
-    ".": "./newsatoshi-402.mjs"
+    ".": {
+      "types": "./newsatoshi-402.d.ts",
+      "import": "./newsatoshi-402.mjs"
+    }
   },
   "bin": {
     "newsatoshi-mcp": "./bin/newsatoshi-mcp.mjs",

@@ -30,6 +30,11 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  pre {
+    max-width: 100%;
+    overflow-x: auto;
+  }
 }
 
 .font-display {

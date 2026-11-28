@@ -2038,7 +2038,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 43);
+    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 45);
 
     let cx_dir: Value = serde_json::from_str(
         &ureq::get(&format!("{base}/api/v2/crosschain/connectivity"))
@@ -2248,7 +2248,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 43);
+    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 45);
 
     // Honest v2 cutover readiness gate & Bonded P2P Desk smoke tests
     let cutover: Value = serde_json::from_str(
