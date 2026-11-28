@@ -55,7 +55,7 @@ class AuxPowStratumTests(unittest.TestCase):
     def test_coinbase_contains_valid_merged_mining_commitment(self) -> None:
         aux_hash = "12" * 32
         coinb1, coinb2 = sa.build_aux_coinbase_parts(aux_hash, bip34_height=3087)
-        full_cb = coinb1 + b"\x00\x00\x00\x01" + b"\x00\x00\x00\x02" + coinb2
+        full_cb = coinb1 + b"\x00\x00\x00\x01" + (b"\x00" * (sa.EXTRANONCE2_SIZE - 1) + b"\x02") + coinb2
         magic_pos = full_cb.find(sa.MERGED_MINING_MAGIC)
         self.assertNotEqual(magic_pos, -1)
         root = full_cb[magic_pos + 4 : magic_pos + 36]
@@ -105,12 +105,15 @@ class AuxPowStratumTests(unittest.TestCase):
                 )
                 cfg = await recv()
                 self.assertTrue(cfg["result"]["version-rolling"])
+                vmask = await recv()
+                self.assertEqual(vmask["method"], "mining.set_version_mask")
 
                 # 2. Subscribe -> clean subscribe result (no premature notify before authorize)
                 await send({"id": 2, "method": "mining.subscribe", "params": ["bitaxe-test/1.0"]})
                 sub = await recv()
                 en1_hex = sub["result"][1]
                 self.assertEqual(len(en1_hex), 8)
+                self.assertEqual(sub["result"][2], sa.EXTRANONCE2_SIZE)
 
                 # 3. Authorize -> receives authorize result, then set_difficulty and mining.notify
                 await send({"id": 3, "method": "mining.authorize", "params": ["bitaxe.rig1", "x"]})
@@ -125,7 +128,7 @@ class AuxPowStratumTests(unittest.TestCase):
                 ]
 
                 # 4. Grind real SHA-256d share meeting regtest target
-                en2_hex = "00000001"
+                en2_hex = "00" * (sa.EXTRANONCE2_SIZE - 1) + "01"
                 coinbase = bytes.fromhex(coinb1_hex + en1_hex + en2_hex + coinb2_hex)
                 merkle_root = sa.fold_merkle_root(
                     sa.sha256d(coinbase), [bytes.fromhex(h) for h in branch_hex]
@@ -261,7 +264,8 @@ class AuxPowStratumTests(unittest.TestCase):
                 self.assertTrue(res3["result"])
                 d2 = await recv()
                 self.assertEqual(d2["method"], "mining.set_difficulty")
-                self.assertEqual(d2["params"][0], 16384.0)
+                self.assertEqual(d2["params"][0], 16384)
+                self.assertIsInstance(d2["params"][0], int)
                 n2 = await recv()
                 self.assertEqual(n2["method"], "mining.notify")
 

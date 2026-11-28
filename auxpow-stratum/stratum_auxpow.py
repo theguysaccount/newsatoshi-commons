@@ -41,7 +41,16 @@ MERGED_MINING_MAGIC = b"\xfa\xbemm"
 BIP320_VERSION_MASK = 0x1FFFE000
 DIFF1_TARGET = 0x00000000FFFF0000000000000000000000000000000000000000000000000000
 EXTRANONCE1_SIZE = 4
-EXTRANONCE2_SIZE = 4
+EXTRANONCE2_SIZE = 8
+
+
+def json_diff(diff: float) -> Any:
+    """Format difficulty as JSON integer when >= 1 to keep strict C/jansson ASICs happy."""
+    if diff >= 1.0:
+        rounded = round(diff)
+        if abs(diff - rounded) < 1e-6:
+            return int(rounded)
+    return round(diff, 6)
 MAX_CLIENTS = 256
 MAX_LINE_BYTES = 4096
 CLIENT_IDLE_TIMEOUT = 300.0
@@ -599,7 +608,7 @@ class AuxPowStratumServer:
                     c["prev_diff_until"] = time.time() + 15.0
                 c["difficulty"] = diff
                 await self._send_json(
-                    c["writer"], {"id": None, "method": "mining.set_difficulty", "params": [diff]}
+                    c["writer"], {"id": None, "method": "mining.set_difficulty", "params": [json_diff(diff)]}
                 )
                 await self._send_json(
                     c["writer"],
@@ -698,10 +707,11 @@ class AuxPowStratumServer:
                     continue
 
                 if method == "mining.configure":
-                    # BIP-320 version-rolling negotiation for Bitaxe / Antminer S19/S21
+                    # BIP-310 / BIP-320 version-rolling negotiation for Bitaxe / Antminer / WhatsMiner / MRR
                     extensions = params[0] if len(params) > 0 and isinstance(params[0], list) else []
                     ext_params = params[1] if len(params) > 1 and isinstance(params[1], dict) else {}
                     res: Dict[str, Any] = {}
+                    granted_mask: Optional[int] = None
                     if "version-rolling" in extensions:
                         try:
                             raw_mask = ext_params.get("version-rolling.mask", f"{BIP320_VERSION_MASK:08x}")
@@ -712,15 +722,41 @@ class AuxPowStratumServer:
                                 {"id": req_id, "result": None, "error": [20, "invalid version-rolling.mask", None]},
                             )
                             continue
-                        granted = req_mask & BIP320_VERSION_MASK
-                        client_state["version_mask"] = granted
+                        granted_mask = req_mask & BIP320_VERSION_MASK
+                        client_state["version_mask"] = granted_mask
                         res["version-rolling"] = True
-                        res["version-rolling.mask"] = f"{granted:08x}"
+                        res["version-rolling.mask"] = f"{granted_mask:08x}"
+                    if "minimum-difficulty" in extensions:
+                        res["minimum-difficulty"] = True
+                        try:
+                            min_d = float(ext_params.get("minimum-difficulty.value", 0))
+                            if min_d > 0 and min_d == min_d and min_d < 1e18:
+                                client_state["suggested_diff"] = max(
+                                    float(client_state.get("suggested_diff") or 0.0), min_d
+                                )
+                        except (ValueError, TypeError):
+                            pass
+                    if "subscribe-extranonce" in extensions:
+                        res["subscribe-extranonce"] = True
+                    print(
+                        f"[auxpow-stratum] configure cid={extranonce1} req={extensions} res={res}",
+                        flush=True,
+                    )
                     await self._send_json(writer, {"id": req_id, "result": res, "error": None})
+                    if granted_mask is not None:
+                        await self._send_json(
+                            writer,
+                            {"id": None, "method": "mining.set_version_mask", "params": [f"{granted_mask:08x}"]},
+                        )
 
                 elif method == "mining.subscribe":
                     client_state["subscribed"] = True
                     sub_id = f"ns-{extranonce1}"
+                    ua = str(params[0])[:64] if params else ""
+                    print(
+                        f"[auxpow-stratum] subscribe cid={extranonce1} ua={ua!r} en2={EXTRANONCE2_SIZE}",
+                        flush=True,
+                    )
                     await self._send_json(
                         writer,
                         {
@@ -741,10 +777,15 @@ class AuxPowStratumServer:
                             if s_diff > 0 and s_diff == s_diff and s_diff < 1e18:
                                 prev = float(client_state.get("difficulty", 16.0))
                                 client_state["prev_difficulty"] = prev
-                                client_state["prev_diff_until"] = time.time() + 15.0
+                                client_state["prev_diff_until"] = time.time() + 35.0
                                 client_state["suggested_diff"] = s_diff
                         except (ValueError, TypeError):
                             pass
+                    print(
+                        f"[auxpow-stratum] suggest_difficulty cid={extranonce1} "
+                        f"worker={mask_worker_label(client_state.get('worker'))} params={params[:2]}",
+                        flush=True,
+                    )
                     await self._send_json(writer, {"id": req_id, "result": True, "error": None})
                     if client_state.get("authorized"):
                         active_job = self.jobs_by_payout.get(client_state.get("payout_address")) or self.current_job
@@ -752,7 +793,15 @@ class AuxPowStratumServer:
                             diff = self._effective_worker_diff(active_job, client_state)
                             client_state["difficulty"] = diff
                             await self._send_json(
-                                writer, {"id": None, "method": "mining.set_difficulty", "params": [diff]}
+                                writer, {"id": None, "method": "mining.set_difficulty", "params": [json_diff(diff)]}
+                            )
+                            await self._send_json(
+                                writer,
+                                {
+                                    "id": None,
+                                    "method": "mining.notify",
+                                    "params": active_job.notify_params(False),
+                                },
                             )
 
                 elif method == "mining.authorize":
@@ -794,7 +843,7 @@ class AuxPowStratumServer:
                         )
                         await self._send_json(
                             writer,
-                            {"id": None, "method": "mining.set_difficulty", "params": [diff]},
+                            {"id": None, "method": "mining.set_difficulty", "params": [json_diff(diff)]},
                         )
                         await self._send_json(
                             writer,
@@ -814,13 +863,18 @@ class AuxPowStratumServer:
                             new_diff = self._maybe_adjust_vardiff(client_state, active_job)
                             if new_diff is not None:
                                 await self._send_json(
-                                    writer, {"id": None, "method": "mining.set_difficulty", "params": [new_diff]}
+                                    writer, {"id": None, "method": "mining.set_difficulty", "params": [json_diff(new_diff)]}
                                 )
 
                 elif method == "mining.extranonce.subscribe":
+                    print(f"[auxpow-stratum] extranonce.subscribe cid={extranonce1}", flush=True)
                     await self._send_json(writer, {"id": req_id, "result": True, "error": None})
 
                 else:
+                    print(
+                        f"[auxpow-stratum] unknown method={method!r} cid={extranonce1} params={str(params)[:120]}",
+                        flush=True,
+                    )
                     await self._send_json(
                         writer, {"id": req_id, "result": None, "error": [20, f"unknown method {method}", None]}
                     )
