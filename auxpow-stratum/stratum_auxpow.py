@@ -255,6 +255,7 @@ class StratumJob:
     btc_raw_txs: List[bytes] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
     submitted_shares: set = field(default_factory=set)
+    clean_jobs: bool = True
 
     def notify_params(self, clean_jobs: bool = True) -> List[Any]:
         return [
@@ -421,14 +422,17 @@ class AuxPowStratumServer:
         aux_coinbase_value = int(aux["coinbasevalue"])
 
         prev_job = self.jobs_by_payout.get(payout_override)
-        # Reuse job if aux block hash unchanged and not stale (< 20s)
-        if (
+        same_tip = (
             prev_job is not None
-            and prev_job.aux_hash == aux_hash
-            and (time.time() - prev_job.created_at) < 20.0
-            and self.btc_rpc is None
-        ):
+            and prev_job.aux_height == aux_height
+            and prev_job.aux_bits == aux_bits
+        )
+        # Keep the same job for 30s while tip height & bits are unchanged:
+        # `createauxblock` bumps nTime on every call, so comparing aux_hash
+        # directly would blast clean_jobs=True every 2s and abort ASIC pipelines.
+        if same_tip and (time.time() - prev_job.created_at) < 30.0 and self.btc_rpc is None:
             return None
+        clean_jobs = (not same_tip) or (self.btc_rpc is not None)
 
         btc_raw_txs: List[bytes] = []
         merkle_branch: List[bytes] = []
@@ -493,11 +497,12 @@ class AuxPowStratumServer:
             coinb2=coinb2,
             merkle_branch_internal=merkle_branch,
             btc_raw_txs=btc_raw_txs,
+            clean_jobs=clean_jobs,
         )
         self.jobs[job_id] = job
-        # Keep only the latest 64 jobs in RAM (supports up to ~32 simultaneous per-miner payout templates)
-        if len(self.jobs) > 64:
-            oldest = sorted(self.jobs.keys())[:-64]
+        # Keep the latest 256 jobs in RAM so in-flight ASIC shares across refreshes stay valid
+        if len(self.jobs) > 256:
+            oldest = sorted(self.jobs.keys())[:-256]
             for k in oldest:
                 self.jobs.pop(k, None)
         self.jobs_by_payout[payout_override] = job
@@ -624,7 +629,9 @@ class AuxPowStratumServer:
                     try:
                         new_job = await asyncio.to_thread(self.refresh_template_sync, pkey)
                         if new_job is not None:
-                            await self._broadcast_job(new_job, clean_jobs=True, payout_filter=pkey)
+                            await self._broadcast_job(
+                                new_job, clean_jobs=new_job.clean_jobs, payout_filter=pkey
+                            )
                     except Exception as exc:
                         if pkey is None:
                             self.last_error = str(exc)
@@ -846,6 +853,10 @@ class AuxPowStratumServer:
         job = self.jobs.get(job_id)
         if job is None:
             self.shares_rejected += 1
+            print(
+                f"[auxpow-stratum] REJECT worker={mask_worker_label(worker)} reason=stale_job job={job_id}",
+                flush=True,
+            )
             return False, [21, "job not found (stale)", None]
 
         try:
@@ -867,6 +878,11 @@ class AuxPowStratumServer:
                 raise ValueError("parent version collides with NEWSATOSHI chain_id")
         except Exception as exc:
             self.shares_rejected += 1
+            print(
+                f"[auxpow-stratum] REJECT worker={mask_worker_label(worker)} reason=malformed({exc}) "
+                f"en2={extranonce2_hex} vb={version_bits_hex}",
+                flush=True,
+            )
             return False, [20, f"malformed share: {exc}", None]
 
         # Canonical per-job deduplication key (normalized lowercase + uint32 values;
@@ -901,6 +917,13 @@ class AuxPowStratumServer:
         worker_target = difficulty_to_target(effective_accept_diff)
         if hash_int > worker_target and hash_int > job.aux_target_int:
             self.shares_rejected += 1
+            share_diff = round(DIFF1_TARGET / max(1, hash_int), 4)
+            print(
+                f"[auxpow-stratum] REJECT worker={mask_worker_label(worker)} reason=low_diff "
+                f"share_diff={share_diff} req_diff={effective_accept_diff} vb={version_bits_hex} "
+                f"ver={version:08x} job={job_id}",
+                flush=True,
+            )
             return False, [23, "low difficulty share", None]
 
         self.shares_accepted += 1
