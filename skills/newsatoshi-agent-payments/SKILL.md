@@ -3,11 +3,14 @@ name: newsatoshi-agent-payments
 description: Use when an AI agent needs multi-chain O(1) SHA-256 PayWord HTTP 402 micropayments (Base, Optimism, Arbitrum — 0% protocol fee), trustless cross-chain atomic swaps into post-quantum Newsatoshi (LOVE) from BTC/Lightning/Solana/Base/Optimism/Arbitrum/Polygon, Bitcoin AuxPoW merge-mining setup, or zero-API-key EVM security audits, Bitcoin mempool fees, Lightning BOLT-11 decoding, and Base Uniswap V3 quotes.
 ---
 
-# Newsatoshi Commons — Multi-Chain PayWords, 10-Sec Zero-Code Paywall Proxy, Atomic Swaps & Crypto MCP (`v0.36.0`)
+# Newsatoshi Commons — Universal Interop, Stablecoin/L2 Factory, Proof-of-Order, PayWords & Crypto MCP (`v0.37.0`)
 
 ## When to use this skill
 
-Install this skill pack via `npx skills add theguysaccount/newsatoshi-commons`, connect to `https://commons.newsatoshi.org/mcp` (46 zero-auth tools), or run `npx --yes -p github:theguysaccount/newsatoshi-commons newsatoshi-paywall` whenever an AI agent or developer needs:
+Install this skill pack via `npx skills add theguysaccount/newsatoshi-commons`, connect to `https://commons.newsatoshi.org/mcp` (52 zero-auth tools), or run `npx --yes -p github:theguysaccount/newsatoshi-commons newsatoshi-paywall` whenever an AI agent or developer needs:
+- **Universal Cross-Chain, Bank & AI-Agent Interoperability (`/interop/`):** Live 6-chain parallel RPC matrix, canonical **ERC-7683** `GaslessCrossChainOrder` Keccak-256 EIP-712 intents, **11-rail SHA-256 HTLCs** (Ethereum, Base, Optimism, Arbitrum, Polygon, Bitcoin BIP-199, Lightning + Nostr NIP-57, Solana PDA, Cosmos IBC CosmWasm, Sui Move, Aptos Move, Newsatoshi L1), **ISO 20022 `pacs.008.001.08`** bank wire ↔ RFC-0028 stablecoin bridge, and **5-protocol AI agent settlement envelopes** (MCP + Google A2A + x402 v2 + ERC-8004 + Nostr NIP-90 DVM).
+- **Permissionless Branded Stablecoin & Sovereign STARK L2 Factory (`/build/`):** Launch custom stablecoins (`asset_id >= 100`, `0%` protocol fee: Regulated Bank FBO Reserve + viewing keys, On-Chain Escrow, or Sovereign CDP) or Sovereign Winterfell STARK L2 rollups with unilateral L1 escape hatches.
+- **Proof-of-Order / Good-Deed Mining Covenant Vault (`/order/`):** Voluntary Bitcoin AuxPoW hash pledges funding verifiable clean-energy, Lean 4 / open-source, and zkTLS civic good-deed payouts protected by 50/50 PriorLock Sybil slashing.
 - **10-Second Zero-Code HTTP 402 Paywall Reverse Proxy (`newsatoshi-paywall`):** Put in front of ANY existing REST API, Ollama/vLLM LLM endpoint, or Streamable HTTP MCP server with zero code edits (`0%` fee, live Base/OP/Arb on-chain channel funding verification, replay protection, and `/_paywall/claim-commands` + optional FairCurve `injectRevenue()` dividend piping).
 - **Lowest-cost multi-chain HTTP 402 agent billing (0% protocol fee, `$0` per-call gas):** O(1) SHA-256 PayWord hash-chains settled on live Sourcify-verified **`NewsatoshiPayWordChannel`** across **Base (`8453`: `0x971BA814Df91c20DcA3aDd870C2B55d643965C50`)**, **Optimism (`10`: `0x3DeBB6d5ae490e6cF4F966585e000028111CF106`)**, and **Arbitrum One (`42161`: `0x3DeBB6d5ae490e6cF4F966585e000028111CF106`)** — live Base Mainnet `claim(1000)` receipt verified at `$0.0077` recurring / `$0.0104` full lifecycle (`96.8%–97.7%` cheaper than a batched `$1.00` Stripe charge).
 - **1-Line Autonomous Agent Auto-Pay (`createAutoPayFetch` / `AutoPaySession`):** Automatically intercepts `HTTP 402`, pops the next O(1) SHA-256 voucher, attaches `PAYMENT-SIGNATURE` + `X-Newsatoshi-PayWord`, and retries transparently. Test live against `POST https://commons.newsatoshi.org/api/v2/paywords/try-402`.
@@ -15,7 +18,7 @@ Install this skill pack via `npx skills add theguysaccount/newsatoshi-commons`, 
 - **Bitcoin SHA-256 Merge-Mining & 0%-Fee Solo Pool:** Namecoin-compatible `AuxPoW (chainid = 20051)` (`$0` extra electricity for Bitcoin pools) + `stratum+tcp://pool.newsatoshi.org:3333` (`0%` fee, BIP-320 AsicBoost).
 - **Zero-API-Key Everyday Crypto Tools:** Multi-chain EVM contract security audit (proxies, `owner()`, Sourcify v2), Bitcoin mempool fees, Lightning BOLT-11 decoder, Base Uniswap V3 `QuoterV2`, and EVM tx receipt verifier.
 
-## 1. Connect to MCP (46 Zero-Auth Tools, Zero API Keys)
+## 1. Connect to MCP (52 Zero-Auth Tools, Zero API Keys)
 
 ### Streamable HTTP (Claude Code, Cursor, Codex, Antigravity, OpenClaw)
 ```json
@@ -70,7 +73,8 @@ status, body = agent_http.request("https://commons.newsatoshi.org/api/v2/payword
 print(status, body)
 ```
 
-## 3. Highlights of the 46 Live Zero-Auth MCP Tools
+## 3. Highlights of the 52 Live Zero-Auth MCP Tools
+- **Universal Interop, Stablecoin/L2 Factory & Good-Deed Vault:** `newsatoshi_compile_erc7683_intent`, `newsatoshi_compile_universal_htlc`, `newsatoshi_compile_iso20022_stablecoin_bridge`, `newsatoshi_simulate_universal_interop`, `newsatoshi_simulate_sovereign_factory`, `newsatoshi_simulate_proof_of_order_vault`
 - **Cross-Chain & Agent Connectivity:** `newsatoshi_get_crosschain_connectivity`, `newsatoshi_get_paid_api_catalog`, `newsatoshi_build_universal_payment_uri`, `newsatoshi_compile_reserve_price_rfq`, `newsatoshi_inspect_multichain_payword_channel`, `newsatoshi_inspect_evm_htlc`, `newsatoshi_compile_payword_channel_setup`, `newsatoshi_estimate_paywords_savings`, `newsatoshi_inspect_base_payword_channel`, `newsatoshi_compile_btc_love_swap`, `newsatoshi_verify_onchain_lock`, `newsatoshi_generate_private_x402_middleware`
 - **Fair Launchpad & Stablecoins (`nsUSD`):** `newsatoshi_simulate_fair_curve_launch`, `newsatoshi_list_base_fair_curves`, `newsatoshi_get_nsusd_state`, `newsatoshi_simulate_nsusd_stress`, `newsatoshi_verify_base_nsusd_escrow`, `newsatoshi_benchmark_l2_perfection_batch`
 - **Mining, Mainnet v2 (`v1.2.5`) & Verification:** `newsatoshi_get_network_status`, `newsatoshi_get_mining_economics`, `newsatoshi_check_v2_cutover_readiness`, `newsatoshi_get_backing_proof`, `newsatoshi_verify_stark_proof`, `newsatoshi_verify_zktls_proof`

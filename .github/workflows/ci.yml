@@ -99,6 +99,16 @@ jobs:
         with:
           python-version: "3.12"
       - run: |
-          node --test sdk/js/test_newsatoshi_402.mjs
+          node --test sdk/js/test_newsatoshi_402.mjs sdk/js/test_newsatoshi_paywall.mjs
           (cd sdk/python && python3 -m unittest -v test_newsatoshi_402.py)
+          (cd bridges/maker-bot && python3 -m unittest -v test_erc7683_solver.py)
           sh -n scripts/install.sh
+
+  evm-contracts:
+    name: EVM Bridge & ERC-7683 Settler Contracts (Foundry)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - working-directory: bridges/evm
+        run: forge test -vv

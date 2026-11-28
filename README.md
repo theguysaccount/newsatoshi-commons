@@ -1,16 +1,18 @@
-# `newsatoshi-commons` — Multi-Chain `O(1)` SHA-256 PayWords, 10-Sec Zero-Code Paywall Proxy, Atomic Swaps & Post-Quantum L2 Gateway (`v0.36.0`)
+# `newsatoshi-commons` — Universal Interop, Stablecoin/L2 Factory, Proof-of-Order & `O(1)` PayWords Gateway (`v0.37.0`)
 
 [![CI](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml/badge.svg)](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml)
 [![Mainnet v2](https://img.shields.io/badge/Mainnet%20v2-LIVE%20%C2%B7%20v1.2.5%20%C2%B7%20BTC%20%23977%2C738-10b981)](https://newsatoshi.org)
-[![MCP](https://img.shields.io/badge/MCP-46%20Zero--Auth%20Tools-38bdf8)](https://commons.newsatoshi.org/mcp)
+[![MCP](https://img.shields.io/badge/MCP-52%20Zero--Auth%20Tools-38bdf8)](https://commons.newsatoshi.org/mcp)
 [![Glama MCP](https://glama.ai/mcp/connectors/org.newsatoshi.commons/newsatoshi-commons/badges/score.svg)](https://glama.ai/mcp/connectors/org.newsatoshi.commons/newsatoshi-commons)
 [![PayWords](https://img.shields.io/badge/PayWords-Base%20%C2%B7%20Optimism%20%C2%B7%20Arbitrum%20(0%25%20Fee)-f59e0b)](https://newsatoshi.org/paywords/)
 [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-amber)](LICENSE)
 
-**Zero-custody, zero-protocol-fee cross-chain payment & settlement infrastructure for autonomous AI agents, metered APIs, Bitcoin merge-miners, and post-quantum Newsatoshi (`LOVE`) Mainnet v2.**
+**Zero-custody, zero-protocol-fee cross-chain interoperability, branded stablecoin & sovereign STARK L2 infrastructure, Proof-of-Order good-deed mining, and `O(1)` PayWords rails for autonomous AI agents, regulated banks, Bitcoin merge-miners, and post-quantum Newsatoshi (`LOVE`) Mainnet v2.**
 
+- **Universal Interop Hub:** [newsatoshi.org/interop](https://newsatoshi.org/interop/) (Live 6-Chain Parallel RPC Matrix, ERC-7683 EIP-712 Intents, 11-Rail SHA-256 HTLCs incl. Cosmos IBC & Sui/Aptos Move, ISO 20022 `pacs.008` Bank XML Bridge, 5-Protocol AI Agent Envelope)
+- **Stablecoin & Sovereign L2 Factory (0% Fee):** [newsatoshi.org/build](https://newsatoshi.org/build/) · **Proof-of-Order Good-Deed Mining:** [newsatoshi.org/order](https://newsatoshi.org/order/) · **Story:** [newsatoshi.org/story](https://newsatoshi.org/story/)
 - **Cross-Chain Connectivity Hub:** [newsatoshi.org/connect](https://newsatoshi.org/connect/) · **PayWords Studio:** [newsatoshi.org/paywords](https://newsatoshi.org/paywords/) · **Fair Launchpad:** [newsatoshi.org/launchpad](https://newsatoshi.org/launchpad/) · **nsUSD:** [newsatoshi.org/nsusd](https://newsatoshi.org/nsusd/)
-- **Live Verify-Only Gateway (0 Server Private Keys):** [commons.newsatoshi.org](https://commons.newsatoshi.org) · **Official MCP Registry:** `org.newsatoshi.commons/newsatoshi-commons` (`46` zero-auth tools) · **Glama Directory:** [glama.ai/mcp/servers](https://glama.ai/mcp/servers)
+- **Live Verify-Only Gateway (0 Server Private Keys):** [commons.newsatoshi.org](https://commons.newsatoshi.org) · **Official MCP Registry:** `org.newsatoshi.commons/newsatoshi-commons` (`52` zero-auth tools) · **Glama Directory:** [glama.ai/mcp/servers](https://glama.ai/mcp/servers)
 - **Install AI Agent Skills (Claude Code / Cursor / Codex / Antigravity):** `npx skills add theguysaccount/newsatoshi-commons`
 - **Wire Protocol Spec (`x402#4494`):** [docs/X402-BATCH-SETTLEMENT-PAYWORDS-SPEC.md](docs/X402-BATCH-SETTLEMENT-PAYWORDS-SPEC.md)
 - **External Security Audit Scope & Reproduction Brief:** [docs/EXTERNAL_AUDIT_BRIEF.md](docs/EXTERNAL_AUDIT_BRIEF.md)
@@ -33,7 +35,7 @@
 
 ## 30-Second Quickstart
 
-### 1. Connect 46 Zero-Auth MCP Tools (Claude, Cursor, Codex, Antigravity, OpenClaw)
+### 1. Connect 52 Zero-Auth MCP Tools (Claude, Cursor, Codex, Antigravity, OpenClaw)
 ```json
 {
   "mcpServers": {
@@ -90,13 +92,15 @@ const res = await payFetch("https://commons.newsatoshi.org/api/v2/paywords/try-4
 
 ---
 
-## Build & Verify All 82 Automated Tests Locally
+## Build & Verify All 112 Automated Tests Locally
 
 ```bash
-cargo test && cargo clippy --all-targets -- -D warnings       # 52 Rust unit + integration tests
-npm test                                                      # 10 JS SDK + newsatoshi-paywall proxy tests
-python3 -m unittest discover -s sdk/python -p "test_*.py"     # 9 Python SDK tests
-python3 -m unittest discover -s auxpow-stratum -p "test_*.py" # 11 Stratum AuxPoW ASIC tests
+cargo test && cargo clippy --all-targets -- -D warnings            # 55 Rust unit + integration tests
+(cd bridges/evm && forge test -vv)                                 # 24 Foundry Solidity + fuzz tests (incl. ERC-7683)
+npm test                                                           # 10 JS SDK + newsatoshi-paywall proxy tests
+python3 -m unittest discover -s sdk/python -p "test_*.py"          # 9 Python SDK tests
+python3 -m unittest discover -s bridges/maker-bot -p "test_*.py"   # 3 ERC-7683 / Multi-Rail Solver tests
+python3 -m unittest discover -s auxpow-stratum -p "test_*.py"      # 11 Stratum AuxPoW ASIC tests
 ```
 
 > **Zero Fake Data Guarantee:** Fresh deployments start at genuine `0` counters and empty ledgers. Every chain height, pool worker, Fair Curve balance, PayWord channel, HTLC preimage, and STARK proof comes directly from live RPCs or deterministic cryptographic verification.
