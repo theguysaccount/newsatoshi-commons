@@ -1,37 +1,37 @@
-# `newsatoshi-commons` — Layer 2 Agent Commerce, `nsUSD` Private Dollar & Atomic Bridge Gateway (`v0.28.2`)
+# `newsatoshi-commons` — Multi-Chain `O(1)` SHA-256 PayWords, Atomic Swaps & Post-Quantum L2 Gateway (`v0.35.0`)
 
 [![CI](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml/badge.svg)](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml)
-[![Mainnet v2](https://img.shields.io/badge/Mainnet%20v2-LIVE%20%C2%B7%20BTC%20%23977%2C738-10b981)](https://commons.newsatoshi.org)
-[![MCP](https://img.shields.io/badge/MCP-33%20Zero--Auth%20Tools-38bdf8)](https://commons.newsatoshi.org/mcp)
-[![nsUSD](https://img.shields.io/badge/Stable%20Rail-nsUSD%20%2B%20L2%20STARK%20Perfection-f59e0b)](https://commons.newsatoshi.org/l2)
-[![Bug Bounty](https://img.shields.io/badge/Security%20Bounty-Paid%20in%20Mined%20LOVE-ef4444)](https://commons.newsatoshi.org/bounty)
+[![Mainnet v2](https://img.shields.io/badge/Mainnet%20v2-LIVE%20%C2%B7%20v1.2.5%20%C2%B7%20BTC%20%23977%2C738-10b981)](https://newsatoshi.org)
+[![MCP](https://img.shields.io/badge/MCP-46%20Zero--Auth%20Tools-38bdf8)](https://commons.newsatoshi.org/mcp)
+[![PayWords](https://img.shields.io/badge/PayWords-Base%20%C2%B7%20Optimism%20%C2%B7%20Arbitrum%20(0%25%20Fee)-f59e0b)](https://newsatoshi.org/paywords/)
 [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-amber)](LICENSE)
 
-**The source-available (noncommercial) Layer-2 gateway for Newsatoshi (`LOVE`) Mainnet v2 — bringing private USD-denominated machine payments (`nsUSD` + `O(1)` PayWords), L2 STARK rollup & escape-hatch verification, 13-theorem Lean 4 solvency proofs, 33 zero-auth MCP tools, trustless 4-chain SHA-256 atomic swaps, and Bitcoin AuxPoW merge-mining to humans and autonomous AI agents.**
+**Zero-custody, zero-protocol-fee cross-chain payment & settlement infrastructure for autonomous AI agents, metered APIs, Bitcoin merge-miners, and post-quantum Newsatoshi (`LOVE`) Mainnet v2.**
 
-- **Live Verify-Only Gateway (0 Server Private Keys):** [commons.newsatoshi.org](https://commons.newsatoshi.org) · **L2 Perfection:** [commons.newsatoshi.org/l2](https://commons.newsatoshi.org/l2)
-- **Satoshi-Format 8-Page Whitepaper PDF:** [commons.newsatoshi.org/whitepaper.pdf](https://commons.newsatoshi.org/whitepaper.pdf)
-- **`nsUSD` Private Stablecoin Engine & Stress Suite:** [commons.newsatoshi.org/nsusd](https://commons.newsatoshi.org/nsusd) · `GET /api/v2/nsusd/state` · [Lean 4 Kernel](formal/NsUsdAndL2Perfection.lean)
-- **Public Security Bug Bounty (Fair-Mined `LOVE`):** [commons.newsatoshi.org/bounty](https://commons.newsatoshi.org/bounty)
-- **Layer-1 Consensus Repo (`v1.2.2`):** [theguysaccount/newsatoshi-rfc0021](https://github.com/theguysaccount/newsatoshi-rfc0021)
-- **License:** [PolyForm Noncommercial License 1.0.0](LICENSE) (non-commercial research, auditing & personal use permitted; see [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for commercial licensing)
-
----
-
-## The Hourglass Architecture: Minimal L1 Waist · Infinite L2 Velocity
-
-| Layer | Repository | What Lives Here |
-| :--- | :--- | :--- |
-| **Layer 2 · Agent Commerce, `nsUSD` & Atomic Bridges** *(This Repo)* | [`newsatoshi-commons`](https://github.com/theguysaccount/newsatoshi-commons) (`v0.28.0`) | **30 zero-auth MCP tools**, USD-denominated `x402` + `O(1)` SHA-256 `PayWords` streaming (`<1 ms`, zero gas), `nsUSD` private dollar settlement rails (`RFC-0028`), trustless Bitcoin / Lightning / Solana / 4-chain EVM SHA-256 atomic swaps into **native Mainnet v2 `LOVE`**, `ERC-8004` agent identity, Web4 charters, and 0%-fee AuxPoW Stratum pool kits. |
-| **Layer 1 · Sovereign Base Money** *(The Narrow Waist)* | [`newsatoshi-rfc0021`](https://github.com/theguysaccount/newsatoshi-rfc0021) (`v1.2.1`) | **Live Mainnet v2 (`nsM2`, anchored to Bitcoin Block `#977,738`, `0 LOVE` premine).** Mandatory shielded privacy via pure FIPS SHA-2/SHA-384 Quartic Goldilocks STARKs (`192`-bit classical / `100–104`-bit conservative QROM), **249/249 spend constraints mechanized in Lean 4 (`0 sorry`)**, Bitcoin AuxPoW merge-mining (`chainid = 20051`), `BatchSpend` `6.5×` compression, `NSPQ2` SLH-DSA-pinned ML-KEM-768 P2P, FlyClient MMR, 50% fee burn, and `PriorLock` collateral. |
-
-> **One Real Coin:** Native Mainnet v2 Layer-1 `LOVE` (mined via Bitcoin AuxPoW on `nsM2`) is the sole canonical base currency of Newsatoshi. Everything on this gateway routes directly to native L1 `LOVE`, Bitcoin/Lightning/EVM atomic HTLCs, and USD-denominated `nsUSD` settlement.
+- **Cross-Chain Connectivity Hub:** [newsatoshi.org/connect](https://newsatoshi.org/connect/) · **PayWords Studio:** [newsatoshi.org/paywords](https://newsatoshi.org/paywords/) · **Fair Launchpad:** [newsatoshi.org/launchpad](https://newsatoshi.org/launchpad/)
+- **Live Verify-Only Gateway (0 Server Private Keys):** [commons.newsatoshi.org](https://commons.newsatoshi.org) · **Official MCP Registry:** `org.newsatoshi.commons/newsatoshi-commons` (`46` zero-auth tools)
+- **Wire Protocol Spec (`x402#4494`):** [docs/X402-BATCH-SETTLEMENT-PAYWORDS-SPEC.md](docs/X402-BATCH-SETTLEMENT-PAYWORDS-SPEC.md)
+- **External Security Audit Scope & Reproduction Brief:** [docs/EXTERNAL_AUDIT_BRIEF.md](docs/EXTERNAL_AUDIT_BRIEF.md)
+- **Layer-1 Consensus Repo (`v1.2.5`):** [theguysaccount/newsatoshi-rfc0021](https://github.com/theguysaccount/newsatoshi-rfc0021) (Pure FIPS SHA-2/384 Winterfell STARKs + FIPS 205 SLH-DSA + `9,349`-line Lean 4.36.0 zero-sorry AIR proof)
+- **License:** [PolyForm Noncommercial License 1.0.0](LICENSE) (free for noncommercial use, auditing & research; see [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for commercial partner licensing)
 
 ---
 
-## 30-Second Quickstart for AI Agents & Developers
+## Live Mainnet Contracts (Ownerless · Non-Upgradeable · 0% Protocol Fee · Sourcify `exact_match`)
 
-### 1. Connect 30 Zero-Auth MCP Tools (Claude, Cursor, Cline, Codex, OpenClaw)
+| Chain | CAIP-2 | `NewsatoshiPayWordChannel` (`0%` Fee) | SHA-256 `NewsatoshiHtlc` | Live On-Chain Proofs |
+| :--- | :--- | :--- | :--- | :--- |
+| **Base Mainnet** | `eip155:8453` | `0x971BA814Df91c20DcA3aDd870C2B55d643965C50` | `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987` | [`claim(1000)`: `$0.0077` (`770,956` gas)](https://basescan.org/tx/0xb79a3c01a8edc0bbc0b25714b2a1b7852c0035be2a083c26da81ef31620f6256) · [Live Paid API `claim(5)` (`75,608` gas)](https://basescan.org/tx/0xd45660a90844b817ec9a7232144882f983104930c4e5555187efffcd926bea06) → [`FairCurvePool.injectRevenue(5000)`](https://basescan.org/tx/0x1c1498db55467d4696569b20b764c552958780d94a823d200847cfdc71f9e3ff) |
+| **Optimism Mainnet** | `eip155:10` | `0x3DeBB6d5ae490e6cF4F966585e000028111CF106` | `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987` | [`claim(100)`: `125,250` gas](https://optimistic.etherscan.io/tx/0x05f72b5f3bbff8407b78be11cbc962414a2af573bc9f08466cab060814b8ef6c) · [HTLC `lock` → `claim`](https://optimistic.etherscan.io/tx/0x88ca2f68dc6e1587ee157bf2f48f6ed5a5044923686a9aac7fda5a9b6be88f0b) |
+| **Arbitrum One** | `eip155:42161` | `0x3DeBB6d5ae490e6cF4F966585e000028111CF106` | `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987` | [Deploy `0xeab6df…6fea`](https://arbiscan.io/tx/0xeab6dfec32c41e44cb784b0675a468e421725fcc56023f4af738226f5ad76fea) (identical deterministic address to Optimism) |
+| **Polygon PoS** | `eip155:137` | *(BackingVault + HTLC live)* | `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987` | [Sourcify `exact_match`](https://repo.sourcify.dev/137/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987) + `NewsatoshiBackingVault` (`0x37Ed…9265`) |
+| **Base Fair Curve Factory** | `eip155:8453` | `0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933` | Live `NSPAY` Pool: `0xC3098ba25E39Effa63dE94EbACE6381781ad4cEd` | Lean 4 Theorems 10–11 (`0 sorry`, 0% premine, 0% platform cut) |
+
+---
+
+## 30-Second Quickstart
+
+### 1. Connect 46 Zero-Auth MCP Tools (Claude, Cursor, Codex, Antigravity, OpenClaw)
 ```json
 {
   "mcpServers": {
@@ -41,63 +41,48 @@
   }
 }
 ```
-Or run locally via zero-install stdio MCP & CLI:
+Or run the zero-install stdio MCP bridge & multi-chain CLI directly:
 ```bash
-npx -y github:theguysaccount/newsatoshi-commons
+npx -y github:theguysaccount/newsatoshi-commons help
+npx -y github:theguysaccount/newsatoshi-commons inspect-channel 0x91fbe151d270ed3b4953c48a068321dfdcf1cc74704040267fdafea63be11153 --chain base
+npx -y github:theguysaccount/newsatoshi-commons pay-uri 0x1744535521EB420be9700475400455a4Ad0EBEa2 10 --rail all
 ```
 
-### 2. Price Any API in Stable USD (`nsUSD` + `O(1)` PayWords, Zero Volatility)
+### 2. Install Zero-Dependency AI Agent Auto-Pay SDKs (JS/TypeScript + Python)
 ```bash
-# Get a live USD-denominated JIT PayWords + multi-chain atomic settlement quote
-curl -sS "https://commons.newsatoshi.org/api/v2/nsusd/quote?usd=0.005" | jq .
-```
-- **O(1) SHA-256 PayWord Verification (Node.js v24 median):** `0.013 ms` per call (1 SHA-256 hash) up to `1,000,000` ticks per channel — zero per-call gas, zero credit card fees, zero custody freeze risk.
-- **Zero-Dependency SDKs:** `sdk/js/newsatoshi-402.mjs` (Node / Workers / Edge) and `sdk/python/newsatoshi_402.py` (FastAPI / Flask / stdlib).
+# JavaScript / TypeScript (includes full TypeScript newsatoshi-402.d.ts definitions)
+npm install github:theguysaccount/newsatoshi-commons
 
-### 3. Mine Real Native Mainnet v2 `LOVE` (0% Pool Fee)
-```text
-Stratum URL: stratum+tcp://pool.newsatoshi.org:3333
-Worker:      <YOUR_MAINNET_V2_ns1_ADDRESS>.rig1
-Password:    x
+# Python 3.9+ (pure stdlib — zero pip transitive dependencies)
+pip install "git+https://github.com/theguysaccount/newsatoshi-commons.git#subdirectory=sdk/python"
 ```
+```js
+import { generatePayWordChain, createAutoPayFetch } from "newsatoshi-mcp";
+const wallet = await generatePayWordChain(1000, 1000);
+const payFetch = createAutoPayFetch({ wallet, chain: "base", channelId: "0x..." });
+const res = await payFetch("https://commons.newsatoshi.org/api/v2/paywords/try-402", { method: "POST" });
+```
+- **Runnable Starters:** [`examples/cloudflare-worker-paywords`](examples/cloudflare-worker-paywords), [`examples/nextjs-vercel-ai-agent`](examples/nextjs-vercel-ai-agent), [`examples/fastapi-langchain-agent`](examples/fastapi-langchain-agent).
+- **Live Paid Production Micro-APIs (`$0.001` USDC via Base/Optimism/Arbitrum PayWords, `1–2 µs` verify):**
+  - `POST https://commons.newsatoshi.org/api/v2/paid/evm-audit-batch`
+  - `POST https://commons.newsatoshi.org/api/v2/paid/tx-verify-batch`
+  - `POST https://commons.newsatoshi.org/api/v2/paid/defi-quote-bundle`
+  - Live telemetry: `GET https://commons.newsatoshi.org/api/v2/paid/status` · Discovery: `GET https://commons.newsatoshi.org/.well-known/x402`
 
-### 4. Trustless Multi-Chain Atomic Buy Roads into Native L1 `LOVE`
-| Source Rail | Standard | Shared Cryptographic Invariant | Live Verification |
-| :--- | :--- | :--- | :--- |
-| **Bitcoin L1 (`BTC`)** | BIP-199 SegWit v0 P2WSH (`bc1q…`) | `SHA256(preimage) == payment_hash` | `src/swap.rs`, `newsatoshi-swap` |
-| **Lightning (`BTC`)** | BOLT-11 Invoice → L1 Hash-Lock | `SHA256(preimage) == payment_hash` | `src/swap.rs`, `bridges/lightning/` |
-| **Solana (`SOL`/`USDC`)** | Deterministic PDA Escrow (`ns_htlc`) | `SHA256(preimage) == payment_hash` | `bridges/solana/src/lib.rs` |
-| **Base / Arb / OP / Polygon** | Ownerless `NewsatoshiHtlc.sol` (`0x02`) | `SHA256(preimage) == payment_hash` | Live on 4 Mainnets: `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987` |
+### 3. Dual-Mine Bitcoin + Mainnet v2 `LOVE` (`AuxPoW chainid=20051`, `$0` Extra Electricity)
+- **0%-Fee Solo Pool (Bitaxe / Antminer / WhatsMiner / MRR):** `stratum+tcp://pool.newsatoshi.org:3333` (`<74char_ns1_address>.rig1`, pass `x` or `d=65536`/`d=524288`)
+- **1-Click Umbrel Community App Store:** `https://github.com/theguysaccount/newsatoshi-umbrel-store`
+- **1-Command Docker / Start9 / Public Pool / CKPool Dual Merge-Mining Kits:** [`auxpow-stratum/`](auxpow-stratum/) (`docker-compose.merge-mine.yml`, `umbrel/`, `start9/`, `public-pool-bridge/`, `ckpool-sidecar.env.example`).
 
 ---
 
-## Live Infrastructure & Canonical Contracts
-
-- **Mainnet v2 (`nsM2`) Live Seed:** `https://newsatoshi-seed-v2.fly.dev/status` (`genesis: 00000000ba1cdad4aa8e82d6613b4df536394c41008fc3a0914a47a44604b9c8`)
-- **Zero-Fee AuxPoW Stratum Pool:** `stratum+tcp://pool.newsatoshi.org:3333` (`https://pool.newsatoshi.org/status`)
-- **Ownerless 4-Chain EVM HTLC (`Base · Arb · OP · Polygon`, 4/4 Sourcify Exact Match):** `0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987`
-- **Ownerless 4-Chain Backing Vault (`NewsatoshiBackingVault.sol`, 0 withdrawal path):** `0x37Ed94525DBE408fA72cDd156409875666679265`
-- **ERC-8004 On-Chain Agent Identity:** `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` ([`/.well-known/erc8004.json`](https://commons.newsatoshi.org/.well-known/erc8004.json))
-- **Agent Discovery:** `POST /mcp` · `/.well-known/x402` · `/.well-known/agent-card.json` · `/llms.txt` · `/openapi.json`
-
----
-
-## Build, Test & Run Locally
+## Build & Verify All 81 Automated Tests Locally
 
 ```bash
-# Install verified SHA-256 release binaries (macOS & Linux)
-curl -fsSL https://commons.newsatoshi.org/install.sh | sh
-
-# Or build & run all 43 unit + integration tests from source
-(cd web && npm ci && npm run build)
-cargo clippy --all-targets -- -D warnings && cargo test
-
-# Start the live verify-only Commons gateway
-cargo run --bin newsatoshi-commons -- serve \
-  --port 8791 \
-  --verify-only \
-  --seed-url https://newsatoshi-seed-v2.fly.dev/status \
-  --static-dir ./web/dist
+cargo test && cargo clippy --all-targets -- -D warnings       # 52 Rust unit + integration tests
+node --test sdk/js/test_newsatoshi_402.mjs                    # 9 JS SDK tests (incl. 1M-tick benchmark)
+python3 -m unittest discover -s sdk/python -p "test_*.py"     # 9 Python SDK tests
+python3 -m unittest discover -s auxpow-stratum -p "test_*.py" # 11 Stratum AuxPoW ASIC tests
 ```
 
-> **Zero Fake Data Guarantee:** Fresh deployments start at genuine `0` counters and empty ledgers. Every chain height, vault balance, STARK proof, and swap receipt rendered on `commons.newsatoshi.org` comes directly from live Mainnet v2, EVM RPCs, or cryptographic verification.
+> **Zero Fake Data Guarantee:** Fresh deployments start at genuine `0` counters and empty ledgers. Every chain height, pool worker, Fair Curve balance, PayWord channel, HTLC preimage, and STARK proof comes directly from live RPCs or deterministic cryptographic verification.

@@ -1725,6 +1725,343 @@ pub fn render_openapi_json(base_url: &str) -> Value {
                         "400": err_ref.clone()
                     }
                 }
+            },
+            "/api/v2/crosschain/connectivity": {
+                "get": {
+                    "operationId": "getCrosschainConnectivity",
+                    "summary": "Live cross-chain connectivity matrix across 3-chain PayWords, 4-chain HTLCs, BTC/Lightning/Solana, AuxPoW mining, and MCP/x402",
+                    "description": "Returns verified live contract addresses, Sourcify exact_match status, live Mainnet v2 AuxPoW pool metrics, and one-line SDK/MCP/x402 integration URLs.",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "200": json_ok("Live cross-chain connectivity matrix", "#/components/schemas/GenericApiResponse")
+                    }
+                }
+            },
+            "/api/v2/evm/channel": {
+                "get": {
+                    "operationId": "inspectEvmPaywordChannel",
+                    "summary": "Live RPC inspector for NewsatoshiPayWordChannel on Base (8453), Optimism (10), or Arbitrum One (42161)",
+                    "description": "Queries live mainnet eth_call channels(bytes32) on the deployed 0%-fee NewsatoshiPayWordChannel contract and returns payer, recipient, token, root, unitPrice, maxCount, claimedCount, expiry, and remaining USDC capacity.",
+                    "parameters": [
+                        api_ver_param.clone(),
+                        { "name": "chain", "in": "query", "required": false, "description": "EVM chain: base, optimism, or arbitrum.", "schema": { "type": "string", "enum": ["base", "optimism", "arbitrum"], "default": "base" } },
+                        { "name": "id", "in": "query", "required": true, "description": "66-character 0x-prefixed bytes32 channel ID.", "schema": { "type": "string" } }
+                    ],
+                    "responses": {
+                        "200": json_ok("Live EVM PayWord channel state", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
+            },
+            "/api/v2/evm/htlc": {
+                "get": {
+                    "operationId": "inspectEvmHtlcSwap",
+                    "summary": "Live RPC inspector for NewsatoshiHtlc on Base, Optimism, Arbitrum One, or Polygon PoS",
+                    "description": "Queries live mainnet eth_call swaps(bytes32) on 0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987 across all 4 EVM chains and returns sender, recipient, token, amount, hashlock, timelock, claimed, refunded, and revealed preimage.",
+                    "parameters": [
+                        api_ver_param.clone(),
+                        { "name": "chain", "in": "query", "required": false, "description": "EVM chain: base, optimism, arbitrum, or polygon.", "schema": { "type": "string", "enum": ["base", "optimism", "arbitrum", "polygon"], "default": "base" } },
+                        { "name": "id", "in": "query", "required": true, "description": "66-character 0x-prefixed bytes32 HTLC swap ID.", "schema": { "type": "string" } }
+                    ],
+                    "responses": {
+                        "200": json_ok("Live EVM HTLC swap state", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
+            },
+            "/api/v2/interop/payment-uri": {
+                "post": {
+                    "operationId": "compileUniversalPaymentUri",
+                    "summary": "Compile standard EIP-681, BIP-21, BOLT-11, Solana Pay, or newsatoshi: payment URIs and wallet deep-links",
+                    "description": "Generates RFC/EIP/BIP-compliant payment URIs across Base/OP/Arb/Polygon USDC & native assets, Bitcoin, Lightning, Solana, and Newsatoshi Mainnet v2 for instant cross-wallet interoperability.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Compiled standard payment URI", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
+            },
+            "/api/v2/swaps/rfq": {
+                "post": {
+                    "operationId": "compileReservePriceRfq",
+                    "summary": "Compile a zero-custody Reserve-Price SHA-256 HTLC RFQ (protects organic LOVE price discovery)",
+                    "description": "Compiles a seller-floor SHA-256 HTLC quote where the buyer locks settlement funds (USDC/ETH/BTC/SOL) first and the seller settles LOVE only at or above reserve_usd_per_love.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Compiled Reserve-Price HTLC RFQ", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
+            },
+            "/api/v2/paywords/try-402": {
+                "get": {
+                    "operationId": "tryHttp402PaywordsGet",
+                    "summary": "Live interactive HTTP 402 -> O(1) SHA-256 PayWord verification sandbox",
+                    "description": "Returns a standard HTTP 402 Payment Required x402 batch-settlement challenge without PAYMENT-SIGNATURE, or verifies a SHA-256 voucher in ~1-2 microseconds and returns 200 OK with PAYMENT-RESPONSE.",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "200": json_ok("Verified PayWord voucher receipt", "#/components/schemas/GenericApiResponse"),
+                        "402": json_ok("HTTP 402 Payment Required challenge", "#/components/schemas/Http402ChallengeResponse")
+                    }
+                },
+                "post": {
+                    "operationId": "tryHttp402PaywordsPost",
+                    "summary": "Submit a live HTTP 402 PayWord voucher for microsecond cryptographic verification",
+                    "description": "Verifies PAYMENT-SIGNATURE (or JSON body voucher) via SHA256^k(w_k) == w_0 with zero gas.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": false,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Verified PayWord voucher receipt", "#/components/schemas/GenericApiResponse"),
+                        "402": json_ok("HTTP 402 Payment Required challenge", "#/components/schemas/Http402ChallengeResponse")
+                    }
+                }
+            },
+            "/api/v2/paywords/cost-savings": {
+                "get": {
+                    "operationId": "getPaywordsCostSavings",
+                    "summary": "Calculate exact PayWords gas & fee savings vs Stripe and per-call x402",
+                    "description": "Compares O(1) SHA-256 PayWords batch settlement against Stripe (2.9% + $0.30) and per-call on-chain ERC-20 transfers across Base, Optimism, Arbitrum, and Newsatoshi L1.",
+                    "parameters": [
+                        api_ver_param.clone(),
+                        { "name": "calls_per_channel", "in": "query", "schema": { "type": "integer", "default": 1000 } },
+                        { "name": "price_usd_per_call", "in": "query", "schema": { "type": "number", "default": 0.001 } }
+                    ],
+                    "responses": {
+                        "200": json_ok("PayWords cost savings breakdown", "#/components/schemas/GenericApiResponse")
+                    }
+                },
+                "post": {
+                    "operationId": "postPaywordsCostSavings",
+                    "summary": "Calculate PayWords cost savings via JSON payload",
+                    "description": "Returns exact cost comparison and savings percentage.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("PayWords cost savings breakdown", "#/components/schemas/GenericApiResponse")
+                    }
+                }
+            },
+            "/api/v2/paywords/channel-kit": {
+                "get": {
+                    "operationId": "getPaywordsChannelKit",
+                    "summary": "Generate turnkey openChannel / claim commands for Base, Optimism, and Arbitrum PayWord channels",
+                    "description": "Returns exact Foundry cast / ethers / viem integration commands targeting live Sourcify-verified NewsatoshiPayWordChannel contracts.",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "200": json_ok("PayWords channel kit", "#/components/schemas/GenericApiResponse")
+                    }
+                },
+                "post": {
+                    "operationId": "postPaywordsChannelKit",
+                    "summary": "Compile a custom PayWord channel kit with recipient, chain, unit price, and max calls",
+                    "description": "Outputs deterministic channel configuration and deployment commands.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("PayWords channel kit", "#/components/schemas/GenericApiResponse")
+                    }
+                }
+            },
+            "/api/v2/x402/paywall-kit": {
+                "get": {
+                    "operationId": "getX402PaywallKit",
+                    "summary": "Generate drop-in x402 + PayWords HTTP 402 paywall middleware code (JS/TS, Python, Cloudflare Worker)",
+                    "description": "Returns ready-to-paste server and agent client code using newsatoshi-402.",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "200": json_ok("x402 Paywall Kit", "#/components/schemas/GenericApiResponse")
+                    }
+                },
+                "post": {
+                    "operationId": "postX402PaywallKit",
+                    "summary": "Generate customized x402 + PayWords paywall middleware",
+                    "description": "Customizes pricing, recipient address, and settlement chain.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("x402 Paywall Kit", "#/components/schemas/GenericApiResponse")
+                    }
+                }
+            },
+            "/api/v2/paid/status": {
+                "get": {
+                    "operationId": "getPaidApiStatus",
+                    "summary": "Live catalog & real settlement stats for production PayWords-gated agent micro-APIs",
+                    "description": "Lists all 3 live $0.001 USDC/call PayWords-gated micro-APIs, accepted settlement chains (Base, Optimism, Arbitrum One), merchant payout address, and real verified call counts (zero fabricated metrics).",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "200": json_ok("Live paid agent API catalog", "#/components/schemas/GenericApiResponse")
+                    }
+                }
+            },
+            "/api/v2/paid/evm-audit-batch": {
+                "get": {
+                    "operationId": "paidEvmAuditBatchChallenge",
+                    "summary": "Production PayWords-gated Multi-Chain EVM Contract & Bytecode Audit Batch ($0.001 USDC/call)",
+                    "description": "Emits HTTP 402 Payment Required challenge for batch EVM contract bytecode/proxy/balance/Sourcify inspection across Base, Optimism, Arbitrum, and Polygon.",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "402": json_ok("HTTP 402 Payment Required ($0.001 USDC PayWords)", "#/components/schemas/Http402ChallengeResponse")
+                    }
+                },
+                "post": {
+                    "operationId": "paidEvmAuditBatch",
+                    "summary": "Execute live Multi-Chain EVM Contract Audit Batch (PayWords HTTP 402 · $0.001 USDC/call)",
+                    "description": "Requires valid PAYMENT-SIGNATURE PayWord voucher backed by a funded Base/Optimism/Arbitrum NewsatoshiPayWordChannel. Verifies voucher in ~1-2 microseconds with monotonic replay protection and returns live RPC bytecode/Sourcify/balance inspection.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Live multi-chain EVM contract audit result + PAYMENT-RESPONSE", "#/components/schemas/GenericApiResponse"),
+                        "402": json_ok("HTTP 402 Payment Required ($0.001 USDC PayWords)", "#/components/schemas/Http402ChallengeResponse")
+                    }
+                }
+            },
+            "/api/v2/paid/tx-verify-batch": {
+                "get": {
+                    "operationId": "paidTxVerifyBatchChallenge",
+                    "summary": "Production PayWords-gated Multi-Chain TX Receipt & Confirmation Verifier ($0.001 USDC/call)",
+                    "description": "Emits HTTP 402 Payment Required challenge for batch EVM transaction receipt, finality, and gas verification.",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "402": json_ok("HTTP 402 Payment Required ($0.001 USDC PayWords)", "#/components/schemas/Http402ChallengeResponse")
+                    }
+                },
+                "post": {
+                    "operationId": "paidTxVerifyBatch",
+                    "summary": "Execute live Multi-Chain TX Receipt & Confirmation Verification Batch (PayWords HTTP 402 · $0.001 USDC/call)",
+                    "description": "Requires valid PAYMENT-SIGNATURE PayWord voucher backed by a funded Base/Optimism/Arbitrum channel. Returns live mainnet receipts, status, gas used, and confirmations.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Live multi-chain TX verification result + PAYMENT-RESPONSE", "#/components/schemas/GenericApiResponse"),
+                        "402": json_ok("HTTP 402 Payment Required ($0.001 USDC PayWords)", "#/components/schemas/Http402ChallengeResponse")
+                    }
+                }
+            },
+            "/api/v2/paid/defi-quote-bundle": {
+                "get": {
+                    "operationId": "paidDefiQuoteBundleChallenge",
+                    "summary": "Production PayWords-gated Multi-Chain RPC Gas & Base FairCurve Spot Quote Bundle ($0.001 USDC/call)",
+                    "description": "Emits HTTP 402 Payment Required challenge for live multi-chain gas, block tip, and Base FairCurve spot quote bundle.",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "402": json_ok("HTTP 402 Payment Required ($0.001 USDC PayWords)", "#/components/schemas/Http402ChallengeResponse")
+                    }
+                },
+                "post": {
+                    "operationId": "paidDefiQuoteBundle",
+                    "summary": "Execute live Multi-Chain Gas & FairCurve Spot Quote Bundle (PayWords HTTP 402 · $0.001 USDC/call)",
+                    "description": "Requires valid PAYMENT-SIGNATURE PayWord voucher backed by a funded Base/Optimism/Arbitrum channel. Returns real-time gas, block heights, and on-chain FairCurve quotes.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": false,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Live multi-chain gas & quote bundle + PAYMENT-RESPONSE", "#/components/schemas/GenericApiResponse"),
+                        "402": json_ok("HTTP 402 Payment Required ($0.001 USDC PayWords)", "#/components/schemas/Http402ChallengeResponse")
+                    }
+                }
+            },
+            "/api/v2/nsusd/state": {
+                "get": {
+                    "operationId": "getNsUsdState",
+                    "summary": "Live RFC-0028 nsUSD backing reserves, collateral ratio, and Lean 4 solvency invariants",
+                    "description": "Returns live NewsatoshiBackingVault multi-chain reserve balances and nsUSD protocol parameters.",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "200": json_ok("Live nsUSD protocol state", "#/components/schemas/GenericApiResponse")
+                    }
+                }
+            },
+            "/api/v2/nsusd/quote": {
+                "get": {
+                    "operationId": "getNsUsdQuote",
+                    "summary": "Exact deterministic nsUSD mint/redeem quote",
+                    "description": "Computes exact integer nsUSD/USDC mint or redeem amounts under RFC-0028.",
+                    "parameters": [
+                        api_ver_param.clone(),
+                        { "name": "usd", "in": "query", "schema": { "type": "number", "default": 1.0 } }
+                    ],
+                    "responses": {
+                        "200": json_ok("Exact nsUSD quote", "#/components/schemas/GenericApiResponse")
+                    }
+                }
+            },
+            "/api/v2/l2/status": {
+                "get": {
+                    "operationId": "getL2Status",
+                    "summary": "Live Newsatoshi L2 Perfection Layer status (PayWords, FairCurve, HTLCs, and Lean 4 proofs)",
+                    "description": "Returns deployed L2 contract telemetry and Lean 4 Theorem verification hashes.",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "200": json_ok("Live L2 perfection status", "#/components/schemas/GenericApiResponse")
+                    }
+                }
+            },
+            "/api/v2/base/curves": {
+                "get": {
+                    "operationId": "getBaseFairCurves",
+                    "summary": "List live on-chain NewsatoshiFairCurveFactory pools on Base Mainnet",
+                    "description": "Queries Base Mainnet RPC for deployed FairCurvePool instances, reserves, spot prices, and injected USDC revenue.",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "200": json_ok("Live Base FairCurve pools", "#/components/schemas/GenericApiResponse")
+                    }
+                }
+            },
+            "/api/v2/launchpad/fair-curve": {
+                "post": {
+                    "operationId": "compileBaseFairCurve",
+                    "summary": "Compile a Base Mainnet 0%-platform-fee FairCurvePool launch with automatic PayWords revenue dividend routing",
+                    "description": "Generates deterministic NewsatoshiFairCurveFactory deployment calldata where 100% of API PayWords claims can flow into injectRevenue() holder dividends.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Compiled FairCurvePool launch payload", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
+            },
+            "/api/v2/live-verify": {
+                "get": {
+                    "operationId": "getLiveVerifyTelemetry",
+                    "summary": "Live cryptographic verification telemetry across L1 Mainnet v2, STARK proofs, and Lean 4 hashes",
+                    "description": "Aggregates live verifiable proof hashes and chain telemetry.",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "200": json_ok("Live cryptographic verification telemetry", "#/components/schemas/GenericApiResponse")
+                    }
+                }
             }
         }
     })

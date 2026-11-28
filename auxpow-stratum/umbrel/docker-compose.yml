@@ -4,10 +4,14 @@
 version: "3.7"
 
 services:
+  app_proxy:
+    environment:
+      APP_HOST: newsatoshi-auxpow-miner_stratum_1
+      APP_PORT: 3334
+      PROXY_AUTH_ADD: "false"
+
   newsatoshi-node:
-    build:
-      context: ..
-      dockerfile: Dockerfile.node
+    image: ghcr.io/theguysaccount/newsatoshi-node:v1.2.5
     restart: on-failure
     command:
       - "--net"
@@ -18,7 +22,7 @@ services:
       - "--peer"
       - "newsatoshi-seed-v2.fly.dev:8445@b024aaeafa0e4ca384b99483c28c3bedde45a5461a560063b283766414dfbbcc"
       - "--peer"
-      - "pool.newsatoshi.org:8445"
+      - "pool.newsatoshi.org:8445@78187a9436dd2d8cc7ed7afff2396b72b56687099d45d93da676b0a90ed8c6b6"
       - "--rpc"
       - "19556"
       - "--rpcbind"
@@ -32,10 +36,8 @@ services:
     volumes:
       - ${APP_DATA_DIR:-./data}:/data
 
-  app_proxy:
-    build:
-      context: ..
-      dockerfile: Dockerfile
+  stratum:
+    image: ghcr.io/theguysaccount/newsatoshi-auxpow-stratum:v1.2.5
     restart: on-failure
     depends_on:
       - newsatoshi-node
