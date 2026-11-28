@@ -3,7 +3,7 @@ name: newsatoshi-agent-payments
 description: Use when an AI agent needs multi-chain O(1) SHA-256 PayWord HTTP 402 micropayments (Base, Optimism, Arbitrum — 0% protocol fee), trustless cross-chain atomic swaps into post-quantum Newsatoshi (LOVE) from BTC/Lightning/Solana/Base/Optimism/Arbitrum/Polygon, Bitcoin AuxPoW merge-mining setup, or zero-API-key EVM security audits, Bitcoin mempool fees, Lightning BOLT-11 decoding, and Base Uniswap V3 quotes.
 ---
 
-# Newsatoshi Commons — Multi-Chain PayWords, Atomic Swaps & Zero-API-Key Crypto MCP (`v0.34.0`)
+# Newsatoshi Commons — Multi-Chain PayWords, Atomic Swaps & Zero-API-Key Crypto MCP (`v0.35.0`)
 
 ## When to use this skill
 

@@ -809,8 +809,13 @@ pub fn build_crosschain_connectivity_directory(base_url: &str) -> Value {
         },
         "agent_payment_implementation": {
             "live_402_sandbox": format!("{base_url}/api/v2/paywords/try-402"),
-            "live_paid_micro_api": format!("{base_url}/api/v2/paid/evm-audit-batch"),
+            "live_paid_micro_apis": [
+                format!("{base_url}/api/v2/paid/evm-audit-batch"),
+                format!("{base_url}/api/v2/paid/tx-verify-batch"),
+                format!("{base_url}/api/v2/paid/defi-quote-bundle")
+            ],
             "live_paid_status": format!("{base_url}/api/v2/paid/status"),
+            "x402_batch_settlement_spec": "https://github.com/theguysaccount/newsatoshi-commons/blob/main/docs/X402-BATCH-SETTLEMENT-PAYWORDS-SPEC.md",
             "channel_kit_compiler": format!("{base_url}/api/v2/paywords/channel-kit"),
             "live_channel_inspector": format!("{base_url}/api/v2/evm/channel"),
             "live_htlc_inspector": format!("{base_url}/api/v2/evm/htlc"),
@@ -1736,7 +1741,7 @@ fn hex_to_bytes32(hex_str: &str) -> Result<[u8; 32], String> {
     Ok(out)
 }
 
-fn build_paid_402_challenge(base_url: &str, reason: &str) -> Value {
+fn build_paid_402_challenge(base_url: &str, endpoint_path: &str, reason: &str) -> Value {
     json!({
         "ok": false,
         "error": "payment_required",
@@ -1745,7 +1750,7 @@ fn build_paid_402_challenge(base_url: &str, reason: &str) -> Value {
         "scheme": "batch-settlement",
         "binding": "paywords-sha256",
         "protocol_fee_bps": 0,
-        "endpoint": format!("{base_url}/api/v2/paid/evm-audit-batch"),
+        "endpoint": format!("{base_url}{endpoint_path}"),
         "merchant_recipient": PAID_API_MERCHANT_ADDRESS,
         "price_per_call_usdc": 0.001,
         "min_unit_amount_usdc_raw": PAID_API_UNIT_PRICE_USDC_RAW.to_string(),
@@ -1756,7 +1761,8 @@ fn build_paid_402_challenge(base_url: &str, reason: &str) -> Value {
             { "chain": "arbitrum", "caip2": "eip155:42161", "contract": MULTICHAIN_PAYWORD_CHANNEL_ADDRESS, "usdc": ARBITRUM_USDC_ADDRESS }
         ],
         "header_format": "PAYMENT-SIGNATURE: base64({\"x402Version\":2,\"scheme\":\"batch-settlement\",\"binding\":\"paywords-sha256\",\"network\":\"eip155:8453\",\"channelId\":\"0x...\",\"index\":1,\"tokenHex\":\"0x...\"})",
-        "sandbox_note": "For unfunded testing use POST /api/v2/paywords/try-402. This production endpoint strictly requires a live on-chain funded NewsatoshiPayWordChannel paying merchant_recipient."
+        "spec_url": "https://github.com/theguysaccount/newsatoshi-commons/blob/main/docs/X402-BATCH-SETTLEMENT-PAYWORDS-SPEC.md",
+        "sandbox_note": "For unfunded testing use POST /api/v2/paywords/try-402. Production /api/v2/paid/* endpoints strictly require a live on-chain funded NewsatoshiPayWordChannel paying merchant_recipient."
     })
 }
 
@@ -1779,7 +1785,7 @@ pub fn get_paid_api_catalog_and_status(base_url: &str) -> Value {
                 "onchain_claimed_steps": st.onchain_claimed_steps,
                 "claimable_steps_unsettled": claimable_steps,
                 "claim_args": {
-                    "function": "claim(bytes32,uint64,bytes32)",
+                    "function": "claim(bytes32,uint32,bytes32)",
                     "channel_id": st.channel_id,
                     "steps": claimable_steps,
                     "preimage": format!("0x{}", hex::encode(st.highest_token))
@@ -1796,6 +1802,16 @@ pub fn get_paid_api_catalog_and_status(base_url: &str) -> Value {
             "verified_funded_calls_served": total_calls,
             "channels": active_channels
         },
+        "verified_mainnet_commercial_flywheel_proof": {
+            "network": "base (eip155:8453)",
+            "channel_id": "0x91fbe151d270ed3b4953c48a068321dfdcf1cc74704040267fdafea63be11153",
+            "open_channel_5_tx": "0x9d9ea256d4f349d1dfd9cfa1ab85f43b0e5abfdb93fed5228454ca55dce8c1f5",
+            "merchant_claim_5_tx": "0xd45660a90844b817ec9a7232144882f983104930c4e5555187efffcd926bea06",
+            "merchant_claim_5_gas": 75608,
+            "fair_curve_inject_revenue_tx": "0x1c1498db55467d4696569b20b764c552958780d94a823d200847cfdc71f9e3ff",
+            "fair_curve_inject_revenue_gas": 73015,
+            "fair_curve_pool": BASE_DEMO_CURVE_POOL_ADDRESS
+        },
         "endpoints": [
             {
                 "method": "POST",
@@ -1804,42 +1820,61 @@ pub fn get_paid_api_catalog_and_status(base_url: &str) -> Value {
                 "price_usdc": 0.001,
                 "description": "Batch multi-chain EVM smart contract security audit (up to 10 contracts across Ethereum, Base, Optimism, Arbitrum, Polygon: bytecode, EIP-1967 proxy/admin slots, owner() risk, ERC-20 metadata, Sourcify v2 exact-match).",
                 "settlement_chains": ["base (eip155:8453)", "optimism (eip155:10)", "arbitrum (eip155:42161)"]
+            },
+            {
+                "method": "POST",
+                "path": "/api/v2/paid/tx-verify-batch",
+                "url": format!("{base_url}/api/v2/paid/tx-verify-batch"),
+                "price_usdc": 0.001,
+                "description": "Batch multi-chain EVM transaction receipt & confirmation verifier (up to 10 transactions across Ethereum, Base, Optimism, Arbitrum, Polygon in one metered call).",
+                "settlement_chains": ["base (eip155:8453)", "optimism (eip155:10)", "arbitrum (eip155:42161)"]
+            },
+            {
+                "method": "POST",
+                "path": "/api/v2/paid/defi-quote-bundle",
+                "url": format!("{base_url}/api/v2/paid/defi-quote-bundle"),
+                "price_usdc": 0.001,
+                "description": "Combined live Base Uniswap V3 QuoterV2 multi-tier quote + live Bitcoin mempool fee oracle bundle in a single metered agent call.",
+                "settlement_chains": ["base (eip155:8453)", "optimism (eip155:10)", "arbitrum (eip155:42161)"]
             }
         ],
-        "free_sandbox_endpoint": format!("{base_url}/api/v2/paywords/try-402")
+        "free_sandbox_endpoint": format!("{base_url}/api/v2/paywords/try-402"),
+        "spec_url": "https://github.com/theguysaccount/newsatoshi-commons/blob/main/docs/X402-BATCH-SETTLEMENT-PAYWORDS-SPEC.md"
     })
 }
 
-/// Production PayWords-gated multi-chain EVM batch security audit (`POST /api/v2/paid/evm-audit-batch`).
-/// Verifies live on-chain channel funding on Base / Optimism / Arbitrum + monotonic O(1) SHA-256
-/// voucher chain with replay protection before executing up to 10 live contract audits.
-pub fn evaluate_paid_evm_audit_batch(
+fn verify_funded_payword_signature(
     payment_signature_hdr: Option<&str>,
-    body_json: &Value,
     base_url: &str,
-) -> (u16, Value) {
+    endpoint_path: &str,
+) -> Result<(Value, u64), (u16, Value)> {
     let Some(sig_raw) = payment_signature_hdr.map(str::trim).filter(|s| !s.is_empty()) else {
-        return (402, build_paid_402_challenge(base_url, "missing PAYMENT-SIGNATURE header"));
+        return Err((
+            402,
+            build_paid_402_challenge(base_url, endpoint_path, "missing PAYMENT-SIGNATURE header"),
+        ));
     };
 
-    let decoded_bytes = match crate::x402::base64_decode(sig_raw) {
-        Ok(b) => b,
-        Err(e) => {
-            return (
-                402,
-                build_paid_402_challenge(base_url, &format!("invalid base64 PAYMENT-SIGNATURE: {e}")),
-            );
-        }
-    };
-    let sig_val: Value = match serde_json::from_slice(&decoded_bytes) {
-        Ok(v) => v,
-        Err(e) => {
-            return (
-                402,
-                build_paid_402_challenge(base_url, &format!("invalid JSON PAYMENT-SIGNATURE: {e}")),
-            );
-        }
-    };
+    let decoded_bytes = crate::x402::base64_decode(sig_raw).map_err(|e| {
+        (
+            402,
+            build_paid_402_challenge(
+                base_url,
+                endpoint_path,
+                &format!("invalid base64 PAYMENT-SIGNATURE: {e}"),
+            ),
+        )
+    })?;
+    let sig_val: Value = serde_json::from_slice(&decoded_bytes).map_err(|e| {
+        (
+            402,
+            build_paid_402_challenge(
+                base_url,
+                endpoint_path,
+                &format!("invalid JSON PAYMENT-SIGNATURE: {e}"),
+            ),
+        )
+    })?;
 
     let net_str = sig_val
         .get("network")
@@ -1849,15 +1884,16 @@ pub fn evaluate_paid_evm_audit_batch(
     let meta = match resolve_evm_chain_meta(net_str) {
         Ok(m) if m.payword_contract.is_some() => m,
         Ok(m) => {
-            return (
+            return Err((
                 402,
                 build_paid_402_challenge(
                     base_url,
+                    endpoint_path,
                     &format!("PayWordChannel not yet deployed on {}; use base, optimism, or arbitrum", m.slug),
                 ),
-            );
+            ));
         }
-        Err(e) => return (402, build_paid_402_challenge(base_url, &e)),
+        Err(e) => return Err((402, build_paid_402_challenge(base_url, endpoint_path, &e))),
     };
     let contract = meta.payword_contract.unwrap_or(BASE_PAYWORD_CHANNEL_ADDRESS);
 
@@ -1868,7 +1904,10 @@ pub fn evaluate_paid_evm_audit_batch(
         .unwrap_or("");
     let cid_clean = strip_hex(cid_str).to_ascii_lowercase();
     if cid_clean.len() != 64 || !cid_clean.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return (402, build_paid_402_challenge(base_url, "invalid 32-byte channelId"));
+        return Err((
+            402,
+            build_paid_402_challenge(base_url, endpoint_path, "invalid 32-byte channelId"),
+        ));
     }
     let cid_0x = format!("0x{cid_clean}");
 
@@ -1878,7 +1917,10 @@ pub fn evaluate_paid_evm_audit_batch(
         .and_then(|v| v.as_u64())
         .unwrap_or(0);
     if index == 0 {
-        return (402, build_paid_402_challenge(base_url, "voucher index must be >= 1"));
+        return Err((
+            402,
+            build_paid_402_challenge(base_url, endpoint_path, "voucher index must be >= 1"),
+        ));
     }
 
     let token_str = sig_val
@@ -1886,10 +1928,12 @@ pub fn evaluate_paid_evm_audit_batch(
         .or_else(|| sig_val.get("token"))
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let token_bytes = match hex_to_bytes32(token_str) {
-        Ok(b) => b,
-        Err(e) => return (402, build_paid_402_challenge(base_url, &format!("invalid tokenHex: {e}"))),
-    };
+    let token_bytes = hex_to_bytes32(token_str).map_err(|e| {
+        (
+            402,
+            build_paid_402_challenge(base_url, endpoint_path, &format!("invalid tokenHex: {e}")),
+        )
+    })?;
 
     let now_unix = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -1907,40 +1951,45 @@ pub fn evaluate_paid_evm_audit_batch(
     }
 
     if need_rpc {
-        let onchain = match inspect_live_multichain_payword_channel(meta.slug, &cid_0x) {
-            Ok(v) => v,
-            Err(e) => {
-                return (
-                    502,
-                    json!({ "ok": false, "error": "rpc_verification_unavailable", "detail": e }),
-                );
-            }
-        };
+        let onchain = inspect_live_multichain_payword_channel(meta.slug, &cid_0x).map_err(|e| {
+            (
+                502,
+                json!({ "ok": false, "error": "rpc_verification_unavailable", "detail": e }),
+            )
+        })?;
         if onchain.get("found").and_then(|v| v.as_bool()) != Some(true) {
-            return (
+            return Err((
                 402,
                 build_paid_402_challenge(
                     base_url,
+                    endpoint_path,
                     &format!("channel {cid_0x} is not funded on {}", meta.label),
                 ),
-            );
+            ));
         }
         if onchain.get("closed").and_then(|v| v.as_bool()) == Some(true) {
-            return (402, build_paid_402_challenge(base_url, "channel is already closed on-chain"));
+            return Err((
+                402,
+                build_paid_402_challenge(base_url, endpoint_path, "channel is already closed on-chain"),
+            ));
         }
         let recipient = onchain.get("recipient").and_then(|v| v.as_str()).unwrap_or("");
         if !recipient.eq_ignore_ascii_case(PAID_API_MERCHANT_ADDRESS) {
-            return (
+            return Err((
                 402,
                 build_paid_402_challenge(
                     base_url,
+                    endpoint_path,
                     &format!("channel recipient {recipient} != merchant {PAID_API_MERCHANT_ADDRESS}"),
                 ),
-            );
+            ));
         }
         let expiry_unix = onchain.get("expiry_unix").and_then(|v| v.as_u64()).unwrap_or(0);
         if expiry_unix <= now_unix.saturating_add(60) {
-            return (402, build_paid_402_challenge(base_url, "channel expired or expiring within 60s"));
+            return Err((
+                402,
+                build_paid_402_challenge(base_url, endpoint_path, "channel expired or expiring within 60s"),
+            ));
         }
         let token_symbol = onchain
             .get("token_symbol")
@@ -1957,27 +2006,26 @@ pub fn evaluate_paid_evm_audit_batch(
         } else if token_symbol == "ETH" {
             PAID_API_UNIT_PRICE_ETH_WEI
         } else {
-            return (
+            return Err((
                 402,
-                build_paid_402_challenge(base_url, "channel token must be native USDC or ETH"),
-            );
+                build_paid_402_challenge(base_url, endpoint_path, "channel token must be native USDC or ETH"),
+            ));
         };
         if unit_amount_raw < min_unit {
-            return (
+            return Err((
                 402,
                 build_paid_402_challenge(
                     base_url,
+                    endpoint_path,
                     &format!("channel unit_amount_raw {unit_amount_raw} < minimum {min_unit} ({token_symbol})"),
                 ),
-            );
+            ));
         }
         let max_steps = onchain.get("max_steps").and_then(|v| v.as_u64()).unwrap_or(0);
         let claimed_steps = onchain.get("claimed_steps").and_then(|v| v.as_u64()).unwrap_or(0);
         let current_root_str = onchain.get("current_root").and_then(|v| v.as_str()).unwrap_or("");
-        let current_root_bytes = match hex_to_bytes32(current_root_str) {
-            Ok(b) => b,
-            Err(e) => return (502, json!({ "ok": false, "error": format!("bad onchain root: {e}") })),
-        };
+        let current_root_bytes = hex_to_bytes32(current_root_str)
+            .map_err(|e| (502, json!({ "ok": false, "error": format!("bad onchain root: {e}") })))?;
         let payer = onchain
             .get("payer")
             .and_then(|v| v.as_str())
@@ -2014,86 +2062,106 @@ pub fn evaluate_paid_evm_audit_batch(
         }
     }
 
-    // Verify O(1) SHA-256 hash chain against monotonic watermark under lock
     let t0 = std::time::Instant::now();
-    let (settlement_snapshot, verify_us) = {
-        let mut guard = match paid_store().lock() {
-            Ok(g) => g,
-            Err(_) => return (500, json!({ "ok": false, "error": "watermark lock poisoned" })),
-        };
-        let Some(entry) = guard.get_mut(&store_key) else {
-            return (402, build_paid_402_challenge(base_url, "channel watermark missing"));
-        };
-        if entry.expiry_unix <= now_unix.saturating_add(60) {
-            return (402, build_paid_402_challenge(base_url, "channel expired"));
-        }
-        if index > entry.max_steps {
-            return (
-                402,
-                build_paid_402_challenge(
-                    base_url,
-                    &format!("voucher index {index} exceeds channel max_steps {}", entry.max_steps),
+    let mut guard = paid_store()
+        .lock()
+        .map_err(|_| (500, json!({ "ok": false, "error": "watermark lock poisoned" })))?;
+    let Some(entry) = guard.get_mut(&store_key) else {
+        return Err((
+            402,
+            build_paid_402_challenge(base_url, endpoint_path, "channel watermark missing"),
+        ));
+    };
+    if entry.expiry_unix <= now_unix.saturating_add(60) {
+        return Err((402, build_paid_402_challenge(base_url, endpoint_path, "channel expired")));
+    }
+    if index > entry.max_steps {
+        return Err((
+            402,
+            build_paid_402_challenge(
+                base_url,
+                endpoint_path,
+                &format!("voucher index {index} exceeds channel max_steps {}", entry.max_steps),
+            ),
+        ));
+    }
+    if index <= entry.highest_index {
+        return Err((
+            402,
+            build_paid_402_challenge(
+                base_url,
+                endpoint_path,
+                &format!(
+                    "stale or replayed voucher index {index} (highest accepted is {})",
+                    entry.highest_index
                 ),
-            );
-        }
-        if index <= entry.highest_index {
-            return (
-                402,
-                build_paid_402_challenge(
-                    base_url,
-                    &format!(
-                        "stale or replayed voucher index {index} (highest accepted is {})",
-                        entry.highest_index
-                    ),
-                ),
-            );
-        }
-        let delta = index - entry.highest_index;
-        if delta > 4_096 {
-            return (402, build_paid_402_challenge(base_url, "voucher step jump > 4096"));
-        }
-        let mut cur = token_bytes;
-        for _ in 0..delta {
-            cur = crate::crypto::sha256(&cur);
-        }
-        if cur != entry.highest_token {
-            return (
-                402,
-                build_paid_402_challenge(
-                    base_url,
-                    "SHA-256 PayWord verification failed: SHA256^delta(tokenHex) != watermark anchor",
-                ),
-            );
-        }
-        let verify_us = t0.elapsed().as_micros() as u64;
-        entry.highest_index = index;
-        entry.highest_token = token_bytes;
-        entry.calls_served = entry.calls_served.saturating_add(1);
-        let claimable_steps = entry.highest_index.saturating_sub(entry.onchain_claimed_steps);
-        let snap = json!({
-            "chain": format!("{} ({})", entry.chain_slug, meta.caip2),
-            "contract": entry.contract,
+            ),
+        ));
+    }
+    let delta = index - entry.highest_index;
+    if delta > 4_096 {
+        return Err((
+            402,
+            build_paid_402_challenge(base_url, endpoint_path, "voucher step jump > 4096"),
+        ));
+    }
+    let mut cur = token_bytes;
+    for _ in 0..delta {
+        cur = crate::crypto::sha256(&cur);
+    }
+    if cur != entry.highest_token {
+        return Err((
+            402,
+            build_paid_402_challenge(
+                base_url,
+                endpoint_path,
+                "SHA-256 PayWord verification failed: SHA256^delta(tokenHex) != watermark anchor",
+            ),
+        ));
+    }
+    let verify_us = t0.elapsed().as_micros() as u64;
+    entry.highest_index = index;
+    entry.highest_token = token_bytes;
+    entry.calls_served = entry.calls_served.saturating_add(1);
+    let claimable_steps = entry.highest_index.saturating_sub(entry.onchain_claimed_steps);
+    let snap = json!({
+        "chain": format!("{} ({})", entry.chain_slug, meta.caip2),
+        "contract": entry.contract,
+        "channel_id": entry.channel_id,
+        "payer": entry.payer,
+        "recipient": PAID_API_MERCHANT_ADDRESS,
+        "token_symbol": entry.token_symbol,
+        "unit_amount_raw": entry.unit_amount_raw.to_string(),
+        "voucher_index_accepted": entry.highest_index,
+        "steps_verified_this_call": delta,
+        "remaining_steps": entry.max_steps.saturating_sub(entry.highest_index),
+        "claimable_steps_total": claimable_steps,
+        "calls_served_on_channel": entry.calls_served,
+        "claim_args": {
+            "function": "claim(bytes32,uint32,bytes32)",
             "channel_id": entry.channel_id,
-            "payer": entry.payer,
-            "recipient": PAID_API_MERCHANT_ADDRESS,
-            "token_symbol": entry.token_symbol,
-            "unit_amount_raw": entry.unit_amount_raw.to_string(),
-            "voucher_index_accepted": entry.highest_index,
-            "steps_verified_this_call": delta,
-            "remaining_steps": entry.max_steps.saturating_sub(entry.highest_index),
-            "claimable_steps_total": claimable_steps,
-            "calls_served_on_channel": entry.calls_served,
-            "claim_args": {
-                "function": "claim(bytes32,uint64,bytes32)",
-                "channel_id": entry.channel_id,
-                "steps": claimable_steps,
-                "preimage": format!("0x{}", hex::encode(entry.highest_token))
-            }
-        });
-        (snap, verify_us)
+            "steps": claimable_steps,
+            "preimage": format!("0x{}", hex::encode(entry.highest_token))
+        }
+    });
+    Ok((snap, verify_us))
+}
+
+/// Production PayWords-gated multi-chain EVM batch security audit (`POST /api/v2/paid/evm-audit-batch`).
+pub fn evaluate_paid_evm_audit_batch(
+    payment_signature_hdr: Option<&str>,
+    body_json: &Value,
+    base_url: &str,
+) -> (u16, Value) {
+    let (settlement_snapshot, verify_us) = match verify_funded_payword_signature(
+        payment_signature_hdr,
+        base_url,
+        "/api/v2/paid/evm-audit-batch",
+    ) {
+        Ok(v) => v,
+        Err(e) => return e,
     };
 
-    // Execute real live multi-chain EVM security audits (up to 10 contracts per metered call)
     let mut targets: Vec<(String, String)> = Vec::new();
     if let Some(arr) = body_json.get("targets").and_then(|v| v.as_array()) {
         for item in arr.iter().take(10) {
@@ -2127,6 +2195,112 @@ pub fn evaluate_paid_evm_audit_batch(
             "settlement": settlement_snapshot,
             "audited_count": audits.len(),
             "audits": audits
+        }),
+    )
+}
+
+/// Production PayWords-gated multi-chain EVM tx receipt batch verifier (`POST /api/v2/paid/tx-verify-batch`).
+pub fn evaluate_paid_tx_verify_batch(
+    payment_signature_hdr: Option<&str>,
+    body_json: &Value,
+    base_url: &str,
+) -> (u16, Value) {
+    let (settlement_snapshot, verify_us) = match verify_funded_payword_signature(
+        payment_signature_hdr,
+        base_url,
+        "/api/v2/paid/tx-verify-batch",
+    ) {
+        Ok(v) => v,
+        Err(e) => return e,
+    };
+
+    let mut txs: Vec<(String, String)> = Vec::new();
+    if let Some(arr) = body_json.get("transactions").and_then(|v| v.as_array()) {
+        for item in arr.iter().take(10) {
+            let ch = item.get("chain").and_then(|v| v.as_str()).unwrap_or("base");
+            if let Some(h) = item.get("tx_hash").and_then(|v| v.as_str()) {
+                txs.push((ch.to_string(), h.to_string()));
+            }
+        }
+    }
+    if txs.is_empty() {
+        txs.push(("base".to_string(), BASE_PAYWORD_1000_CLAIM_PROOF_TX.to_string()));
+    }
+
+    let mut receipts = Vec::with_capacity(txs.len());
+    for (ch, h) in &txs {
+        match crate::crypto_tools::verify_tx_receipt(ch, h) {
+            Ok(v) => receipts.push(v),
+            Err(e) => receipts.push(json!({ "ok": false, "chain": ch, "tx_hash": h, "error": e })),
+        }
+    }
+
+    (
+        200,
+        json!({
+            "ok": true,
+            "status": "paid_service_delivered",
+            "funding_status": "verified_onchain_funded",
+            "verified_in_us": verify_us,
+            "per_call_onchain_gas": 0,
+            "protocol_fee_bps": 0,
+            "settlement": settlement_snapshot,
+            "verified_count": receipts.len(),
+            "receipts": receipts
+        }),
+    )
+}
+
+/// Production PayWords-gated DeFi Quote + Bitcoin Mempool Oracle Bundle (`POST /api/v2/paid/defi-quote-bundle`).
+pub fn evaluate_paid_defi_quote_bundle(
+    payment_signature_hdr: Option<&str>,
+    body_json: &Value,
+    base_url: &str,
+) -> (u16, Value) {
+    let (settlement_snapshot, verify_us) = match verify_funded_payword_signature(
+        payment_signature_hdr,
+        base_url,
+        "/api/v2/paid/defi-quote-bundle",
+    ) {
+        Ok(v) => v,
+        Err(e) => return e,
+    };
+
+    let from_asset = body_json
+        .get("from_asset")
+        .and_then(|v| v.as_str())
+        .unwrap_or("ETH");
+    let to_asset = body_json
+        .get("to_asset")
+        .and_then(|v| v.as_str())
+        .unwrap_or("USDC");
+    let amount = body_json
+        .get("amount")
+        .and_then(|v| v.as_str())
+        .unwrap_or("1");
+    let btc_addr = body_json.get("btc_address").and_then(|v| v.as_str());
+
+    let uniswap = match crate::crypto_tools::quote_base_uniswap_v3(from_asset, to_asset, amount) {
+        Ok(v) => v,
+        Err(e) => json!({ "ok": false, "error": e }),
+    };
+    let btc_mempool = match crate::crypto_tools::fetch_bitcoin_mempool_oracle(btc_addr) {
+        Ok(v) => v,
+        Err(e) => json!({ "ok": false, "error": e }),
+    };
+
+    (
+        200,
+        json!({
+            "ok": true,
+            "status": "paid_service_delivered",
+            "funding_status": "verified_onchain_funded",
+            "verified_in_us": verify_us,
+            "per_call_onchain_gas": 0,
+            "protocol_fee_bps": 0,
+            "settlement": settlement_snapshot,
+            "base_uniswap_v3": uniswap,
+            "bitcoin_mempool": btc_mempool
         }),
     )
 }
@@ -2427,14 +2601,20 @@ mod tests {
         assert_eq!(dir["agent_payment_implementation"]["mcp_tools_count"], 46);
         assert!(SDK_DTS_SOURCE.contains("createAutoPayFetch"));
 
-        // Production paid endpoint rejects unpaid requests with HTTP 402
+        // Production paid endpoints strictly reject unpaid requests with HTTP 402
         let (p402, p402_body) =
             evaluate_paid_evm_audit_batch(None, &json!({}), "https://commons.newsatoshi.org");
         assert_eq!(p402, 402);
         assert_eq!(p402_body["merchant_recipient"], PAID_API_MERCHANT_ADDRESS);
+        let (tx402, _) =
+            evaluate_paid_tx_verify_batch(None, &json!({}), "https://commons.newsatoshi.org");
+        assert_eq!(tx402, 402);
+        let (q402, _) =
+            evaluate_paid_defi_quote_bundle(None, &json!({}), "https://commons.newsatoshi.org");
+        assert_eq!(q402, 402);
         let paid_cat = get_paid_api_catalog_and_status("https://commons.newsatoshi.org");
         assert_eq!(paid_cat["ok"], true);
-        assert_eq!(paid_cat["endpoints"].as_array().unwrap().len(), 1);
+        assert_eq!(paid_cat["endpoints"].as_array().unwrap().len(), 3);
 
         let uri_all = build_universal_payment_uri(
             "all",

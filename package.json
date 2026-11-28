@@ -1,6 +1,6 @@
 {
   "name": "newsatoshi-mcp",
-  "version": "0.34.0",
+  "version": "0.35.0",
   "description": "Zero-dependency MCP stdio bridge (45 tools), multi-chain Base/Optimism/Arbitrum O(1) SHA-256 PayWords AI Agent Auto-Pay SDK, Universal Payment URI compiler, and post-quantum Newsatoshi (LOVE) cross-chain toolkit.",
   "type": "module",
   "main": "./sdk/js/newsatoshi-402.mjs",

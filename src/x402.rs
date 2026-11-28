@@ -628,7 +628,26 @@ pub fn render_well_known_x402(base_url: &str) -> Value {
         "erc8004": format!("{}/.well-known/erc8004.json", base_url.trim_end_matches('/')),
         "facilitator": x402_facilitator_url(),
         "payTo": x402_pay_to(),
-        "resources": resources
+        "resources": resources,
+        "batch_settlement_paywords": {
+            "scheme": "batch-settlement",
+            "binding": "paywords-sha256",
+            "protocol_fee_bps": 0,
+            "spec_url": "https://github.com/theguysaccount/newsatoshi-commons/blob/main/docs/X402-BATCH-SETTLEMENT-PAYWORDS-SPEC.md",
+            "x402_issue": "https://github.com/x402-foundation/x402/issues/4494",
+            "merchant_recipient": crate::paywords_launchpad::PAID_API_MERCHANT_ADDRESS,
+            "live_contracts": {
+                "eip155:8453": crate::paywords_launchpad::BASE_PAYWORD_CHANNEL_ADDRESS,
+                "eip155:10": crate::paywords_launchpad::MULTICHAIN_PAYWORD_CHANNEL_ADDRESS,
+                "eip155:42161": crate::paywords_launchpad::MULTICHAIN_PAYWORD_CHANNEL_ADDRESS
+            },
+            "endpoints": [
+                format!("{}/api/v2/paid/evm-audit-batch", base_url.trim_end_matches('/')),
+                format!("{}/api/v2/paid/tx-verify-batch", base_url.trim_end_matches('/')),
+                format!("{}/api/v2/paid/defi-quote-bundle", base_url.trim_end_matches('/'))
+            ],
+            "free_sandbox": format!("{}/api/v2/paywords/try-402", base_url.trim_end_matches('/'))
+        }
     })
 }
 

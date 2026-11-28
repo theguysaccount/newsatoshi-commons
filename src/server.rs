@@ -724,6 +724,8 @@ fn handle_request(req: Request, state: &AppState) {
             | "/api/v2/swaps/rfq"
             | "/api/v2/paid/status"
             | "/api/v2/paid/evm-audit-batch"
+            | "/api/v2/paid/tx-verify-batch"
+            | "/api/v2/paid/defi-quote-bundle"
             | "/api/web4/charters"
             | "/api/web4/services"
             | "/api/web4/bounties"
@@ -1157,6 +1159,32 @@ fn handle_request(req: Request, state: &AppState) {
             let body_str = read_body_string(&mut req).unwrap_or_default();
             let body_json: Value = serde_json::from_str(&body_str).unwrap_or_else(|_| json!({}));
             let (status, payload) = crate::paywords_launchpad::evaluate_paid_evm_audit_batch(
+                sig.as_deref(),
+                &body_json,
+                &base_url,
+            );
+            respond_json(req, status, &payload);
+        }
+        (Method::Post, "/api/v2/paid/tx-verify-batch")
+        | (Method::Get, "/api/v2/paid/tx-verify-batch") => {
+            let base_url = infer_base_url(&req);
+            let sig = header_value_ci(&req, "payment-signature");
+            let body_str = read_body_string(&mut req).unwrap_or_default();
+            let body_json: Value = serde_json::from_str(&body_str).unwrap_or_else(|_| json!({}));
+            let (status, payload) = crate::paywords_launchpad::evaluate_paid_tx_verify_batch(
+                sig.as_deref(),
+                &body_json,
+                &base_url,
+            );
+            respond_json(req, status, &payload);
+        }
+        (Method::Post, "/api/v2/paid/defi-quote-bundle")
+        | (Method::Get, "/api/v2/paid/defi-quote-bundle") => {
+            let base_url = infer_base_url(&req);
+            let sig = header_value_ci(&req, "payment-signature");
+            let body_str = read_body_string(&mut req).unwrap_or_default();
+            let body_json: Value = serde_json::from_str(&body_str).unwrap_or_else(|_| json!({}));
+            let (status, payload) = crate::paywords_launchpad::evaluate_paid_defi_quote_bundle(
                 sig.as_deref(),
                 &body_json,
                 &base_url,

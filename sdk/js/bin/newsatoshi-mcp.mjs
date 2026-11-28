@@ -1,18 +1,25 @@
 #!/usr/bin/env node
 /**
- * newsatoshi-mcp — Zero-Dependency Stdio MCP Bridge & Zero-API-Key Crypto CLI
+ * newsatoshi-mcp v0.35.0 — Zero-Dependency Stdio MCP Bridge (46 Tools) & Multi-Chain Crypto/402 CLI
  *
  * Usage:
  *   npx -y github:theguysaccount/newsatoshi-commons
  *     Starts a stdio JSON-RPC 2.0 MCP bridge forwarding to https://commons.newsatoshi.org/mcp
- *     (all 19 live tools: EVM security audit, Bitcoin mempool oracle, BOLT-11 decoder,
- *      Base Uniswap V3 quoter, EVM tx receipt verifier, Newsatoshi L1 & PayWord 402).
+ *     (all 46 zero-auth tools: Base/Optimism/Arbitrum O(1) PayWords, 4-chain SHA-256 HTLC swaps,
+ *      Universal Payment URIs, Reserve-Price RFQ, Paid Agent Micro-APIs, EVM security audits,
+ *      Bitcoin mempool oracle, BOLT-11 decoder, Base Uniswap V3 quoter, and Newsatoshi L1).
  *
  *   CLI Subcommands (zero API keys required):
  *     newsatoshi-mcp serve [--url <mcp-url>]
  *     newsatoshi-mcp tools
  *     newsatoshi-mcp status
+ *     newsatoshi-mcp connectivity
+ *     newsatoshi-mcp paid-catalog
  *     newsatoshi-mcp inspect <0xAddress> [--chain base|ethereum|arbitrum|optimism|polygon]
+ *     newsatoshi-mcp inspect-channel <0xChannelId> [--chain base|optimism|arbitrum]
+ *     newsatoshi-mcp inspect-htlc <0xSwapId> [--chain base|optimism|arbitrum|polygon]
+ *     newsatoshi-mcp pay-uri <recipient> <amount> [--rail all|base|optimism|arbitrum|polygon|bitcoin|lightning|solana|newsatoshi] [--asset USDC] [--memo "..."]
+ *     newsatoshi-mcp rfq <loveAmount> <minReserveUsd> <sellerAddr> [--rail base_usdc] [--hours 24]
  *     newsatoshi-mcp btc-fees
  *     newsatoshi-mcp decode-bolt11 <lnbc...>
  *     newsatoshi-mcp quote-base <ETH|USDC|WETH|wLOVE> <ETH|USDC|WETH|wLOVE> <amount>
@@ -44,7 +51,7 @@ function parseFlag(args, flag, fallback = undefined) {
 }
 
 function printHelp() {
-  console.log(`newsatoshi-mcp v0.15.1 — Zero-API-Key Crypto MCP Bridge & Post-Quantum 402 CLI
+  console.log(`newsatoshi-mcp v0.35.0 — Zero-API-Key Multi-Chain MCP Bridge (46 Tools) & O(1) PayWords CLI
 
 STDIO MCP BRIDGE (default when invoked with no subcommand):
   npx -y github:theguysaccount/newsatoshi-commons
@@ -53,7 +60,13 @@ STDIO MCP BRIDGE (default when invoked with no subcommand):
 ZERO-API-KEY CLI COMMANDS:
   newsatoshi-mcp tools
   newsatoshi-mcp status
+  newsatoshi-mcp connectivity
+  newsatoshi-mcp paid-catalog
   newsatoshi-mcp inspect <0xContract> [--chain base|ethereum|arbitrum|optimism|polygon]
+  newsatoshi-mcp inspect-channel <0xChannelId> [--chain base|optimism|arbitrum]
+  newsatoshi-mcp inspect-htlc <0xSwapId> [--chain base|optimism|arbitrum|polygon]
+  newsatoshi-mcp pay-uri <recipient> <amount> [--rail all|base|optimism|arbitrum|polygon|bitcoin|solana|newsatoshi] [--asset USDC] [--memo "Order"]
+  newsatoshi-mcp rfq <loveAmount> <minReserveUsd> <sellerAddr> [--rail base_usdc] [--hours 24]
   newsatoshi-mcp btc-fees
   newsatoshi-mcp decode-bolt11 <bolt11_invoice>
   newsatoshi-mcp quote-base <tokenIn> <tokenOut> <amount>
@@ -79,7 +92,6 @@ export async function forwardJsonRpcLine(line, mcpUrl = MCP_URL, fetchImpl = fet
     });
   }
 
-  // Notifications have no id; acknowledge locally without blocking stdio.
   const isNotification =
     parsed && typeof parsed === "object" && !Array.isArray(parsed) && parsed.id === undefined;
 
@@ -89,7 +101,7 @@ export async function forwardJsonRpcLine(line, mcpUrl = MCP_URL, fetchImpl = fet
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
-        "User-Agent": "newsatoshi-mcp-stdio/0.13.0",
+        "User-Agent": "newsatoshi-mcp-stdio/0.35.0",
       },
       body: trimmed,
     });
@@ -123,7 +135,6 @@ async function runStdioBridge(mcpUrl) {
     terminal: false,
   });
 
-  // Process messages sequentially to preserve MCP JSON-RPC ordering on stdout.
   let queue = Promise.resolve();
   rl.on("line", (line) => {
     queue = queue.then(async () => {
@@ -181,11 +192,86 @@ async function runCli(argv) {
     return;
   }
 
+  if (cmd === "connectivity") {
+    const res = unwrapToolResult(await client.callTool("newsatoshi_get_crosschain_connectivity", {}));
+    console.log(JSON.stringify(res, null, 2));
+    return;
+  }
+
+  if (cmd === "paid-catalog") {
+    const res = unwrapToolResult(await client.callTool("newsatoshi_get_paid_api_catalog", {}));
+    console.log(JSON.stringify(res, null, 2));
+    return;
+  }
+
   if (cmd === "inspect") {
     const address = argv[1];
     if (!address) throw new Error("Usage: newsatoshi-mcp inspect <0xAddress> [--chain base]");
     const chain = parseFlag(argv, "--chain", "base");
     const res = unwrapToolResult(await client.inspectEvmContract(address, chain));
+    console.log(JSON.stringify(res, null, 2));
+    return;
+  }
+
+  if (cmd === "inspect-channel") {
+    const channelId = argv[1];
+    if (!channelId) throw new Error("Usage: newsatoshi-mcp inspect-channel <0xChannelId> [--chain base|optimism|arbitrum]");
+    const chain = parseFlag(argv, "--chain", "base");
+    const res = unwrapToolResult(
+      await client.callTool("newsatoshi_inspect_multichain_payword_channel", { chain, channel_id: channelId })
+    );
+    console.log(JSON.stringify(res, null, 2));
+    return;
+  }
+
+  if (cmd === "inspect-htlc") {
+    const swapId = argv[1];
+    if (!swapId) throw new Error("Usage: newsatoshi-mcp inspect-htlc <0xSwapId> [--chain base|optimism|arbitrum|polygon]");
+    const chain = parseFlag(argv, "--chain", "base");
+    const res = unwrapToolResult(
+      await client.callTool("newsatoshi_inspect_evm_htlc", { chain, swap_id: swapId })
+    );
+    console.log(JSON.stringify(res, null, 2));
+    return;
+  }
+
+  if (cmd === "pay-uri") {
+    const [, recipient, amountStr] = argv;
+    if (!recipient || !amountStr) {
+      throw new Error("Usage: newsatoshi-mcp pay-uri <recipient> <amount> [--rail all|base|optimism|arbitrum|polygon|bitcoin|solana|newsatoshi]");
+    }
+    const rail = parseFlag(argv, "--rail", "all");
+    const asset = parseFlag(argv, "--asset");
+    const memo = parseFlag(argv, "--memo");
+    const res = unwrapToolResult(
+      await client.callTool("newsatoshi_build_universal_payment_uri", {
+        rail,
+        recipient,
+        amount: Number(amountStr),
+        ...(asset ? { asset } : {}),
+        ...(memo ? { memo } : {}),
+      })
+    );
+    console.log(JSON.stringify(res, null, 2));
+    return;
+  }
+
+  if (cmd === "rfq") {
+    const [, loveStr, minUsdStr, sellerAddr] = argv;
+    if (!loveStr || !minUsdStr || !sellerAddr) {
+      throw new Error("Usage: newsatoshi-mcp rfq <loveAmount> <minReserveUsd> <sellerAddr> [--rail base_usdc] [--hours 24]");
+    }
+    const settlement_rail = parseFlag(argv, "--rail", "base_usdc");
+    const expiry_hours = Number(parseFlag(argv, "--hours", "24"));
+    const res = unwrapToolResult(
+      await client.callTool("newsatoshi_compile_reserve_price_rfq", {
+        love_amount: Number(loveStr),
+        min_reserve_price_usd: Number(minUsdStr),
+        settlement_rail,
+        seller_settlement_address: sellerAddr,
+        expiry_hours,
+      })
+    );
     console.log(JSON.stringify(res, null, 2));
     return;
   }

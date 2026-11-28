@@ -3,7 +3,7 @@
   "name": "org.newsatoshi.commons/newsatoshi-commons",
   "title": "Newsatoshi Commons — Private x402, nsUSD & Multi-Chain Crypto MCP",
   "description": "46 zero-auth tools: Live PayWords paid API, Base/OP/Arb channels, Universal URIs & 4-chain HTLCs.",
-  "version": "0.34.0",
+  "version": "0.35.0",
   "websiteUrl": "https://commons.newsatoshi.org",
   "repository": {
     "url": "https://github.com/theguysaccount/newsatoshi-commons",
