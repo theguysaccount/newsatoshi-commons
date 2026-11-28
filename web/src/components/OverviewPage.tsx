@@ -220,15 +220,16 @@ newsatoshi-swap keygen`,
 
 const CANONICAL_CONTRACTS = [
   {
-    name: 'NewsatoshiPayWordChannel',
-    role: 'L2/Base USDC · Ownerless O(1) SHA-256 PayWords channel (0% fee, 0 per-call gas, 96k-gas live claim proof)',
+    name: 'NewsatoshiPayWordChannel (Multi-Chain)',
+    role: 'Base · Optimism · Arbitrum · Ownerless O(1) SHA-256 PayWords (0% fee, live Base claim(1000) = $0.0077 & Optimism claim(100))',
     address: '0x971BA814Df91c20DcA3aDd870C2B55d643965C50',
-    badge: 'Base · Sourcify Exact Match',
+    badge: '3 Chains · Sourcify Exact Match',
     explorers: [
-      { label: 'Contract', url: 'https://basescan.org/address/0x971BA814Df91c20DcA3aDd870C2B55d643965C50' },
-      { label: 'Live Open Tx', url: 'https://basescan.org/tx/0x8229bb7282f79b819122c40e66e8f8dcec832d30fccb1a5b75f9eb49133be31d' },
-      { label: 'Live Claim(7) Tx', url: 'https://basescan.org/tx/0x122885e1b36aa5b8a62f97f4b4bfb3b235bdebe0055a8cd3a4ed7c52393a5356' },
-      { label: 'Live Refund Tx', url: 'https://basescan.org/tx/0x3a826c82fdaffdbbdb8049db7793a342524e3a74742c9504ef8baad1380c4c0d' },
+      { label: 'Base', url: 'https://basescan.org/address/0x971BA814Df91c20DcA3aDd870C2B55d643965C50' },
+      { label: 'Base Claim(1000)', url: 'https://basescan.org/tx/0xb79a3c01a8edc0bbc0b25714b2a1b7852c0035be2a083c26da81ef31620f6256' },
+      { label: 'Optimism', url: 'https://optimistic.etherscan.io/address/0x3DeBB6d5ae490e6cF4F966585e000028111CF106' },
+      { label: 'OP Claim(100)', url: 'https://optimistic.etherscan.io/tx/0x05f72b5f3bbff8407b78be11cbc962414a2af573bc9f08466cab060814b8ef6c' },
+      { label: 'Arbitrum', url: 'https://arbiscan.io/address/0x3DeBB6d5ae490e6cF4F966585e000028111CF106' },
     ],
     sourcify: 'https://repo.sourcify.dev/8453/0x971BA814Df91c20DcA3aDd870C2B55d643965C50',
   },
@@ -1157,12 +1158,21 @@ export function OverviewPage({ seed, backing, onNavigate, onNotice }: OverviewPa
               </a>{' '}
               (live Base USDC{' '}
               <a
-                href="https://basescan.org/tx/0x122885e1b36aa5b8a62f97f4b4bfb3b235bdebe0055a8cd3a4ed7c52393a5356"
+                href="https://basescan.org/tx/0xb79a3c01a8edc0bbc0b25714b2a1b7852c0035be2a083c26da81ef31620f6256"
                 target="_blank"
                 rel="noreferrer"
                 className="text-cyan-300 underline hover:text-white"
               >
-                96k-gas claim proof
+                claim(1000) $0.0077 proof
+              </a>
+              {' '}· also live on{' '}
+              <a
+                href="https://newsatoshi.org/connect/"
+                target="_blank"
+                rel="noreferrer"
+                className="text-cyan-300 underline hover:text-white"
+              >
+                Optimism &amp; Arbitrum
               </a>
               ).
             </p>

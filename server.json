@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "org.newsatoshi.commons/newsatoshi-commons",
   "title": "Newsatoshi Commons — Private x402, nsUSD & Multi-Chain Crypto MCP",
-  "description": "40 zero-auth tools: Live Base USDC PayWords, fair curves indexer, x402 SDK, nsUSD & swaps.",
-  "version": "0.30.0",
+  "description": "41 zero-auth tools: Base/Optimism/Arbitrum PayWords, 4-chain HTLC swaps, AI Agent SDK & try-402.",
+  "version": "0.31.0",
   "websiteUrl": "https://commons.newsatoshi.org",
   "repository": {
     "url": "https://github.com/theguysaccount/newsatoshi-commons",
