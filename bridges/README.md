@@ -9,6 +9,9 @@ Every buy road in this directory uses **identical SHA-256 HTLC cryptography (`SH
 | **3. Solana (`bridges/solana/`)** | Phantom, Backpack, Solflare + **Jupiter** (any SOL/SPL token → USDC → HTLC → LOVE) | Native `sol_sha256` deterministic PDA Escrow (`["ns_htlc", hash, sender]`) | Contract & instruction codec ready (`cargo test` verified) |
 | **4. Base / Arbitrum / Optimism / Polygon (`bridges/evm/`)** | MetaMask, Coinbase Smart Wallet (Apple Pay → Base USDC), Rabby, Rainbow | Immutable ownerless `NewsatoshiHtlc.sol` using EVM `0x02` `sha256()` precompile | **LIVE ON 4 MAINNETS**: Universal address [`0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987`](https://basescan.org/address/0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987) (all 4 Sourcify `exact_match` + live atomic claims proven) |
 | **5. Direct Hashrate (`auxpow-stratum/`)** | Bitaxe, NerdQAxe, Antminer S19/S21, solo `bitcoind` | AuxPoW merge-mining (`chainid = 20051`, `50 LOVE/block`) | Live E2E verified against `newsatoshi-0.1.0` |
+| **6. ERC-7683 Solver Intents (`bridges/evm/NewsatoshiErc7683Settler.sol`)** | UniswapX, Across, CoW, Superchain solvers | Immutable `IOriginSettler` + EIP-712 `openFor()` + `sha256` precompile claim | Foundry tested (including 256-run fuzz) + live `/api/v2/interop/erc7683-intent` |
+| **7. Cosmos IBC (`bridges/cosmos/`)** | Keplr, Leap, Noble USDC, Osmosis (`ICS-20`) | Immutable CosmWasm 2.x `sha2::Sha256` HTLC (`LockHtlc`/`ClaimHtlc`/`RefundHtlc`) | Contract ready + live `/api/v2/interop/universal-htlc` |
+| **8. Sui & Aptos Move (`bridges/move/`)** | Sui Wallet, Petra, Martian (`USDC` / `SUI` / `APT`) | Native `std::hash::sha2_256` Move shared-object / resource-account HTLC | Move modules ready + live `/api/v2/interop/universal-htlc` |
 
 ## Live Multi-Chain EVM Deployments (Universal Ownerless Addresses)
 

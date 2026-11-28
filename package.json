@@ -1,7 +1,7 @@
 {
   "name": "newsatoshi-mcp",
-  "version": "0.36.0",
-  "description": "Zero-dependency MCP stdio bridge (46 tools), 10-second zero-code PayWords HTTP 402 reverse proxy (newsatoshi-paywall), multi-chain Base/Optimism/Arbitrum O(1) SHA-256 PayWords AI Agent Auto-Pay SDK, Universal Payment URI compiler, and post-quantum Newsatoshi (LOVE) toolkit.",
+  "version": "0.37.0",
+  "description": "Zero-dependency MCP stdio bridge (52 tools), Universal Interoperability SDK (ERC-7683, 11-rail SHA-256 HTLC, ISO 20022 pacs.008, MCP/A2A/x402/ERC-8004/Nostr DVM), Branded Stablecoin & Sovereign STARK L2 Factory, Proof-of-Order Good-Deed Vault, and 10-second PayWords HTTP 402 reverse proxy.",
   "type": "module",
   "main": "./sdk/js/newsatoshi-402.mjs",
   "types": "./sdk/js/newsatoshi-402.d.ts",

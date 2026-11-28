@@ -2276,3 +2276,88 @@ export function createAutoPayFetch({
     return fetchImpl(url, { ...init, headers });
   };
 }
+
+// ============================================================================
+// v0.37.0 Universal Interoperability, Branded Stablecoin/L2 Factory & Good-Deed Vault
+// ============================================================================
+
+async function commonsJsonRequest(path, { method = "GET", body = null, baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  const url = `${String(baseUrl).replace(/\/$/, "")}${path}`;
+  const init = {
+    method,
+    headers: { Accept: "application/json", ...(body !== null ? { "Content-Type": "application/json" } : {}) },
+    ...(body !== null ? { body: JSON.stringify(body) } : {}),
+  };
+  const resp = await fetchImpl(url, init);
+  const text = await resp.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(`Newsatoshi Commons ${path} HTTP ${resp.status}: ${text.slice(0, 200)}`);
+  }
+  if (!resp.ok) {
+    throw new Error(data?.error || `Newsatoshi Commons ${path} HTTP ${resp.status}`);
+  }
+  return data;
+}
+
+export async function getInteropMatrix({ live = true, baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest(`/api/v2/interop/matrix?live=${live ? "true" : "false"}`, { baseUrl, fetchImpl });
+}
+
+export async function compileErc7683Intent(params, { baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest("/api/v2/interop/erc7683-intent", { method: "POST", body: params || {}, baseUrl, fetchImpl });
+}
+
+export async function compileUniversalHtlc(params, { baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest("/api/v2/interop/universal-htlc", { method: "POST", body: params || {}, baseUrl, fetchImpl });
+}
+
+export async function compileIso20022Bridge(params, { baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest("/api/v2/interop/iso20022-bridge", { method: "POST", body: params || {}, baseUrl, fetchImpl });
+}
+
+export async function compileAgentInteropEnvelope(params, { baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest("/api/v2/interop/agent-envelope", { method: "POST", body: params || {}, baseUrl, fetchImpl });
+}
+
+export async function verifyAtomicBundle(params, { baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest("/api/v2/interop/verify-atomic-bundle", { method: "POST", body: params || {}, baseUrl, fetchImpl });
+}
+
+export async function simulateUniversalInterop({ baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest("/api/v2/interop/simulate", { method: "POST", body: {}, baseUrl, fetchImpl });
+}
+
+export async function getFactoryState({ baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest("/api/v2/factory/state", { baseUrl, fetchImpl });
+}
+
+export async function launchBrandedStablecoin(params, { baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest("/api/v2/factory/stablecoin", { method: "POST", body: params || {}, baseUrl, fetchImpl });
+}
+
+export async function launchSovereignL2(params, { baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest("/api/v2/factory/l2", { method: "POST", body: params || {}, baseUrl, fetchImpl });
+}
+
+export async function simulateSovereignFactory(params = {}, { baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest("/api/v2/factory/simulate", { method: "POST", body: params, baseUrl, fetchImpl });
+}
+
+export async function getOrderVaultState({ baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest("/api/v2/order/state", { baseUrl, fetchImpl });
+}
+
+export async function recordAuxPowPledge(params, { baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest("/api/v2/order/pledge", { method: "POST", body: params || {}, baseUrl, fetchImpl });
+}
+
+export async function submitGoodDeedClaim(params, { baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest("/api/v2/order/claim", { method: "POST", body: params || {}, baseUrl, fetchImpl });
+}
+
+export async function simulateProofOfOrder({ baseUrl = DEFAULT_COMMONS_URL, fetchImpl = globalThis.fetch } = {}) {
+  return commonsJsonRequest("/api/v2/order/simulate", { method: "POST", body: {}, baseUrl, fetchImpl });
+}

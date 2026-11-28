@@ -146,3 +146,24 @@ export class NewsatoshiMcpClient {
   listTools(): Promise<Array<Record<string, unknown>>>;
   callTool(name: string, args?: Record<string, unknown>): Promise<Record<string, unknown>>;
 }
+
+export interface CommonsClientOptions {
+  baseUrl?: string;
+  fetchImpl?: typeof fetch;
+}
+
+export function getInteropMatrix(options?: CommonsClientOptions & { live?: boolean }): Promise<Record<string, unknown>>;
+export function compileErc7683Intent(params: Record<string, unknown>, options?: CommonsClientOptions): Promise<Record<string, unknown>>;
+export function compileUniversalHtlc(params: Record<string, unknown>, options?: CommonsClientOptions): Promise<Record<string, unknown>>;
+export function compileIso20022Bridge(params: Record<string, unknown>, options?: CommonsClientOptions): Promise<Record<string, unknown>>;
+export function compileAgentInteropEnvelope(params: Record<string, unknown>, options?: CommonsClientOptions): Promise<Record<string, unknown>>;
+export function verifyAtomicBundle(params: Record<string, unknown>, options?: CommonsClientOptions): Promise<Record<string, unknown>>;
+export function simulateUniversalInterop(options?: CommonsClientOptions): Promise<Record<string, unknown>>;
+export function getFactoryState(options?: CommonsClientOptions): Promise<Record<string, unknown>>;
+export function launchBrandedStablecoin(params: Record<string, unknown>, options?: CommonsClientOptions): Promise<Record<string, unknown>>;
+export function launchSovereignL2(params: Record<string, unknown>, options?: CommonsClientOptions): Promise<Record<string, unknown>>;
+export function simulateSovereignFactory(params?: Record<string, unknown>, options?: CommonsClientOptions): Promise<Record<string, unknown>>;
+export function getOrderVaultState(options?: CommonsClientOptions): Promise<Record<string, unknown>>;
+export function recordAuxPowPledge(params: Record<string, unknown>, options?: CommonsClientOptions): Promise<Record<string, unknown>>;
+export function submitGoodDeedClaim(params: Record<string, unknown>, options?: CommonsClientOptions): Promise<Record<string, unknown>>;
+export function simulateProofOfOrder(options?: CommonsClientOptions): Promise<Record<string, unknown>>;

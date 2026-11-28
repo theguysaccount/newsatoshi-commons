@@ -1,9 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "org.newsatoshi.commons/newsatoshi-commons",
-  "title": "Newsatoshi Commons — Private x402, nsUSD & Multi-Chain Crypto MCP",
-  "description": "46 zero-auth tools: Live PayWords paid API, Base/OP/Arb channels, Universal URIs & 4-chain HTLCs.",
-  "version": "0.35.0",
+  "title": "Newsatoshi Commons — Universal Interop, Stablecoin/L2 Factory, Good-Deed Vault & Private x402 MCP",
+  "description": "52 zero-auth tools: ERC-7683, 11-rail HTLCs, ISO 20022, Stablecoin/L2 Factory, Proof-of-Order & PayWords.",
+  "version": "0.37.0",
   "websiteUrl": "https://commons.newsatoshi.org",
   "repository": {
     "url": "https://github.com/theguysaccount/newsatoshi-commons",

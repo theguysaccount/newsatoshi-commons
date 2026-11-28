@@ -1,7 +1,7 @@
 {
   "name": "@newsatoshi/402",
-  "version": "0.36.0",
-  "description": "Zero-dependency multi-chain HTTP 402 PayWord SDK (Base, Optimism, Arbitrum + Newsatoshi L1), 10-second zero-code PayWords reverse proxy (newsatoshi-paywall), 1-line AI Agent createAutoPayFetch, Universal Payment URIs, and stdio MCP bridge.",
+  "version": "0.37.0",
+  "description": "Zero-dependency multi-chain HTTP 402 PayWord SDK (Base, Optimism, Arbitrum + Newsatoshi L1), Universal Interoperability Layer (ERC-7683, 11-rail HTLC, ISO 20022, 5-protocol AI agent envelopes), Branded Stablecoin/L2 Factory, Proof-of-Order Good-Deed Vault, and 52-tool stdio MCP bridge.",
   "type": "module",
   "main": "./newsatoshi-402.mjs",
   "types": "./newsatoshi-402.d.ts",

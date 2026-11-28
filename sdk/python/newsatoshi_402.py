@@ -1637,3 +1637,87 @@ class AutoPaySession:
         paid_headers["X-Newsatoshi-PayWord"] = f"channel={self.channel_id},{pay['header_value']}"
         req2 = urllib.request.Request(url, data=data, method=method, headers=paid_headers)
         return self._exec(req2)
+
+
+# ============================================================================
+# v0.37.0 Universal Interoperability, Branded Stablecoin/L2 Factory & Good-Deed Vault
+# ============================================================================
+
+def _commons_json_request(
+    path: str,
+    method: str = "GET",
+    body: Optional[Dict[str, Any]] = None,
+    base_url: str = DEFAULT_COMMONS_URL,
+    timeout: float = 20.0,
+    opener: Optional[Callable[[urllib.request.Request, float], Tuple[int, str]]] = None,
+) -> Dict[str, Any]:
+    url = f"{base_url.rstrip('/')}{path}"
+    raw = json.dumps(body).encode("utf-8") if body is not None else None
+    headers = {"Accept": "application/json", "User-Agent": "newsatoshi-402-python/0.37.0"}
+    if raw is not None:
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=raw, method=method, headers=headers)
+    if opener is not None:
+        status, text = opener(req, timeout)
+    else:
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                status, text = resp.status, resp.read().decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as err:
+            status, text = err.code, err.read().decode("utf-8", errors="replace")
+    parsed = json.loads(text)
+    if status >= 400:
+        raise RuntimeError(parsed.get("error") or f"Newsatoshi Commons {path} HTTP {status}")
+    return parsed
+
+
+def get_interop_matrix(live: bool = True, base_url: str = DEFAULT_COMMONS_URL, opener=None) -> Dict[str, Any]:
+    return _commons_json_request(f"/api/v2/interop/matrix?live={'true' if live else 'false'}", base_url=base_url, opener=opener)
+
+
+def compile_erc7683_intent(params: Dict[str, Any], base_url: str = DEFAULT_COMMONS_URL, opener=None) -> Dict[str, Any]:
+    return _commons_json_request("/api/v2/interop/erc7683-intent", method="POST", body=params, base_url=base_url, opener=opener)
+
+
+def compile_universal_htlc(params: Dict[str, Any], base_url: str = DEFAULT_COMMONS_URL, opener=None) -> Dict[str, Any]:
+    return _commons_json_request("/api/v2/interop/universal-htlc", method="POST", body=params, base_url=base_url, opener=opener)
+
+
+def compile_iso20022_bridge(params: Dict[str, Any], base_url: str = DEFAULT_COMMONS_URL, opener=None) -> Dict[str, Any]:
+    return _commons_json_request("/api/v2/interop/iso20022-bridge", method="POST", body=params, base_url=base_url, opener=opener)
+
+
+def compile_agent_interop_envelope(params: Dict[str, Any], base_url: str = DEFAULT_COMMONS_URL, opener=None) -> Dict[str, Any]:
+    return _commons_json_request("/api/v2/interop/agent-envelope", method="POST", body=params, base_url=base_url, opener=opener)
+
+
+def verify_atomic_bundle(params: Dict[str, Any], base_url: str = DEFAULT_COMMONS_URL, opener=None) -> Dict[str, Any]:
+    return _commons_json_request("/api/v2/interop/verify-atomic-bundle", method="POST", body=params, base_url=base_url, opener=opener)
+
+
+def simulate_universal_interop(base_url: str = DEFAULT_COMMONS_URL, opener=None) -> Dict[str, Any]:
+    return _commons_json_request("/api/v2/interop/simulate", method="POST", body={}, base_url=base_url, opener=opener)
+
+
+def get_factory_state(base_url: str = DEFAULT_COMMONS_URL, opener=None) -> Dict[str, Any]:
+    return _commons_json_request("/api/v2/factory/state", base_url=base_url, opener=opener)
+
+
+def launch_branded_stablecoin(params: Dict[str, Any], base_url: str = DEFAULT_COMMONS_URL, opener=None) -> Dict[str, Any]:
+    return _commons_json_request("/api/v2/factory/stablecoin", method="POST", body=params, base_url=base_url, opener=opener)
+
+
+def launch_sovereign_l2(params: Dict[str, Any], base_url: str = DEFAULT_COMMONS_URL, opener=None) -> Dict[str, Any]:
+    return _commons_json_request("/api/v2/factory/l2", method="POST", body=params, base_url=base_url, opener=opener)
+
+
+def simulate_sovereign_factory(params: Optional[Dict[str, Any]] = None, base_url: str = DEFAULT_COMMONS_URL, opener=None) -> Dict[str, Any]:
+    return _commons_json_request("/api/v2/factory/simulate", method="POST", body=params or {}, base_url=base_url, opener=opener)
+
+
+def get_order_vault_state(base_url: str = DEFAULT_COMMONS_URL, opener=None) -> Dict[str, Any]:
+    return _commons_json_request("/api/v2/order/state", base_url=base_url, opener=opener)
+
+
+def simulate_proof_of_order(base_url: str = DEFAULT_COMMONS_URL, opener=None) -> Dict[str, Any]:
+    return _commons_json_request("/api/v2/order/simulate", method="POST", body={}, base_url=base_url, opener=opener)

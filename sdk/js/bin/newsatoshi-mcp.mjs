@@ -51,7 +51,7 @@ function parseFlag(args, flag, fallback = undefined) {
 }
 
 function printHelp() {
-  console.log(`newsatoshi-mcp v0.35.0 — Zero-API-Key Multi-Chain MCP Bridge (46 Tools) & O(1) PayWords CLI
+  console.log(`newsatoshi-mcp v0.37.0 — Zero-API-Key Universal Interop & MCP Bridge (52 Tools) + O(1) PayWords CLI
 
 STDIO MCP BRIDGE (default when invoked with no subcommand):
   npx -y github:theguysaccount/newsatoshi-commons
@@ -61,6 +61,13 @@ ZERO-API-KEY CLI COMMANDS:
   newsatoshi-mcp tools
   newsatoshi-mcp status
   newsatoshi-mcp connectivity
+  newsatoshi-mcp interop-matrix
+  newsatoshi-mcp erc7683 <originChain> <userEvm> <destNs1> [--token USDC] [--amount 100000000]
+  newsatoshi-mcp universal-htlc <srcRail> <dstRail> <recipient> [--amount "100 USDC"]
+  newsatoshi-mcp iso20022 <ticker> <amountDecimal> [--debtor CHASUS33XXX] [--creditor FRBKUS44XXX]
+  newsatoshi-mcp simulate-interop
+  newsatoshi-mcp simulate-factory [--ticker BANKUSD]
+  newsatoshi-mcp simulate-order
   newsatoshi-mcp paid-catalog
   newsatoshi-mcp inspect <0xContract> [--chain base|ethereum|arbitrum|optimism|polygon]
   newsatoshi-mcp inspect-channel <0xChannelId> [--chain base|optimism|arbitrum]
@@ -342,6 +349,79 @@ async function runCli(argv) {
         2
       )
     );
+    return;
+  }
+
+  if (cmd === "interop-matrix") {
+    const resp = await fetch(`${COMMONS_BASE}/api/v2/interop/matrix`);
+    console.log(JSON.stringify(await resp.json(), null, 2));
+    return;
+  }
+
+  if (cmd === "erc7683") {
+    const [, origin_chain = "base", user_evm_address = "0x1111222233334444555566667777888899990000", destination_ns1 = "ns1qinteroptreasury0000000000000000001"] = argv;
+    const input_token = parseFlag(argv, "--token", "USDC");
+    const input_amount_units = Number(parseFlag(argv, "--amount", "100000000"));
+    const res = unwrapToolResult(
+      await client.callTool("newsatoshi_compile_erc7683_intent", {
+        origin_chain,
+        user_evm_address,
+        input_token,
+        input_amount_units,
+        destination_ns1,
+      })
+    );
+    console.log(JSON.stringify(res, null, 2));
+    return;
+  }
+
+  if (cmd === "universal-htlc") {
+    const [, source_rail = "cosmos_ibc", dest_rail = "newsatoshi_l1", recipient = "ns1qrecipient00000000000000000001"] = argv;
+    const amount_display = parseFlag(argv, "--amount", "100 USDC");
+    const res = unwrapToolResult(
+      await client.callTool("newsatoshi_compile_universal_htlc", {
+        source_rail,
+        dest_rail,
+        recipient,
+        amount_display,
+      })
+    );
+    console.log(JSON.stringify(res, null, 2));
+    return;
+  }
+
+  if (cmd === "iso20022") {
+    const [, stablecoin_ticker = "BANKUSD", amount_decimal = "250000.00"] = argv;
+    const debtor_bic = parseFlag(argv, "--debtor", "CHASUS33XXX");
+    const creditor_bic = parseFlag(argv, "--creditor", "FRBKUS44XXX");
+    const res = unwrapToolResult(
+      await client.callTool("newsatoshi_compile_iso20022_stablecoin_bridge", {
+        stablecoin_ticker,
+        amount_decimal,
+        debtor_bic,
+        creditor_bic,
+      })
+    );
+    console.log(JSON.stringify(res, null, 2));
+    return;
+  }
+
+  if (cmd === "simulate-interop") {
+    const res = unwrapToolResult(await client.callTool("newsatoshi_simulate_universal_interop", {}));
+    console.log(JSON.stringify(res, null, 2));
+    return;
+  }
+
+  if (cmd === "simulate-factory") {
+    const ticker = parseFlag(argv, "--ticker", "BANKUSD");
+    const res = unwrapToolResult(await client.callTool("newsatoshi_simulate_sovereign_factory", { ticker }));
+    console.log(JSON.stringify(res, null, 2));
+    return;
+  }
+
+  if (cmd === "simulate-order") {
+    const res = unwrapToolResult(await client.callTool("newsatoshi_simulate_proof_of_order_vault", {}));
+    console.log(JSON.stringify(res, null, 2));
     return;
   }
 

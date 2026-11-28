@@ -1,0 +1,17 @@
+[package]
+name = "newsatoshi-cosmwasm-htlc"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Immutable, ownerless CosmWasm SHA-256 HTLC bridge for Cosmos IBC (ICS-20) <-> Newsatoshi Mainnet v2 (LOVE / nsUSD)."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+cosmwasm-schema = "2.1"
+cosmwasm-std = "2.1"
+cw-storage-plus = "2.0"
+hex = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+sha2 = "0.10"
