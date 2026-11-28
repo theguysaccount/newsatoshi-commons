@@ -718,6 +718,8 @@ fn handle_request(req: Request, state: &AppState) {
             | "/api/v2/launchpad/fair-curve"
             | "/api/v2/base/curves"
             | "/api/v2/base/channel"
+            | "/api/v2/evm/channel"
+            | "/api/v2/evm/htlc"
             | "/api/web4/charters"
             | "/api/web4/services"
             | "/api/web4/bounties"
@@ -1067,6 +1069,36 @@ fn handle_request(req: Request, state: &AppState) {
                     req,
                     400,
                     &json!({ "ok": false, "error": "missing required query param 'id' (0x-prefixed 32-byte channel_id)" }),
+                ),
+            }
+        }
+        (Method::Get, "/api/v2/evm/channel") => {
+            let chain = query_param(&raw_url, "chain").unwrap_or_else(|| "base".to_string());
+            let cid = query_param(&raw_url, "id").or_else(|| query_param(&raw_url, "channel_id"));
+            match cid {
+                Some(id) => match crate::paywords_launchpad::inspect_live_multichain_payword_channel(&chain, &id) {
+                    Ok(v) => respond_json(req, 200, &v),
+                    Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+                },
+                None => respond_json(
+                    req,
+                    400,
+                    &json!({ "ok": false, "error": "missing required query param 'id' or 'channel_id' (0x-prefixed 32-byte hash)" }),
+                ),
+            }
+        }
+        (Method::Get, "/api/v2/evm/htlc") => {
+            let chain = query_param(&raw_url, "chain").unwrap_or_else(|| "base".to_string());
+            let sid = query_param(&raw_url, "swap_id").or_else(|| query_param(&raw_url, "id"));
+            match sid {
+                Some(id) => match crate::paywords_launchpad::inspect_live_evm_htlc(&chain, &id) {
+                    Ok(v) => respond_json(req, 200, &v),
+                    Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+                },
+                None => respond_json(
+                    req,
+                    400,
+                    &json!({ "ok": false, "error": "missing required query param 'swap_id' or 'id' (0x-prefixed 32-byte hash)" }),
                 ),
             }
         }

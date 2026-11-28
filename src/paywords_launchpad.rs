@@ -732,6 +732,8 @@ pub fn build_crosschain_connectivity_directory(base_url: &str) -> Value {
             "hash_invariant": "SHA256(32-byte preimage) == payment_hash (identical across Bitcoin OP_SHA256, Lightning BOLT-11, EVM sha256 precompile 0x02, Solana sha256, and Newsatoshi L1 lock --hash)",
             "compile_endpoint": format!("{base_url}/api/swaps/compile"),
             "verify_endpoint": format!("{base_url}/api/swaps/verify"),
+            "live_evm_htlc_inspector": format!("{base_url}/api/v2/evm/htlc?chain=optimism&swap_id=<0x64hex>"),
+            "live_multichain_payword_inspector": format!("{base_url}/api/v2/evm/channel?chain=base&id=<0x64hex>"),
             "rails": [
                 {
                     "rail": "btc_onchain",
@@ -795,7 +797,7 @@ pub fn build_crosschain_connectivity_directory(base_url: &str) -> Value {
             "pool_status_url": "https://pool.newsatoshi.org/status",
             "mine_setup_url": "https://newsatoshi.org/mine/",
             "supported_hardware": ["Bitaxe / NerdAxe (password: x)", "Antminer S19/S21/S21XP+ (password: d=524288)", "WhatsMiner M30/M50/M60 (password: d=524288)", "MiningRigRentals SHA256 AsicBoost (74-char ns1... worker)"],
-            "dual_btc_love_merge_mining": "python3 auxpow-stratum/stratum_auxpow.py --ns-rpc http://127.0.0.1:19556 --btc-rpc http://127.0.0.1:8332 (earns 50 LOVE/block at $0 extra power alongside BTC)",
+            "dual_btc_love_merge_mining": "docker compose -f auxpow-stratum/docker-compose.merge-mine.yml up -d (or python3 auxpow-stratum/stratum_auxpow.py --ns-rpc http://127.0.0.1:19556 --btc-rpc http://127.0.0.1:8332 — earns 50 LOVE/block at $0 extra power alongside BTC)",
             "pinned_nspq2_seeds": [
                 "newsatoshi-seed-v2.fly.dev:8445@b024aaeafa0e4ca384b99483c28c3bedde45a5461a560063b283766414dfbbcc",
                 "pool.newsatoshi.org:8445@78187a9436dd2d8cc7ed7afff2396b72b56687099d45d93da676b0a90ed8c6b6"
@@ -804,8 +806,10 @@ pub fn build_crosschain_connectivity_directory(base_url: &str) -> Value {
         "agent_payment_implementation": {
             "live_402_sandbox": format!("{base_url}/api/v2/paywords/try-402"),
             "channel_kit_compiler": format!("{base_url}/api/v2/paywords/channel-kit"),
+            "live_channel_inspector": format!("{base_url}/api/v2/evm/channel"),
+            "live_htlc_inspector": format!("{base_url}/api/v2/evm/htlc"),
             "mcp_endpoint": format!("{base_url}/mcp"),
-            "mcp_tools_count": 41,
+            "mcp_tools_count": 43,
             "zero_dep_js_sdk": "https://newsatoshi.org/sdk/newsatoshi-402.mjs",
             "zero_dep_python_sdk": "https://newsatoshi.org/sdk/newsatoshi-402.py",
             "frameworks": ["cloudflare_worker", "express", "fastapi", "agent_fetch_js", "agent_python"],
@@ -979,14 +983,91 @@ const BASE_RPC_URLS: &[&str] = &[
     "https://mainnet.base.org",
     "https://base-rpc.publicnode.com",
 ];
+const OPTIMISM_RPC_URLS: &[&str] = &[
+    "https://mainnet.optimism.io",
+    "https://optimism-rpc.publicnode.com",
+];
+const ARBITRUM_RPC_URLS: &[&str] = &[
+    "https://arb1.arbitrum.io/rpc",
+    "https://arbitrum-one-rpc.publicnode.com",
+];
+const POLYGON_RPC_URLS: &[&str] = &[
+    "https://polygon-bor-rpc.publicnode.com",
+    "https://polygon-rpc.com",
+];
+
+#[derive(Clone, Copy)]
+struct EvmChainMeta {
+    slug: &'static str,
+    label: &'static str,
+    caip2: &'static str,
+    native_symbol: &'static str,
+    usdc: &'static str,
+    payword_contract: Option<&'static str>,
+    htlc_contract: &'static str,
+    explorer_base: &'static str,
+    rpc_urls: &'static [&'static str],
+}
+
+fn resolve_evm_chain_meta(chain: &str) -> Result<EvmChainMeta, String> {
+    match chain.trim().to_ascii_lowercase().as_str() {
+        "" | "base" | "eip155:8453" | "8453" => Ok(EvmChainMeta {
+            slug: "base",
+            label: "Base Mainnet",
+            caip2: "eip155:8453",
+            native_symbol: "ETH",
+            usdc: BASE_USDC_ADDRESS,
+            payword_contract: Some(BASE_PAYWORD_CHANNEL_ADDRESS),
+            htlc_contract: CANONICAL_EVM_HTLC_ADDRESS,
+            explorer_base: "https://basescan.org",
+            rpc_urls: BASE_RPC_URLS,
+        }),
+        "optimism" | "op" | "eip155:10" | "10" => Ok(EvmChainMeta {
+            slug: "optimism",
+            label: "Optimism Mainnet",
+            caip2: "eip155:10",
+            native_symbol: "ETH",
+            usdc: OPTIMISM_USDC_ADDRESS,
+            payword_contract: Some(MULTICHAIN_PAYWORD_CHANNEL_ADDRESS),
+            htlc_contract: CANONICAL_EVM_HTLC_ADDRESS,
+            explorer_base: "https://optimistic.etherscan.io",
+            rpc_urls: OPTIMISM_RPC_URLS,
+        }),
+        "arbitrum" | "arb" | "arbitrum-one" | "eip155:42161" | "42161" => Ok(EvmChainMeta {
+            slug: "arbitrum",
+            label: "Arbitrum One",
+            caip2: "eip155:42161",
+            native_symbol: "ETH",
+            usdc: ARBITRUM_USDC_ADDRESS,
+            payword_contract: Some(MULTICHAIN_PAYWORD_CHANNEL_ADDRESS),
+            htlc_contract: CANONICAL_EVM_HTLC_ADDRESS,
+            explorer_base: "https://arbiscan.io",
+            rpc_urls: ARBITRUM_RPC_URLS,
+        }),
+        "polygon" | "matic" | "pol" | "eip155:137" | "137" => Ok(EvmChainMeta {
+            slug: "polygon",
+            label: "Polygon PoS",
+            caip2: "eip155:137",
+            native_symbol: "POL",
+            usdc: POLYGON_USDC_ADDRESS,
+            payword_contract: None,
+            htlc_contract: CANONICAL_EVM_HTLC_ADDRESS,
+            explorer_base: "https://polygonscan.com",
+            rpc_urls: POLYGON_RPC_URLS,
+        }),
+        other => Err(format!(
+            "unsupported EVM chain '{other}': supported chains are base, optimism, arbitrum, polygon"
+        )),
+    }
+}
 
 static BASE_CURVES_CACHE: std::sync::OnceLock<std::sync::Mutex<Option<(std::time::Instant, Value)>>> =
     std::sync::OnceLock::new();
 
-fn base_rpc_post(payload: &Value) -> Result<Value, String> {
+fn evm_rpc_post(urls: &[&str], label: &str, payload: &Value) -> Result<Value, String> {
     let body_str = serde_json::to_string(payload).map_err(|e| format!("json encode error: {e}"))?;
     let mut last_err = String::new();
-    for url in BASE_RPC_URLS {
+    for url in urls {
         let cfg = ureq::Agent::config_builder()
             .timeout_global(Some(std::time::Duration::from_secs(7)))
             .build();
@@ -1007,24 +1088,33 @@ fn base_rpc_post(payload: &Value) -> Result<Value, String> {
             Err(e) => last_err = format!("{url} rpc error: {e}"),
         }
     }
-    Err(format!("Base Mainnet RPC unavailable: {last_err}"))
+    Err(format!("{label} RPC unavailable: {last_err}"))
 }
 
-fn eth_call_single(to: &str, data: &str) -> Result<String, String> {
+fn base_rpc_post(payload: &Value) -> Result<Value, String> {
+    evm_rpc_post(BASE_RPC_URLS, "Base Mainnet", payload)
+}
+
+fn evm_eth_call_single(meta: EvmChainMeta, to: &str, data: &str) -> Result<String, String> {
     let payload = json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "eth_call",
         "params": [{ "to": to, "data": data }, "latest"]
     });
-    let resp = base_rpc_post(&payload)?;
+    let resp = evm_rpc_post(meta.rpc_urls, meta.label, &payload)?;
     if let Some(err) = resp.get("error") {
-        return Err(format!("eth_call error: {err}"));
+        return Err(format!("{} eth_call error: {err}", meta.label));
     }
     resp.get("result")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
-        .ok_or_else(|| "missing eth_call result".to_string())
+        .ok_or_else(|| format!("missing {} eth_call result", meta.label))
+}
+
+fn eth_call_single(to: &str, data: &str) -> Result<String, String> {
+    let base = resolve_evm_chain_meta("base")?;
+    evm_eth_call_single(base, to, data)
 }
 
 fn eth_call_batch(calls: &[(&str, &str)]) -> Result<Vec<String>, String> {
@@ -1105,29 +1195,44 @@ fn decode_abi_string(hex_str: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Decode the 10-word ABI tuple returned by `NewsatoshiPayWordChannel.channels(bytes32)`.
-pub fn decode_base_payword_channel_words(result_hex: &str, channel_id_hex: &str) -> Value {
+/// Decode the 10-word ABI tuple returned by `NewsatoshiPayWordChannel.channels(bytes32)` on any supported EVM chain.
+pub fn decode_multichain_payword_channel_words(
+    chain: &str,
+    result_hex: &str,
+    channel_id_hex: &str,
+) -> Result<Value, String> {
+    let meta = resolve_evm_chain_meta(chain)?;
+    let contract = meta.payword_contract.ok_or_else(|| {
+        format!(
+            "NewsatoshiPayWordChannel is live on base, optimism, and arbitrum (not yet deployed on {}; use HTLC inspector for {})",
+            meta.slug, meta.slug
+        )
+    })?;
     let clean_id = strip_hex(channel_id_hex).to_ascii_lowercase();
     let cid = format!("0x{clean_id}");
     let clean = strip_hex(result_hex);
     if clean.len() < 640 {
-        return json!({
+        return Ok(json!({
             "ok": true,
             "found": false,
+            "chain": format!("{} ({})", meta.slug, meta.caip2),
+            "chain_slug": meta.slug,
             "channel_id": cid,
-            "contract": BASE_PAYWORD_CHANNEL_ADDRESS,
+            "contract": contract,
             "reason": "short or empty RPC result"
-        });
+        }));
     }
     let payer = decode_word_address(clean, 0);
     if payer == "0x0000000000000000000000000000000000000000" {
-        return json!({
+        return Ok(json!({
             "ok": true,
             "found": false,
+            "chain": format!("{} ({})", meta.slug, meta.caip2),
+            "chain_slug": meta.slug,
             "channel_id": cid,
-            "contract": BASE_PAYWORD_CHANNEL_ADDRESS,
-            "reason": "channel not found on Base Mainnet"
-        });
+            "contract": contract,
+            "reason": format!("channel not found on {}", meta.label)
+        }));
     }
     let recipient = decode_word_address(clean, 1);
     let token = decode_word_address(clean, 2);
@@ -1141,18 +1246,21 @@ pub fn decode_base_payword_channel_words(result_hex: &str, channel_id_hex: &str)
     let remaining_steps = if closed { 0 } else { max_steps.saturating_sub(claimed_steps) };
     let remaining_raw = (remaining_steps as u128).saturating_mul(unit_amount);
     let claimed_raw = (claimed_steps as u128).saturating_mul(unit_amount);
-    let is_usdc = token.eq_ignore_ascii_case(BASE_USDC_ADDRESS);
+    let is_usdc = token.eq_ignore_ascii_case(meta.usdc);
+    let is_native = token == "0x0000000000000000000000000000000000000000";
 
-    json!({
+    let mut out = json!({
         "ok": true,
         "found": true,
-        "chain": "base (eip155:8453)",
-        "contract": BASE_PAYWORD_CHANNEL_ADDRESS,
+        "chain": format!("{} ({})", meta.slug, meta.caip2),
+        "chain_slug": meta.slug,
+        "chain_label": meta.label,
+        "contract": contract,
         "channel_id": cid,
         "payer": payer,
         "recipient": recipient,
         "token": token,
-        "token_symbol": if is_usdc { "USDC" } else if token == "0x0000000000000000000000000000000000000000" { "ETH" } else { "ERC20" },
+        "token_symbol": if is_usdc { "USDC" } else if is_native { meta.native_symbol } else { "ERC20" },
         "initial_root": initial_root,
         "current_root": current_root,
         "unit_amount_raw": unit_amount.to_string(),
@@ -1166,19 +1274,141 @@ pub fn decode_base_payword_channel_words(result_hex: &str, channel_id_hex: &str)
         "remaining_amount_usdc": if is_usdc { Some(round6((remaining_raw as f64) / 1e6)) } else { None },
         "expiry_unix": expiry,
         "closed": closed,
-        "basescan_contract_url": format!("https://basescan.org/address/{BASE_PAYWORD_CHANNEL_ADDRESS}")
-    })
+        "explorer_contract_url": format!("{}/address/{contract}", meta.explorer_base)
+    });
+    if meta.slug == "base" {
+        out["basescan_contract_url"] = json!(format!("https://basescan.org/address/{contract}"));
+    }
+    Ok(out)
 }
 
-/// Inspect any live `NewsatoshiPayWordChannel` (`0x971BA814Df91c20DcA3aDd870C2B55d643965C50`) on Base Mainnet.
-pub fn inspect_live_base_payword_channel(channel_id_hex: &str) -> Result<Value, String> {
+/// Decode the 10-word ABI tuple returned by `NewsatoshiPayWordChannel.channels(bytes32)` on Base Mainnet.
+pub fn decode_base_payword_channel_words(result_hex: &str, channel_id_hex: &str) -> Value {
+    decode_multichain_payword_channel_words("base", result_hex, channel_id_hex)
+        .unwrap_or_else(|e| json!({ "ok": false, "error": e }))
+}
+
+/// Inspect any live `NewsatoshiPayWordChannel` across Base, Optimism, or Arbitrum directly via JSON-RPC.
+pub fn inspect_live_multichain_payword_channel(
+    chain: &str,
+    channel_id_hex: &str,
+) -> Result<Value, String> {
+    let meta = resolve_evm_chain_meta(chain)?;
+    let contract = meta.payword_contract.ok_or_else(|| {
+        format!(
+            "NewsatoshiPayWordChannel is live on base, optimism, and arbitrum (not yet deployed on {})",
+            meta.slug
+        )
+    })?;
     let clean = strip_hex(channel_id_hex).to_ascii_lowercase();
     if clean.len() != 64 || !clean.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err("channel_id must be a 32-byte (64 hex character) bytes32 hash".into());
     }
     let calldata = format!("0x7a7ebd7b{clean}");
-    let raw = eth_call_single(BASE_PAYWORD_CHANNEL_ADDRESS, &calldata)?;
-    Ok(decode_base_payword_channel_words(&raw, &clean))
+    let raw = evm_eth_call_single(meta, contract, &calldata)?;
+    decode_multichain_payword_channel_words(meta.slug, &raw, &clean)
+}
+
+/// Inspect any live `NewsatoshiPayWordChannel` (`0x971BA814Df91c20DcA3aDd870C2B55d643965C50`) on Base Mainnet.
+pub fn inspect_live_base_payword_channel(channel_id_hex: &str) -> Result<Value, String> {
+    inspect_live_multichain_payword_channel("base", channel_id_hex)
+}
+
+/// Decode the 9-word ABI tuple returned by `NewsatoshiHtlc.swaps(bytes32)` (`0xeb84e7f2`) across
+/// Base, Optimism, Arbitrum, and Polygon.
+pub fn decode_evm_htlc_swap_words(
+    chain: &str,
+    result_hex: &str,
+    swap_id_hex: &str,
+) -> Result<Value, String> {
+    let meta = resolve_evm_chain_meta(chain)?;
+    let clean_id = strip_hex(swap_id_hex).to_ascii_lowercase();
+    let sid = format!("0x{clean_id}");
+    let clean = strip_hex(result_hex);
+    if clean.len() < 576 {
+        return Ok(json!({
+            "ok": true,
+            "found": false,
+            "chain": format!("{} ({})", meta.slug, meta.caip2),
+            "chain_slug": meta.slug,
+            "swap_id": sid,
+            "contract": meta.htlc_contract,
+            "reason": "short or empty RPC result"
+        }));
+    }
+    let sender = decode_word_address(clean, 0);
+    if sender == "0x0000000000000000000000000000000000000000" {
+        return Ok(json!({
+            "ok": true,
+            "found": false,
+            "chain": format!("{} ({})", meta.slug, meta.caip2),
+            "chain_slug": meta.slug,
+            "swap_id": sid,
+            "contract": meta.htlc_contract,
+            "reason": format!("HTLC swap not found on {}", meta.label)
+        }));
+    }
+    let recipient = decode_word_address(clean, 1);
+    let token = decode_word_address(clean, 2);
+    let amount_raw = decode_word_u128(clean, 3);
+    let payment_hash = format!("0x{}", clean[4 * 64..5 * 64].to_ascii_lowercase());
+    let timelock_unix = decode_word_u128(clean, 5) as u64;
+    let claimed = decode_word_u128(clean, 6) != 0;
+    let refunded = decode_word_u128(clean, 7) != 0;
+    let preimage = format!("0x{}", clean[8 * 64..9 * 64].to_ascii_lowercase());
+    let is_native = token == "0x0000000000000000000000000000000000000000";
+    let is_usdc = token.eq_ignore_ascii_case(meta.usdc);
+    let status = if claimed {
+        "claimed"
+    } else if refunded {
+        "refunded"
+    } else {
+        "locked_active"
+    };
+    let amount_human = if is_native {
+        Some(round8((amount_raw as f64) / 1e18))
+    } else if is_usdc {
+        Some(round6((amount_raw as f64) / 1e6))
+    } else {
+        None
+    };
+
+    Ok(json!({
+        "ok": true,
+        "found": true,
+        "chain": format!("{} ({})", meta.slug, meta.caip2),
+        "chain_slug": meta.slug,
+        "chain_label": meta.label,
+        "contract": meta.htlc_contract,
+        "swap_id": sid,
+        "status": status,
+        "sender": sender,
+        "recipient": recipient,
+        "token": token,
+        "token_symbol": if is_native { meta.native_symbol } else if is_usdc { "USDC" } else { "ERC20" },
+        "amount_raw": amount_raw.to_string(),
+        "amount_human": amount_human,
+        "payment_hash": payment_hash,
+        "timelock_unix": timelock_unix,
+        "claimed": claimed,
+        "refunded": refunded,
+        "preimage_revealed": if claimed { Some(preimage) } else { None },
+        "explorer_contract_url": format!("{}/address/{}", meta.explorer_base, meta.htlc_contract),
+        "newsatoshi_l1_matching_hash": payment_hash.trim_start_matches("0x")
+    }))
+}
+
+/// Inspect any live SHA-256 `NewsatoshiHtlc` swap (`0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987`)
+/// across Base, Optimism, Arbitrum, or Polygon directly via JSON-RPC.
+pub fn inspect_live_evm_htlc(chain: &str, swap_id_hex: &str) -> Result<Value, String> {
+    let meta = resolve_evm_chain_meta(chain)?;
+    let clean = strip_hex(swap_id_hex).to_ascii_lowercase();
+    if clean.len() != 64 || !clean.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err("swap_id must be a 32-byte (64 hex character) bytes32 hash".into());
+    }
+    let calldata = format!("0xeb84e7f2{clean}");
+    let raw = evm_eth_call_single(meta, meta.htlc_contract, &calldata)?;
+    decode_evm_htlc_swap_words(meta.slug, &raw, &clean)
 }
 
 /// Read all live Fair Bonding Curves deployed via `NewsatoshiFairCurveFactory`
@@ -1470,10 +1700,50 @@ mod tests {
             evaluate_live_paywords_try_402(None, Some(&bad_hdr), "https://commons.newsatoshi.org");
         assert_eq!(st_bad, 402);
 
-        // Cross-chain connectivity directory
+        // Cross-chain connectivity directory & Multi-chain PayWord + HTLC decoding
         let dir = build_crosschain_connectivity_directory("https://commons.newsatoshi.org");
         assert_eq!(dir["ok"], true);
         assert_eq!(dir["paywords_multichain_evm"].as_array().unwrap().len(), 3);
-        assert_eq!(dir["agent_payment_implementation"]["mcp_tools_count"], 41);
+        assert_eq!(dir["agent_payment_implementation"]["mcp_tools_count"], 43);
+
+        let op_words = format!(
+            "0x{:0>64}{:0>64}{:0>64}{}{}{:064x}{:064x}{:064x}{:064x}{:064x}",
+            "1111111111111111111111111111111111111111",
+            "1744535521eb420be9700475400455a4ad0ebea2",
+            "0b2c639c533813f4aa9d7837caf62653d097ff85",
+            "aa".repeat(32),
+            "bb".repeat(32),
+            1_000u128,
+            100u128,
+            100u128,
+            1_900_000_000u128,
+            1u128,
+        );
+        let op_dec = decode_multichain_payword_channel_words("optimism", &op_words, &cid).unwrap();
+        assert_eq!(op_dec["found"], true);
+        assert_eq!(op_dec["chain_slug"], "optimism");
+        assert_eq!(op_dec["token_symbol"], "USDC");
+        assert_eq!(op_dec["claimed_steps"], 100);
+        assert_eq!(op_dec["closed"], true);
+
+        let sid = "ef".repeat(32);
+        let htlc_words = format!(
+            "0x{:0>64}{:0>64}{:0>64}{:064x}{}{:064x}{:064x}{:064x}{}",
+            "1744535521eb420be9700475400455a4ad0ebea2",
+            "2222222222222222222222222222222222222222",
+            "0000000000000000000000000000000000000000",
+            100_000_000_000_000u128,
+            "12".repeat(32),
+            1_900_000_000u128,
+            1u128,
+            0u128,
+            "34".repeat(32),
+        );
+        let htlc_dec = decode_evm_htlc_swap_words("optimism", &htlc_words, &sid).unwrap();
+        assert_eq!(htlc_dec["found"], true);
+        assert_eq!(htlc_dec["status"], "claimed");
+        assert_eq!(htlc_dec["token_symbol"], "ETH");
+        assert_eq!(htlc_dec["claimed"], true);
+        assert_eq!(htlc_dec["preimage_revealed"], format!("0x{}", "34".repeat(32)));
     }
 }
