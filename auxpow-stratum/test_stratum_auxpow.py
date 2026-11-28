@@ -105,8 +105,6 @@ class AuxPowStratumTests(unittest.TestCase):
                 )
                 cfg = await recv()
                 self.assertTrue(cfg["result"]["version-rolling"])
-                vmask = await recv()
-                self.assertEqual(vmask["method"], "mining.set_version_mask")
 
                 # 2. Subscribe -> clean subscribe result (no premature notify before authorize)
                 await send({"id": 2, "method": "mining.subscribe", "params": ["bitaxe-test/1.0"]})

@@ -158,14 +158,17 @@ def build_aux_coinbase_parts(
 
     bip34 = encode_bip34_height(bip34_height)
     mm_commit = MERGED_MINING_MAGIC + aux_root + struct.pack("<II", 1, 0)
-    script_prefix = bip34 + mm_commit
-    script_suffix = coinbase_tag[:24]
+    # Keep coinb1 compact (< 64 bytes, matching CKPool / Braiins / WhatsMiner btminer):
+    # put extranonce1+extranonce2 immediately after BIP-34 height and place the Namecoin
+    # AuxPoW commitment (`\xfa\xbemm || aux_root || size || nonce`) in coinb2.
+    script_prefix = bip34
+    script_suffix = mm_commit + coinbase_tag[:24]
     total_script_len = len(script_prefix) + EXTRANONCE1_SIZE + EXTRANONCE2_SIZE + len(script_suffix)
     if total_script_len > 100:
         raise ValueError(f"coinbase scriptSig length {total_script_len} exceeds Bitcoin 100-byte consensus limit")
 
     coinb1 = (
-        struct.pack("<I", 2)  # nVersion = 2
+        struct.pack("<I", 1)  # nVersion = 1 (canonical Bitcoin coinbase)
         + b"\x01"  # 1 input
         + b"\x00" * 32  # null prevout
         + b"\xff\xff\xff\xff"  # prevout index
@@ -480,16 +483,24 @@ class AuxPowStratumServer:
                 extra_outputs=extra_outputs,
             )
         else:
-            # Standalone AuxPoW Solo-LOVE mode (parent header crafted solely for AuxPoW verification)
+            # Standalone AuxPoW Solo-LOVE mode (Bitcoin-canonical parent header for ASIC compatibility;
+            # Newsatoshi consensus checks sha256d(parent_header) <= aux_target and \xfabemm in coinbase).
             parent_version = 0x20000000
-            parent_prevhash_stratum = prevhash_to_stratum("11" * 32)
-            parent_nbits = int(aux_bits, 16)
+            parent_prevhash_stratum = prevhash_to_stratum(
+                "0000000000000000000123456789abcdef0123456789abcdef0123456789abcd"
+            )
+            parent_nbits = 0x1701F0A3
             parent_ntime = int(time.time())
+            p2pkh_script = (
+                self.btc_payout_script
+                if len(self.btc_payout_script) >= 20
+                else bytes.fromhex("76a914000000000000000000000000000000000000000088ac")
+            )
             coinb1, coinb2 = build_aux_coinbase_parts(
                 aux_hash_display_hex=aux_hash,
                 bip34_height=max(1, aux_height),
                 coinbase_tag=self.coinbase_tag,
-                payout_script=self.btc_payout_script,
+                payout_script=p2pkh_script,
                 coinbase_value_sats=312_500_000,
             )
 
@@ -748,11 +759,6 @@ class AuxPowStratumServer:
                         flush=True,
                     )
                     await self._send_json(writer, {"id": req_id, "result": res, "error": None})
-                    if granted_mask is not None:
-                        await self._send_json(
-                            writer,
-                            {"id": None, "method": "mining.set_version_mask", "params": [f"{granted_mask:08x}"]},
-                        )
 
                 elif method == "mining.subscribe":
                     client_state["subscribed"] = True
