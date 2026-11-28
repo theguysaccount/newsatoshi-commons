@@ -1,0 +1,8 @@
+name = "newsatoshi-paywords-worker"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+
+[vars]
+PAYWORDS_CHAIN = "base"
+PAYWORDS_RECIPIENT = "0x1744535521EB420be9700475400455a4Ad0EBEa2"
+PAYWORDS_UNIT_RAW = "1000"

@@ -23,6 +23,9 @@ pub const CANONICAL_EVM_HTLC_ADDRESS: &str = "0xF564A8F600B02981Bc02aC62a2B7d0C8
 pub const BASE_FAIR_CURVE_FACTORY_ADDRESS: &str = "0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933";
 pub const BASE_DEMO_CURVE_POOL_ADDRESS: &str = "0xC3098ba25E39Effa63dE94EbACE6381781ad4cEd";
 pub const BASE_DEMO_CURVE_TOKEN_ADDRESS: &str = "0x406B3484560c89C030720D9a4101500474e5D2d9";
+pub const PAID_API_MERCHANT_ADDRESS: &str = "0x1744535521EB420be9700475400455a4Ad0EBEa2";
+pub const PAID_API_UNIT_PRICE_USDC_RAW: u128 = 1_000;
+pub const PAID_API_UNIT_PRICE_ETH_WEI: u128 = 10_000_000_000;
 
 pub const BASE_PAYWORD_OPEN_PROOF_TX: &str =
     "0x8229bb7282f79b819122c40e66e8f8dcec832d30fccb1a5b75f9eb49133be31d";
@@ -806,19 +809,24 @@ pub fn build_crosschain_connectivity_directory(base_url: &str) -> Value {
         },
         "agent_payment_implementation": {
             "live_402_sandbox": format!("{base_url}/api/v2/paywords/try-402"),
+            "live_paid_micro_api": format!("{base_url}/api/v2/paid/evm-audit-batch"),
+            "live_paid_status": format!("{base_url}/api/v2/paid/status"),
             "channel_kit_compiler": format!("{base_url}/api/v2/paywords/channel-kit"),
             "live_channel_inspector": format!("{base_url}/api/v2/evm/channel"),
             "live_htlc_inspector": format!("{base_url}/api/v2/evm/htlc"),
             "universal_payment_uri_compiler": format!("{base_url}/api/v2/interop/payment-uri"),
             "reserve_price_rfq_compiler": format!("{base_url}/api/v2/swaps/rfq"),
             "mcp_endpoint": format!("{base_url}/mcp"),
-            "mcp_tools_count": 45,
+            "mcp_tools_count": 46,
             "zero_dep_js_sdk": "https://newsatoshi.org/sdk/newsatoshi-402.mjs",
             "typescript_types": "https://newsatoshi.org/sdk/newsatoshi-402.d.ts",
             "zero_dep_python_sdk": "https://newsatoshi.org/sdk/newsatoshi-402.py",
             "npm_install": "npm install github:theguysaccount/newsatoshi-commons",
             "pip_install": "pip install \"git+https://github.com/theguysaccount/newsatoshi-commons.git#subdirectory=sdk/python\"",
             "umbrel_merge_mine_kit": "https://github.com/theguysaccount/newsatoshi-commons/tree/main/auxpow-stratum/umbrel",
+            "start9_merge_mine_kit": "https://github.com/theguysaccount/newsatoshi-commons/tree/main/auxpow-stratum/start9",
+            "public_pool_merge_mine_kit": "https://github.com/theguysaccount/newsatoshi-commons/tree/main/auxpow-stratum/public-pool-bridge",
+            "external_audit_brief": "https://github.com/theguysaccount/newsatoshi-commons/blob/main/docs/EXTERNAL_AUDIT_BRIEF.md",
             "frameworks": ["cloudflare_worker", "express", "fastapi", "agent_fetch_js", "agent_python"],
             "x402_standard_proposal": "https://github.com/x402-foundation/x402/issues/4494"
         }
@@ -1687,6 +1695,442 @@ pub fn compile_reserve_price_rfq(
     }))
 }
 
+// =============================================================================
+// Live Production PayWords-Gated Agent Micro-API (Real On-Chain Channel Funded)
+// =============================================================================
+
+#[derive(Clone)]
+struct PaidChannelWatermark {
+    chain_slug: String,
+    contract: String,
+    channel_id: String,
+    payer: String,
+    token_symbol: String,
+    unit_amount_raw: u128,
+    max_steps: u64,
+    onchain_claimed_steps: u64,
+    expiry_unix: u64,
+    cached_at: std::time::Instant,
+    highest_index: u64,
+    highest_token: [u8; 32],
+    calls_served: u64,
+}
+
+static PAID_CHANNEL_STORE: std::sync::OnceLock<
+    std::sync::Mutex<std::collections::HashMap<String, PaidChannelWatermark>>,
+> = std::sync::OnceLock::new();
+
+fn paid_store() -> &'static std::sync::Mutex<std::collections::HashMap<String, PaidChannelWatermark>>
+{
+    PAID_CHANNEL_STORE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+fn hex_to_bytes32(hex_str: &str) -> Result<[u8; 32], String> {
+    let clean = strip_hex(hex_str);
+    if clean.len() != 64 {
+        return Err("expected 32-byte (64 hex char) value".into());
+    }
+    let raw = hex::decode(clean).map_err(|e| format!("invalid hex: {e}"))?;
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&raw);
+    Ok(out)
+}
+
+fn build_paid_402_challenge(base_url: &str, reason: &str) -> Value {
+    json!({
+        "ok": false,
+        "error": "payment_required",
+        "reason": reason,
+        "x402Version": 2,
+        "scheme": "batch-settlement",
+        "binding": "paywords-sha256",
+        "protocol_fee_bps": 0,
+        "endpoint": format!("{base_url}/api/v2/paid/evm-audit-batch"),
+        "merchant_recipient": PAID_API_MERCHANT_ADDRESS,
+        "price_per_call_usdc": 0.001,
+        "min_unit_amount_usdc_raw": PAID_API_UNIT_PRICE_USDC_RAW.to_string(),
+        "min_unit_amount_eth_wei": PAID_API_UNIT_PRICE_ETH_WEI.to_string(),
+        "accepted_live_channels": [
+            { "chain": "base", "caip2": "eip155:8453", "contract": BASE_PAYWORD_CHANNEL_ADDRESS, "usdc": BASE_USDC_ADDRESS },
+            { "chain": "optimism", "caip2": "eip155:10", "contract": MULTICHAIN_PAYWORD_CHANNEL_ADDRESS, "usdc": OPTIMISM_USDC_ADDRESS },
+            { "chain": "arbitrum", "caip2": "eip155:42161", "contract": MULTICHAIN_PAYWORD_CHANNEL_ADDRESS, "usdc": ARBITRUM_USDC_ADDRESS }
+        ],
+        "header_format": "PAYMENT-SIGNATURE: base64({\"x402Version\":2,\"scheme\":\"batch-settlement\",\"binding\":\"paywords-sha256\",\"network\":\"eip155:8453\",\"channelId\":\"0x...\",\"index\":1,\"tokenHex\":\"0x...\"})",
+        "sandbox_note": "For unfunded testing use POST /api/v2/paywords/try-402. This production endpoint strictly requires a live on-chain funded NewsatoshiPayWordChannel paying merchant_recipient."
+    })
+}
+
+/// Honest live status & catalog of production PayWords-gated agent micro-APIs (zero fake counters).
+pub fn get_paid_api_catalog_and_status(base_url: &str) -> Value {
+    let mut active_channels = Vec::new();
+    let mut total_calls: u64 = 0;
+    if let Ok(guard) = paid_store().lock() {
+        for st in guard.values() {
+            total_calls = total_calls.saturating_add(st.calls_served);
+            let claimable_steps = st.highest_index.saturating_sub(st.onchain_claimed_steps);
+            active_channels.push(json!({
+                "chain": st.chain_slug,
+                "contract": st.contract,
+                "channel_id": st.channel_id,
+                "payer": st.payer,
+                "token_symbol": st.token_symbol,
+                "calls_served": st.calls_served,
+                "highest_verified_index": st.highest_index,
+                "onchain_claimed_steps": st.onchain_claimed_steps,
+                "claimable_steps_unsettled": claimable_steps,
+                "claim_args": {
+                    "function": "claim(bytes32,uint64,bytes32)",
+                    "channel_id": st.channel_id,
+                    "steps": claimable_steps,
+                    "preimage": format!("0x{}", hex::encode(st.highest_token))
+                }
+            }));
+        }
+    }
+    json!({
+        "ok": true,
+        "pricing_model": "O(1) SHA-256 PayWords ($0.000000 per-call gas, 0% protocol fee, 1 batch settlement tx)",
+        "merchant_recipient": PAID_API_MERCHANT_ADDRESS,
+        "live_telemetry": {
+            "verified_funded_channels_served": active_channels.len(),
+            "verified_funded_calls_served": total_calls,
+            "channels": active_channels
+        },
+        "endpoints": [
+            {
+                "method": "POST",
+                "path": "/api/v2/paid/evm-audit-batch",
+                "url": format!("{base_url}/api/v2/paid/evm-audit-batch"),
+                "price_usdc": 0.001,
+                "description": "Batch multi-chain EVM smart contract security audit (up to 10 contracts across Ethereum, Base, Optimism, Arbitrum, Polygon: bytecode, EIP-1967 proxy/admin slots, owner() risk, ERC-20 metadata, Sourcify v2 exact-match).",
+                "settlement_chains": ["base (eip155:8453)", "optimism (eip155:10)", "arbitrum (eip155:42161)"]
+            }
+        ],
+        "free_sandbox_endpoint": format!("{base_url}/api/v2/paywords/try-402")
+    })
+}
+
+/// Production PayWords-gated multi-chain EVM batch security audit (`POST /api/v2/paid/evm-audit-batch`).
+/// Verifies live on-chain channel funding on Base / Optimism / Arbitrum + monotonic O(1) SHA-256
+/// voucher chain with replay protection before executing up to 10 live contract audits.
+pub fn evaluate_paid_evm_audit_batch(
+    payment_signature_hdr: Option<&str>,
+    body_json: &Value,
+    base_url: &str,
+) -> (u16, Value) {
+    let Some(sig_raw) = payment_signature_hdr.map(str::trim).filter(|s| !s.is_empty()) else {
+        return (402, build_paid_402_challenge(base_url, "missing PAYMENT-SIGNATURE header"));
+    };
+
+    let decoded_bytes = match crate::x402::base64_decode(sig_raw) {
+        Ok(b) => b,
+        Err(e) => {
+            return (
+                402,
+                build_paid_402_challenge(base_url, &format!("invalid base64 PAYMENT-SIGNATURE: {e}")),
+            );
+        }
+    };
+    let sig_val: Value = match serde_json::from_slice(&decoded_bytes) {
+        Ok(v) => v,
+        Err(e) => {
+            return (
+                402,
+                build_paid_402_challenge(base_url, &format!("invalid JSON PAYMENT-SIGNATURE: {e}")),
+            );
+        }
+    };
+
+    let net_str = sig_val
+        .get("network")
+        .or_else(|| sig_val.get("chain"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("base");
+    let meta = match resolve_evm_chain_meta(net_str) {
+        Ok(m) if m.payword_contract.is_some() => m,
+        Ok(m) => {
+            return (
+                402,
+                build_paid_402_challenge(
+                    base_url,
+                    &format!("PayWordChannel not yet deployed on {}; use base, optimism, or arbitrum", m.slug),
+                ),
+            );
+        }
+        Err(e) => return (402, build_paid_402_challenge(base_url, &e)),
+    };
+    let contract = meta.payword_contract.unwrap_or(BASE_PAYWORD_CHANNEL_ADDRESS);
+
+    let cid_str = sig_val
+        .get("channelId")
+        .or_else(|| sig_val.get("channel_id"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let cid_clean = strip_hex(cid_str).to_ascii_lowercase();
+    if cid_clean.len() != 64 || !cid_clean.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return (402, build_paid_402_challenge(base_url, "invalid 32-byte channelId"));
+    }
+    let cid_0x = format!("0x{cid_clean}");
+
+    let index = sig_val
+        .get("index")
+        .or_else(|| sig_val.get("ticks"))
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    if index == 0 {
+        return (402, build_paid_402_challenge(base_url, "voucher index must be >= 1"));
+    }
+
+    let token_str = sig_val
+        .get("tokenHex")
+        .or_else(|| sig_val.get("token"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let token_bytes = match hex_to_bytes32(token_str) {
+        Ok(b) => b,
+        Err(e) => return (402, build_paid_402_challenge(base_url, &format!("invalid tokenHex: {e}"))),
+    };
+
+    let now_unix = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let store_key = format!("{}:{cid_0x}", meta.slug);
+    let mut need_rpc = true;
+    if let Ok(guard) = paid_store().lock() {
+        if let Some(existing) = guard.get(&store_key) {
+            if existing.cached_at.elapsed() < std::time::Duration::from_secs(120) {
+                need_rpc = false;
+            }
+        }
+    }
+
+    if need_rpc {
+        let onchain = match inspect_live_multichain_payword_channel(meta.slug, &cid_0x) {
+            Ok(v) => v,
+            Err(e) => {
+                return (
+                    502,
+                    json!({ "ok": false, "error": "rpc_verification_unavailable", "detail": e }),
+                );
+            }
+        };
+        if onchain.get("found").and_then(|v| v.as_bool()) != Some(true) {
+            return (
+                402,
+                build_paid_402_challenge(
+                    base_url,
+                    &format!("channel {cid_0x} is not funded on {}", meta.label),
+                ),
+            );
+        }
+        if onchain.get("closed").and_then(|v| v.as_bool()) == Some(true) {
+            return (402, build_paid_402_challenge(base_url, "channel is already closed on-chain"));
+        }
+        let recipient = onchain.get("recipient").and_then(|v| v.as_str()).unwrap_or("");
+        if !recipient.eq_ignore_ascii_case(PAID_API_MERCHANT_ADDRESS) {
+            return (
+                402,
+                build_paid_402_challenge(
+                    base_url,
+                    &format!("channel recipient {recipient} != merchant {PAID_API_MERCHANT_ADDRESS}"),
+                ),
+            );
+        }
+        let expiry_unix = onchain.get("expiry_unix").and_then(|v| v.as_u64()).unwrap_or(0);
+        if expiry_unix <= now_unix.saturating_add(60) {
+            return (402, build_paid_402_challenge(base_url, "channel expired or expiring within 60s"));
+        }
+        let token_symbol = onchain
+            .get("token_symbol")
+            .and_then(|v| v.as_str())
+            .unwrap_or("ERC20")
+            .to_string();
+        let unit_amount_raw = onchain
+            .get("unit_amount_raw")
+            .and_then(|v| v.as_str())
+            .and_then(|s| s.parse::<u128>().ok())
+            .unwrap_or(0);
+        let min_unit = if token_symbol == "USDC" {
+            PAID_API_UNIT_PRICE_USDC_RAW
+        } else if token_symbol == "ETH" {
+            PAID_API_UNIT_PRICE_ETH_WEI
+        } else {
+            return (
+                402,
+                build_paid_402_challenge(base_url, "channel token must be native USDC or ETH"),
+            );
+        };
+        if unit_amount_raw < min_unit {
+            return (
+                402,
+                build_paid_402_challenge(
+                    base_url,
+                    &format!("channel unit_amount_raw {unit_amount_raw} < minimum {min_unit} ({token_symbol})"),
+                ),
+            );
+        }
+        let max_steps = onchain.get("max_steps").and_then(|v| v.as_u64()).unwrap_or(0);
+        let claimed_steps = onchain.get("claimed_steps").and_then(|v| v.as_u64()).unwrap_or(0);
+        let current_root_str = onchain.get("current_root").and_then(|v| v.as_str()).unwrap_or("");
+        let current_root_bytes = match hex_to_bytes32(current_root_str) {
+            Ok(b) => b,
+            Err(e) => return (502, json!({ "ok": false, "error": format!("bad onchain root: {e}") })),
+        };
+        let payer = onchain
+            .get("payer")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        if let Ok(mut guard) = paid_store().lock() {
+            guard
+                .entry(store_key.clone())
+                .and_modify(|e| {
+                    e.onchain_claimed_steps = claimed_steps;
+                    e.expiry_unix = expiry_unix;
+                    e.cached_at = std::time::Instant::now();
+                    if claimed_steps > e.highest_index {
+                        e.highest_index = claimed_steps;
+                        e.highest_token = current_root_bytes;
+                    }
+                })
+                .or_insert(PaidChannelWatermark {
+                    chain_slug: meta.slug.to_string(),
+                    contract: contract.to_string(),
+                    channel_id: cid_0x.clone(),
+                    payer,
+                    token_symbol,
+                    unit_amount_raw,
+                    max_steps,
+                    onchain_claimed_steps: claimed_steps,
+                    expiry_unix,
+                    cached_at: std::time::Instant::now(),
+                    highest_index: claimed_steps,
+                    highest_token: current_root_bytes,
+                    calls_served: 0,
+                });
+        }
+    }
+
+    // Verify O(1) SHA-256 hash chain against monotonic watermark under lock
+    let t0 = std::time::Instant::now();
+    let (settlement_snapshot, verify_us) = {
+        let mut guard = match paid_store().lock() {
+            Ok(g) => g,
+            Err(_) => return (500, json!({ "ok": false, "error": "watermark lock poisoned" })),
+        };
+        let Some(entry) = guard.get_mut(&store_key) else {
+            return (402, build_paid_402_challenge(base_url, "channel watermark missing"));
+        };
+        if entry.expiry_unix <= now_unix.saturating_add(60) {
+            return (402, build_paid_402_challenge(base_url, "channel expired"));
+        }
+        if index > entry.max_steps {
+            return (
+                402,
+                build_paid_402_challenge(
+                    base_url,
+                    &format!("voucher index {index} exceeds channel max_steps {}", entry.max_steps),
+                ),
+            );
+        }
+        if index <= entry.highest_index {
+            return (
+                402,
+                build_paid_402_challenge(
+                    base_url,
+                    &format!(
+                        "stale or replayed voucher index {index} (highest accepted is {})",
+                        entry.highest_index
+                    ),
+                ),
+            );
+        }
+        let delta = index - entry.highest_index;
+        if delta > 4_096 {
+            return (402, build_paid_402_challenge(base_url, "voucher step jump > 4096"));
+        }
+        let mut cur = token_bytes;
+        for _ in 0..delta {
+            cur = crate::crypto::sha256(&cur);
+        }
+        if cur != entry.highest_token {
+            return (
+                402,
+                build_paid_402_challenge(
+                    base_url,
+                    "SHA-256 PayWord verification failed: SHA256^delta(tokenHex) != watermark anchor",
+                ),
+            );
+        }
+        let verify_us = t0.elapsed().as_micros() as u64;
+        entry.highest_index = index;
+        entry.highest_token = token_bytes;
+        entry.calls_served = entry.calls_served.saturating_add(1);
+        let claimable_steps = entry.highest_index.saturating_sub(entry.onchain_claimed_steps);
+        let snap = json!({
+            "chain": format!("{} ({})", entry.chain_slug, meta.caip2),
+            "contract": entry.contract,
+            "channel_id": entry.channel_id,
+            "payer": entry.payer,
+            "recipient": PAID_API_MERCHANT_ADDRESS,
+            "token_symbol": entry.token_symbol,
+            "unit_amount_raw": entry.unit_amount_raw.to_string(),
+            "voucher_index_accepted": entry.highest_index,
+            "steps_verified_this_call": delta,
+            "remaining_steps": entry.max_steps.saturating_sub(entry.highest_index),
+            "claimable_steps_total": claimable_steps,
+            "calls_served_on_channel": entry.calls_served,
+            "claim_args": {
+                "function": "claim(bytes32,uint64,bytes32)",
+                "channel_id": entry.channel_id,
+                "steps": claimable_steps,
+                "preimage": format!("0x{}", hex::encode(entry.highest_token))
+            }
+        });
+        (snap, verify_us)
+    };
+
+    // Execute real live multi-chain EVM security audits (up to 10 contracts per metered call)
+    let mut targets: Vec<(String, String)> = Vec::new();
+    if let Some(arr) = body_json.get("targets").and_then(|v| v.as_array()) {
+        for item in arr.iter().take(10) {
+            let ch = item.get("chain").and_then(|v| v.as_str()).unwrap_or("base");
+            if let Some(addr) = item.get("address").and_then(|v| v.as_str()) {
+                targets.push((ch.to_string(), addr.to_string()));
+            }
+        }
+    }
+    if targets.is_empty() {
+        targets.push(("base".to_string(), BASE_PAYWORD_CHANNEL_ADDRESS.to_string()));
+    }
+
+    let mut audits = Vec::with_capacity(targets.len());
+    for (ch, addr) in &targets {
+        match crate::crypto_tools::inspect_evm_contract(ch, addr) {
+            Ok(v) => audits.push(v),
+            Err(e) => audits.push(json!({ "ok": false, "chain": ch, "address": addr, "error": e })),
+        }
+    }
+
+    (
+        200,
+        json!({
+            "ok": true,
+            "status": "paid_service_delivered",
+            "funding_status": "verified_onchain_funded",
+            "verified_in_us": verify_us,
+            "per_call_onchain_gas": 0,
+            "protocol_fee_bps": 0,
+            "settlement": settlement_snapshot,
+            "audited_count": audits.len(),
+            "audits": audits
+        }),
+    )
+}
+
 /// Read all live Fair Bonding Curves deployed via `NewsatoshiFairCurveFactory`
 /// (`0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933`) directly from Base Mainnet RPC (15s TTL cache).
 pub fn fetch_live_base_fair_curves(force_refresh: bool) -> Result<Value, String> {
@@ -1980,8 +2424,17 @@ mod tests {
         let dir = build_crosschain_connectivity_directory("https://commons.newsatoshi.org");
         assert_eq!(dir["ok"], true);
         assert_eq!(dir["paywords_multichain_evm"].as_array().unwrap().len(), 3);
-        assert_eq!(dir["agent_payment_implementation"]["mcp_tools_count"], 45);
+        assert_eq!(dir["agent_payment_implementation"]["mcp_tools_count"], 46);
         assert!(SDK_DTS_SOURCE.contains("createAutoPayFetch"));
+
+        // Production paid endpoint rejects unpaid requests with HTTP 402
+        let (p402, p402_body) =
+            evaluate_paid_evm_audit_batch(None, &json!({}), "https://commons.newsatoshi.org");
+        assert_eq!(p402, 402);
+        assert_eq!(p402_body["merchant_recipient"], PAID_API_MERCHANT_ADDRESS);
+        let paid_cat = get_paid_api_catalog_and_status("https://commons.newsatoshi.org");
+        assert_eq!(paid_cat["ok"], true);
+        assert_eq!(paid_cat["endpoints"].as_array().unwrap().len(), 1);
 
         let uri_all = build_universal_payment_uri(
             "all",

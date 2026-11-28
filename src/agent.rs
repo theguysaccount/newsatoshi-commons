@@ -884,7 +884,8 @@ pub fn render_mcp_server_card_json(base_url: &str) -> Value {
             "newsatoshi_inspect_multichain_payword_channel",
             "newsatoshi_inspect_evm_htlc",
             "newsatoshi_build_universal_payment_uri",
-            "newsatoshi_compile_reserve_price_rfq"
+            "newsatoshi_compile_reserve_price_rfq",
+            "newsatoshi_get_paid_api_catalog"
         ],
         "resources": [
             "newsatoshi://llms.txt",
@@ -964,7 +965,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 - Commons Treasury Balance: `{bal} LOVE` (`nonce={nonce}`, `parcels={parcels}`, `kwh={kwh}`, `starks={starks}`)
 
 ## Agent Interfaces (Zero Auth Required for All Reads, Compilers & Verifiers)
-- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **45 live tools** (including Universal Multi-Chain Payment URIs, Reserve-Price RFQ HTLC swaps, live 3-chain Base/Optimism/Arbitrum `O(1)` SHA-256 PayWordChannel + 4-chain EVM SHA-256 HTLC live RPC inspectors, cost-savings & Cloudflare/Express/FastAPI/AI-Agent setup kit, Cross-Chain Connectivity Directory, dilution-proof Fair Bonding-Curve Launchpad simulator, 60-second private `x402`/`nsUSD` paywall middleware generator, live Base USDC vault escrow verifier, `nsUSD` Dual-Tier stablecoin engine + stress suite, L2 Perfection Layer STARK batch benchmark, 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.5` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
+- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **46 live tools** (including live production PayWords-gated paid agent micro-API `/api/v2/paid/evm-audit-batch`, Universal Multi-Chain Payment URIs, Reserve-Price RFQ HTLC swaps, live 3-chain Base/Optimism/Arbitrum `O(1)` SHA-256 PayWordChannel + 4-chain EVM SHA-256 HTLC live RPC inspectors, cost-savings & Cloudflare/Express/FastAPI/AI-Agent setup kit, Cross-Chain Connectivity Directory, dilution-proof Fair Bonding-Curve Launchpad simulator, 60-second private `x402`/`nsUSD` paywall middleware generator, live Base USDC vault escrow verifier, `nsUSD` Dual-Tier stablecoin engine + stress suite, L2 Perfection Layer STARK batch benchmark, 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.5` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
 - **Zero-Install Stdio MCP Bridge & CLI (Node 18+, Zero Dependencies):** `npx -y github:theguysaccount/newsatoshi-commons` (`inspect`, `btc-fees`, `decode-bolt11`, `quote-base`, `verify-tx`, `payword-demo`, or stdio MCP `serve`).
 - [Native LOVE PayWord & x402 v2 Discovery]({base_url}/.well-known/x402): 4 live monetized endpoints settling primarily in **native `LOVE`** (`<1ms` zero-gas SHA-256 PayWords / `PriorLock`), with Base/Arbitrum/Polygon USDC (`x402 v2`, `$0.001`) supported as outer bridge on-ramps (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).
 - [MCP Server Card]({base_url}/.well-known/mcp/server-card.json) & [MCP Registry Manifest]({base_url}/server.json): Standard MCP discovery cards (`org.newsatoshi.commons/newsatoshi-commons`).
@@ -1028,7 +1029,7 @@ Add to Claude Desktop, Cursor, Codex, Antigravity, or any Streamable HTTP MCP ho
   }}
 }}
 ```
-Available MCP tools (45 live tools — zero API keys required):
+Available MCP tools (46 live tools — zero API keys required):
 - `crypto_inspect_evm_contract` — Live multi-chain EVM smart contract security audit (bytecode, EIP-1967 proxy/admin slots, `owner()` admin risk, ERC-20 metadata, Sourcify v2 exact-match verification across Ethereum, Base, Arbitrum, Optimism & Polygon)
 - `crypto_bitcoin_mempool_oracle` — Live Bitcoin chain tip, recommended sat/vB fee tiers (`fastest`, `30m`, `60m`, `economy`), and mempool backlog
 - `crypto_decode_bolt11_invoice` — Pure-Rust BOLT-11 Lightning invoice decoder (network, sats/msats, payment hash, expiry, description)
@@ -1074,6 +1075,7 @@ Available MCP tools (45 live tools — zero API keys required):
 - `newsatoshi_inspect_evm_htlc` — Inspect any live SHA-256 `NewsatoshiHtlc` (`0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987`) atomic swap across **Base**, **Optimism**, **Arbitrum**, or **Polygon** directly via JSON-RPC (`status`, `sender`, `recipient`, `amount`, `payment_hash`, `timelock`, and revealed 32-byte `preimage`)
 - `newsatoshi_build_universal_payment_uri` — Generate standards-compliant wallet/agent payment URIs across **Base / Optimism / Arbitrum / Polygon (EIP-681)**, **Bitcoin (BIP-21)**, **Lightning (BOLT-11)**, **Solana Pay**, and **Newsatoshi Mainnet v2 (`newsatoshi:`)** from one call
 - `newsatoshi_compile_reserve_price_rfq` — Compile a permissionless seller-defined Reserve-Price RFQ SHA-256 HTLC manifest protecting organic `LOVE` price discovery (zero thin-AMM dumping; buyer locks settlement rail first at `>= min_reserve_price_usd`)
+- `newsatoshi_get_paid_api_catalog` — Return live production PayWords-gated agent micro-API catalog (`/api/v2/paid/evm-audit-batch`, `$0.001` USDC per batch audit across Base/Optimism/Arbitrum) and honest live verified funded-channel telemetry
 
 Stdio MCP Bridge (for stdio-only hosts such as Claude Desktop, Cursor, Cline, or shell scripts):
 ```json
@@ -2321,6 +2323,14 @@ pub fn mcp_tools_list() -> Value {
                         "expiry_hours": { "type": "integer", "description": "RFQ validity window in hours (1..720, default: 24)" }
                     }
                 }
+            },
+            {
+                "name": "newsatoshi_get_paid_api_catalog",
+                "description": "Return the live production PayWords-gated agent micro-API catalog (POST /api/v2/paid/evm-audit-batch, $0.001 USDC per batch contract audit on Base, Optimism, or Arbitrum) and honest live funded-channel call telemetry.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {}
+                }
             }
         ]
     })
@@ -3033,6 +3043,9 @@ pub fn handle_mcp_jsonrpc(
                         love_amt, min_price, rail, seller, hours,
                     )
                 }
+                "newsatoshi_get_paid_api_catalog" => Ok(
+                    crate::paywords_launchpad::get_paid_api_catalog_and_status(base_url),
+                ),
                 other => Err(format!("unknown MCP tool '{other}'")),
             };
 
@@ -3138,6 +3151,6 @@ mod tests {
             &client,
             None,
         );
-        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 45);
+        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 46);
     }
 }

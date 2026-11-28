@@ -1,6 +1,6 @@
 {
   "name": "@newsatoshi/402",
-  "version": "0.33.0",
+  "version": "0.34.0",
   "description": "Zero-dependency multi-chain HTTP 402 PayWord SDK (Base, Optimism, Arbitrum + Newsatoshi L1), 1-line AI Agent createAutoPayFetch, Universal Payment URIs, stdio MCP bridge, and zero-API-key crypto tools.",
   "type": "module",
   "main": "./newsatoshi-402.mjs",

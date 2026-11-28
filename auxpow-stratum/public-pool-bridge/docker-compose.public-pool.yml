@@ -1,0 +1,72 @@
+# Bitaxe Public Pool Dual BTC + Newsatoshi (LOVE) AuxPoW Bridge
+#
+# Runs alongside an existing Public Pool + Bitcoin Core deployment so every home Bitaxe / NerdQAxe
+# miner connected to port 3333 simultaneously solo-mines Bitcoin AND merge-mines 50 LOVE/block
+# on Newsatoshi Mainnet v2 (AuxPoW chainid=20051) at $0 extra electricity.
+#
+# Quickstart:
+#   export BTC_RPC_URL="http://bitcoind:8332/"        # or http://host.docker.internal:8332/
+#   export BTC_RPC_AUTH="bitcoinrpc:YOUR_PASS"
+#   export BTC_PAYOUT_SCRIPT_HEX="0014<your_p2wpkh_20bytes>"
+#   export NS_PAYOUT_ADDRESS="ns1<your_74char_shielded_address>"
+#   export NS_RPC_AUTH="auxpow:$(openssl rand -hex 16)"
+#   docker compose -f docker-compose.public-pool.yml up -d
+
+services:
+  newsatoshi-v2-node:
+    build:
+      context: ..
+      dockerfile: Dockerfile.node
+    container_name: public-pool-newsatoshi-v2
+    restart: unless-stopped
+    command:
+      - "--net"
+      - "mainnet-v2"
+      - "--datadir"
+      - "/data"
+      - "node"
+      - "--peer"
+      - "newsatoshi-seed-v2.fly.dev:8445@b024aaeafa0e4ca384b99483c28c3bedde45a5461a560063b283766414dfbbcc"
+      - "--peer"
+      - "pool.newsatoshi.org:8445"
+      - "--rpc"
+      - "19556"
+      - "--rpcbind"
+      - "0.0.0.0"
+      - "--rpcauth"
+      - "${NS_RPC_AUTH:?Set NS_RPC_AUTH=auxpow:<secret>}"
+      - "--status"
+      - "8080"
+      - "--statusbind"
+      - "0.0.0.0"
+    volumes:
+      - newsatoshi-public-pool-data:/data
+
+  public-pool-auxpow-bridge:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: public-pool-btc-love-bridge
+    restart: unless-stopped
+    depends_on:
+      - newsatoshi-v2-node
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      STRATUM_BIND: "0.0.0.0"
+      STRATUM_PORT: "${STRATUM_PORT:-3333}"
+      STATUS_PORT: "${STATUS_PORT:-3334}"
+      NS_RPC_URL: "http://newsatoshi-v2-node:19556/"
+      NS_RPC_AUTH: "${NS_RPC_AUTH:?Set NS_RPC_AUTH=auxpow:<secret>}"
+      NS_PAYOUT_ADDRESS: "${NS_PAYOUT_ADDRESS:?Set NS_PAYOUT_ADDRESS=ns1...}"
+      BTC_RPC_URL: "${BTC_RPC_URL:?Set BTC_RPC_URL}"
+      BTC_RPC_AUTH: "${BTC_RPC_AUTH:?Set BTC_RPC_AUTH}"
+      BTC_PAYOUT_SCRIPT_HEX: "${BTC_PAYOUT_SCRIPT_HEX:?Set BTC_PAYOUT_SCRIPT_HEX}"
+      COINBASE_TAG: "/public-pool+love-auxpow/"
+      POLL_INTERVAL: "1.5"
+    ports:
+      - "${STRATUM_PORT:-3333}:3333"
+      - "127.0.0.1:${STATUS_PORT:-3334}:3334"
+
+volumes:
+  newsatoshi-public-pool-data:

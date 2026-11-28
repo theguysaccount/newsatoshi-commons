@@ -722,6 +722,8 @@ fn handle_request(req: Request, state: &AppState) {
             | "/api/v2/evm/htlc"
             | "/api/v2/interop/payment-uri"
             | "/api/v2/swaps/rfq"
+            | "/api/v2/paid/status"
+            | "/api/v2/paid/evm-audit-batch"
             | "/api/web4/charters"
             | "/api/web4/services"
             | "/api/web4/bounties"
@@ -1142,6 +1144,24 @@ fn handle_request(req: Request, state: &AppState) {
                 "text/typescript; charset=utf-8",
                 crate::paywords_launchpad::SDK_DTS_SOURCE.to_string(),
             );
+        }
+        (Method::Get, "/api/v2/paid/status") => {
+            let base_url = infer_base_url(&req);
+            let out = crate::paywords_launchpad::get_paid_api_catalog_and_status(&base_url);
+            respond_json(req, 200, &out);
+        }
+        (Method::Post, "/api/v2/paid/evm-audit-batch")
+        | (Method::Get, "/api/v2/paid/evm-audit-batch") => {
+            let base_url = infer_base_url(&req);
+            let sig = header_value_ci(&req, "payment-signature");
+            let body_str = read_body_string(&mut req).unwrap_or_default();
+            let body_json: Value = serde_json::from_str(&body_str).unwrap_or_else(|_| json!({}));
+            let (status, payload) = crate::paywords_launchpad::evaluate_paid_evm_audit_batch(
+                sig.as_deref(),
+                &body_json,
+                &base_url,
+            );
+            respond_json(req, status, &payload);
         }
         (Method::Get, "/sdk/newsatoshi-402.mjs") => {
             respond_text(

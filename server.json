@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "org.newsatoshi.commons/newsatoshi-commons",
   "title": "Newsatoshi Commons — Private x402, nsUSD & Multi-Chain Crypto MCP",
-  "description": "45 zero-auth tools: Multi-chain PayWords, Universal Payment URIs, Reserve-Price RFQ & 4-chain HTLC.",
-  "version": "0.33.0",
+  "description": "46 zero-auth tools: Live PayWords paid agent API, Base/OP/Arb channels, Universal URIs & 4-chain HTLCs.",
+  "version": "0.34.0",
   "websiteUrl": "https://commons.newsatoshi.org",
   "repository": {
     "url": "https://github.com/theguysaccount/newsatoshi-commons",

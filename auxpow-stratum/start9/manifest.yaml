@@ -1,0 +1,61 @@
+id: newsatoshi-auxpow
+title: "Newsatoshi BTC+LOVE AuxPoW Merge-Miner"
+version: 1.2.5
+release-notes: "Canonical Newsatoshi Mainnet v2 (v1.2.5) verifying node + zero-fee Bitcoin AuxPoW Stratum v1 merge-mining sidecar (chainid=20051)."
+license: PolyForm-Noncommercial-1.0.0
+wrapper-repo: "https://github.com/theguysaccount/newsatoshi-commons"
+upstream-repo: "https://github.com/theguysaccount/newsatoshi-rfc0021"
+support-site: "https://newsatoshi.org/connect/"
+marketing-site: "https://newsatoshi.org/"
+description:
+  short: Dual-mine Bitcoin + post-quantum Newsatoshi (LOVE) at $0 extra electricity via Namecoin AuxPoW (chainid=20051).
+  long: >-
+    Connects directly to your Start9 Bitcoin Core node over the StartOS LAN and exposes
+    stratum+tcp://<your-start9>.local:3333 for Bitaxe, NerdQAxe, Antminer, and WhatsMiner hardware.
+    Every SHA-256 hash working on Bitcoin simultaneously mines 50 LOVE/block on Newsatoshi Mainnet v2
+    at zero additional power cost.
+assets:
+  license: LICENSE
+main:
+  type: docker
+  image: main
+  entrypoint: /usr/local/bin/docker_entrypoint.sh
+  args: []
+  mounts:
+    main: /data
+health-checks:
+  stratum-status:
+    name: AuxPoW Stratum Status
+    success-message: AuxPoW merge-mining bridge is online and synced to Mainnet v2.
+    type: docker
+    image: main
+    entrypoint: curl
+    args: ["-fsS", "http://127.0.0.1:3334/status"]
+    inject: true
+config:
+  get:
+    type: script
+  set:
+    type: script
+dependencies:
+  bitcoind:
+    version: ">=25.0.0 <30.0.0"
+    requirement:
+      type: opt-in
+      how: Enable Bitcoin Core RPC to activate simultaneous BTC + LOVE dual merge-mining (leave off for standalone LOVE solo mode).
+    description: Local Start9 Bitcoin Core node for simultaneous BTC + LOVE AuxPoW merge-mining.
+interfaces:
+  stratum:
+    name: Stratum v1 AuxPoW Mining Port
+    description: Point Bitaxe / NerdQAxe / ASIC miners here (port 3333).
+    lan-config:
+      3333:
+        ssl: false
+        internal: 3333
+  status:
+    name: Live JSON Telemetry
+    description: Read-only live hashrate, worker, and AuxPoW block status.
+    lan-config:
+      3334:
+        ssl: false
+        internal: 3334
