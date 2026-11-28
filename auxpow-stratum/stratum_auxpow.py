@@ -371,9 +371,14 @@ class AuxPowStratumServer:
 
     def _effective_worker_diff(self, job: StratumJob, client: Optional[Dict[str, Any]] = None) -> float:
         aux_diff = DIFF1_TARGET / max(1, job.aux_target_int)
-        # Never exceed aux_diff (so every valid Newsatoshi block is always submitted)
+        # Never exceed aux_diff for auto/suggested diffs (so every Newsatoshi block is submitted),
+        # EXCEPT when the miner explicitly sets password `d=<diff>` (e.g. d=524288 for 138 TH/s MRR rigs
+        # whose hardware optimal difficulty floor exceeds low launch aux_diff).
         max_safe = max(aux_diff, 1e-6)
         if client is not None:
+            fixed = client.get("fixed_diff")
+            if fixed is not None and fixed > 0:
+                return max(1e-6, float(fixed))
             requested = client.get("suggested_diff")
             if requested is not None and requested > 0:
                 return max(1e-6, min(float(requested), max_safe))
@@ -387,7 +392,7 @@ class AuxPowStratumServer:
 
     def _maybe_adjust_vardiff(self, client: Dict[str, Any], job: StratumJob) -> Optional[float]:
         """Auto-scale per-client difficulty targeting ~1 share every 5s (MRR / NiceHash / TH/s safe)."""
-        if client.get("suggested_diff") is not None:
+        if client.get("fixed_diff") is not None or client.get("suggested_diff") is not None:
             return None
         now = time.time()
         times: List[float] = client.setdefault("share_times", [])
@@ -771,7 +776,7 @@ class AuxPowStratumServer:
                     )
 
                 elif method == "mining.suggest_difficulty":
-                    if params:
+                    if params and client_state.get("fixed_diff") is None:
                         try:
                             s_diff = float(params[0])
                             if s_diff > 0 and s_diff == s_diff and s_diff < 1e18:
@@ -783,11 +788,12 @@ class AuxPowStratumServer:
                             pass
                     print(
                         f"[auxpow-stratum] suggest_difficulty cid={extranonce1} "
-                        f"worker={mask_worker_label(client_state.get('worker'))} params={params[:2]}",
+                        f"worker={mask_worker_label(client_state.get('worker'))} params={params[:2]} "
+                        f"fixed_diff={client_state.get('fixed_diff')}",
                         flush=True,
                     )
                     await self._send_json(writer, {"id": req_id, "result": True, "error": None})
-                    if client_state.get("authorized"):
+                    if client_state.get("authorized") and client_state.get("fixed_diff") is None:
                         active_job = self.jobs_by_payout.get(client_state.get("payout_address")) or self.current_job
                         if active_job is not None:
                             diff = self._effective_worker_diff(active_job, client_state)
@@ -813,8 +819,8 @@ class AuxPowStratumServer:
                     if pass_diff is not None:
                         prev = float(client_state.get("difficulty", 16.0))
                         client_state["prev_difficulty"] = prev
-                        client_state["prev_diff_until"] = time.time() + 15.0
-                        client_state["suggested_diff"] = pass_diff
+                        client_state["prev_diff_until"] = time.time() + 35.0
+                        client_state["fixed_diff"] = pass_diff
                     custom_addr = extract_payout_address(worker_name)
                     await self._send_json(writer, {"id": req_id, "result": True, "error": None})
                     target_job = self.current_job
