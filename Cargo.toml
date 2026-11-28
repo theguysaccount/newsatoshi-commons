@@ -1,9 +1,9 @@
 [package]
 name = "newsatoshi-commons"
-version = "0.37.0"
+version = "0.38.0"
 edition = "2021"
 license = "PolyForm-Noncommercial-1.0.0"
-description = "Newsatoshi Commons Gateway (Mainnet v2 nsM2 / v1.2.5 + Universal Interoperability Layer: ERC-7683 Intents, 11-Rail SHA-256 Atomic Bridges across EVM/BTC/Lightning/Nostr/Solana/Cosmos IBC/Sui/Aptos, ISO 20022 pacs.008 Bank Stablecoin Bridge, MCP/A2A/x402/ERC-8004/Nostr DVM + Stablecoin & Sovereign STARK L2 Factory + Proof-of-Order Good-Deed Vault): 52 zero-auth MCP tools."
+description = "Newsatoshi Commons Gateway (Mainnet v2 nsM2 + RFC-0030 Autonomous Cyber-Economy Clearinghouse + Universal Interoperability Layer + Branded Stablecoin & Sovereign STARK L2 Factory + Proof-of-Order Good-Deed Vault): 54 zero-auth MCP tools, 29 zero-sorry Lean 4 L2 theorems."
 
 [[bin]]
 name = "newsatoshi-commons"

@@ -2038,7 +2038,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 52);
+    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 54);
 
     let cx_dir: Value = serde_json::from_str(
         &ureq::get(&format!("{base}/api/v2/crosschain/connectivity"))
@@ -2248,7 +2248,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 52);
+    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 54);
 
     // Permissionless Stablecoin + Sovereign L2 Factory & Proof-of-Order Good-Deed Vault smoke tests
     let factory_state: Value = serde_json::from_str(
@@ -2359,6 +2359,47 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
     assert_eq!(interop_sim["ok"], true);
     assert_eq!(interop_sim["sandbox"], true);
     assert_eq!(interop_sim["domain_4_ai_agent_and_stark_finality"]["stark_valid"], true);
+
+    // RFC-0030 Autonomous Cyber-Economy Clearinghouse smoke tests
+    let econ_state: Value = serde_json::from_str(
+        &ureq::get(&format!("{base}/api/v2/economy/state"))
+            .call()
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(econ_state["ok"], true);
+    assert_eq!(econ_state["economy"]["honest_initial_state"], true);
+    assert_eq!(econ_state["economy"]["slas_count"], 0);
+
+    let econ_dag: Value = serde_json::from_str(
+        &ureq::post(&format!("{base}/api/v2/economy/dag-split"))
+            .header("Content-Type", "application/json")
+            .send(r#"{"swarm_id":"test-swarm","total_budget_units":100000000}"#)
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(econ_dag["ok"], true);
+    assert_eq!(econ_dag["exact_integer_conservation"], true);
+
+    let econ_sim: Value = serde_json::from_str(
+        &ureq::post(&format!("{base}/api/v2/economy/simulate"))
+            .header("Content-Type", "application/json")
+            .send(r#"{}"#)
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(econ_sim["ok"], true);
+    assert_eq!(econ_sim["sandbox"], true);
+    assert_eq!(econ_sim["step_5_stark_conservation_proof"]["valid"], true);
 
     // Honest v2 cutover readiness gate & Bonded P2P Desk smoke tests
     let cutover: Value = serde_json::from_str(

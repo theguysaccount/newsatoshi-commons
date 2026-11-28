@@ -893,7 +893,9 @@ pub fn render_mcp_server_card_json(base_url: &str) -> Value {
             "newsatoshi_compile_erc7683_intent",
             "newsatoshi_compile_universal_htlc",
             "newsatoshi_compile_iso20022_stablecoin_bridge",
-            "newsatoshi_simulate_universal_interop"
+            "newsatoshi_simulate_universal_interop",
+            "newsatoshi_compile_agent_swarm_dag",
+            "newsatoshi_simulate_cyber_economy"
         ],
         "resources": [
             "newsatoshi://llms.txt",
@@ -973,7 +975,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 - Commons Treasury Balance: `{bal} LOVE` (`nonce={nonce}`, `parcels={parcels}`, `kwh={kwh}`, `starks={starks}`)
 
 ## Agent Interfaces (Zero Auth Required for All Reads, Compilers & Verifiers)
-- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **52 live tools** (including Universal Interoperability Layer — ERC-7683 cross-chain intents, 11-rail SHA-256 atomic bridges across EVMs/Bitcoin/Lightning/Nostr/Solana/Cosmos IBC/Sui/Aptos, ISO 20022 `pacs.008` bank-to-stablecoin settlement, MCP/A2A/x402/ERC-8004/Nostr DVM agent envelopes — plus Permissionless Branded Stablecoin & Sovereign STARK L2 Factory, Proof-of-Order Good-Deed Mining Covenant Vault, live production PayWords-gated paid agent micro-API `/api/v2/paid/evm-audit-batch`, Universal Multi-Chain Payment URIs, Reserve-Price RFQ HTLC swaps, live 3-chain Base/Optimism/Arbitrum `O(1)` SHA-256 PayWordChannel + 4-chain EVM SHA-256 HTLC live RPC inspectors, cost-savings & Cloudflare/Express/FastAPI/AI-Agent setup kit, Cross-Chain Connectivity Directory, dilution-proof Fair Bonding-Curve Launchpad simulator, 60-second private `x402`/`nsUSD` paywall middleware generator, live Base USDC vault escrow verifier, `nsUSD` Dual-Tier stablecoin engine + stress suite, L2 Perfection Layer STARK batch benchmark, 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.5` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
+- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **54 live tools** (including RFC-0030 Autonomous Cyber-Economy Clearinghouse — verifiable agent-to-agent SLA escrow, hierarchical swarm DAG revenue splits, anti-hallucination 50/50 slashing — Universal Interoperability Layer, Branded Stablecoin & Sovereign STARK L2 Factory, Proof-of-Order Good-Deed Vault, and live PayWords/HTLC rails).
 - **Zero-Install Stdio MCP Bridge & CLI (Node 18+, Zero Dependencies):** `npx -y github:theguysaccount/newsatoshi-commons` (`inspect`, `btc-fees`, `decode-bolt11`, `quote-base`, `verify-tx`, `payword-demo`, or stdio MCP `serve`).
 - [Native LOVE PayWord & x402 v2 Discovery]({base_url}/.well-known/x402): 4 live monetized endpoints settling primarily in **native `LOVE`** (`<1ms` zero-gas SHA-256 PayWords / `PriorLock`), with Base/Arbitrum/Polygon USDC (`x402 v2`, `$0.001`) supported as outer bridge on-ramps (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).
 - [MCP Server Card]({base_url}/.well-known/mcp/server-card.json) & [MCP Registry Manifest]({base_url}/server.json): Standard MCP discovery cards (`org.newsatoshi.commons/newsatoshi-commons`).
@@ -1037,7 +1039,7 @@ Add to Claude Desktop, Cursor, Codex, Antigravity, or any Streamable HTTP MCP ho
   }}
 }}
 ```
-Available MCP tools (52 live tools — zero API keys required):
+Available MCP tools (54 live tools — zero API keys required):
 - `crypto_inspect_evm_contract` — Live multi-chain EVM smart contract security audit (bytecode, EIP-1967 proxy/admin slots, `owner()` admin risk, ERC-20 metadata, Sourcify v2 exact-match verification across Ethereum, Base, Arbitrum, Optimism & Polygon)
 - `crypto_bitcoin_mempool_oracle` — Live Bitcoin chain tip, recommended sat/vB fee tiers (`fastest`, `30m`, `60m`, `economy`), and mempool backlog
 - `crypto_decode_bolt11_invoice` — Pure-Rust BOLT-11 Lightning invoice decoder (network, sats/msats, payment hash, expiry, description)
@@ -1090,6 +1092,8 @@ Available MCP tools (52 live tools — zero API keys required):
 - `newsatoshi_compile_universal_htlc` — Compile native two-leg SHA-256 atomic bridge payloads across 11 ecosystems (`ethereum`, `base`, `optimism`, `arbitrum`, `polygon`, `bitcoin`, `lightning/nostr_zap`, `solana`, `cosmos_ibc`, `sui_move`, `aptos_move`, `newsatoshi_l1`) sharing one 32-byte SHA-256 preimage
 - `newsatoshi_compile_iso20022_stablecoin_bridge` — Compile a schema-accurate ISO 20022 `pacs.008.001.08` (FedNow / SWIFT / SEPA Instant) bank wire XML bound deterministically to an RFC-0028 regulated stablecoin (`nsUSD` or custom `asset_id >= 100`) reserve mint commitment
 - `newsatoshi_simulate_universal_interop` — Run the isolated 4-domain end-to-end Universal Interoperability sandbox (ISO 20022 bank wire -> ERC-7683 EIP-712 intent -> 11-rail SHA-256 atomic preimage verification -> Winterfell 0.13 STARK conservation + Escape-Hatch proof)
+- `newsatoshi_compile_agent_swarm_dag` — Compile a deterministic RFC-0030 Hierarchical Multi-Agent Swarm DAG Revenue Split with Lean-4-proved exact integer conservation (zero dust leak)
+- `newsatoshi_simulate_cyber_economy` — Run the isolated 5-step RFC-0030 Autonomous Cyber-Economy Clearinghouse sandbox (verifiable SLA escrow -> 4-agent DAG split -> rogue hallucinating agent 50/50 slash & burn -> cryptographic reputation -> Winterfell 0.13 STARK proof)
 
 Stdio MCP Bridge (for stdio-only hosts such as Claude Desktop, Cursor, Cline, or shell scripts):
 ```json
@@ -2308,6 +2312,64 @@ pub fn render_openapi_json(base_url: &str) -> Value {
                     }
                 }
             },
+            "/api/v2/economy/state": {
+                "get": {
+                    "operationId": "getCyberEconomyState",
+                    "summary": "Live RFC-0030 Autonomous Cyber-Economy Clearinghouse state (honest zero initial state)",
+                    "description": "Returns live SLA escrows, cryptographic agent reputation commitments, settled volume, and economy_root_hex.",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "200": json_ok("Live cyber economy clearinghouse state", "#/components/schemas/GenericApiResponse")
+                    }
+                }
+            },
+            "/api/v2/economy/sla": {
+                "post": {
+                    "operationId": "createCyberSla",
+                    "summary": "Create a verifiable Agent-to-Agent SLA Escrow Contract with >= 5% PriorLock stake",
+                    "description": "Locks SLA budget against hash_preimage_delivery, freivalds_matrix_proof, lean4_zero_sorry_artifact, or zktls_api_receipt.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Created SLA contract", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
+            },
+            "/api/v2/economy/dag-split": {
+                "post": {
+                    "operationId": "compileSwarmDagSplit",
+                    "summary": "Compile exact integer Hierarchical Multi-Agent Swarm DAG Revenue Split (Lean 4 proved)",
+                    "description": "Computes zero-leakage integer payouts across 1..32 sub-agents with coordinator remainder conservation.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Compiled swarm DAG split", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
+            },
+            "/api/v2/economy/simulate": {
+                "post": {
+                    "operationId": "simulateCyberEconomy",
+                    "summary": "Run isolated 5-step RFC-0030 Cyber-Economy Clearinghouse + Winterfell 0.13 STARK sandbox",
+                    "description": "Proves honest SLA settlement, 4-agent DAG split, adversarial hallucinating agent 50/50 slashing, cryptographic reputations, and Winterfell STARK conservation with zero live mutation.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": false,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Cyber economy sandbox report", "#/components/schemas/GenericApiResponse")
+                    }
+                }
+            },
             "/api/v2/base/curves": {
                 "get": {
                     "operationId": "getBaseFairCurves",
@@ -2858,6 +2920,23 @@ pub fn mcp_tools_list() -> Value {
             {
                 "name": "newsatoshi_simulate_universal_interop",
                 "description": "Execute the isolated 4-domain end-to-end Universal Interoperability sandbox: ISO 20022 bank wire -> ERC-7683 EIP-712 intent -> 11-rail SHA-256 atomic preimage verification -> Winterfell 0.13 STARK conservation + unilateral Escape-Hatch proof.",
+                "inputSchema": { "type": "object", "properties": {} }
+            },
+            {
+                "name": "newsatoshi_compile_agent_swarm_dag",
+                "description": "Compile a deterministic RFC-0030 Hierarchical Multi-Agent Swarm DAG Revenue Split with Lean-4-proved exact integer conservation (sum of sub-agent payouts + coordinator remainder == total budget, zero dust leak).",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "swarm_id": { "type": "string", "default": "autonomous-swarm-01" },
+                        "settlement_asset": { "type": "string", "default": "NSUSD" },
+                        "total_budget_units": { "type": "integer", "default": 100000000 }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_simulate_cyber_economy",
+                "description": "Run the isolated 5-step RFC-0030 Autonomous Cyber-Economy Clearinghouse sandbox: verifiable SLA escrow -> 4-agent DAG split -> hallucinating rogue agent 50/50 PriorLock slash & burn -> cryptographic agent reputations -> live Winterfell 0.13 STARK conservation proof.",
                 "inputSchema": { "type": "object", "properties": {} }
             },
             {
@@ -3700,6 +3779,40 @@ pub fn handle_mcp_jsonrpc(
                         .unwrap_or("00000000ba1cdad4aa8e82d6613b4df536394c41008fc3a0914a47a44604b9c8");
                     crate::interop::run_universal_interop_simulation(base_url, l1_h, l1_tip)
                 }
+                "newsatoshi_compile_agent_swarm_dag" => {
+                    let swarm_id = args.get("swarm_id").and_then(|v| v.as_str()).unwrap_or("autonomous-swarm-01");
+                    let asset = args.get("settlement_asset").and_then(|v| v.as_str()).unwrap_or("NSUSD");
+                    let budget = args.get("total_budget_units").and_then(|v| v.as_u64()).unwrap_or(100_000_000);
+                    crate::cyber_economy::compile_swarm_dag_split(
+                        swarm_id,
+                        "ns1qorchestrator00000000000000000001",
+                        asset,
+                        budget,
+                        &[
+                            crate::cyber_economy::SwarmSplitNode {
+                                agent_id: "research-agent-01".to_string(),
+                                role: "Researcher".to_string(),
+                                payout_address: "ns1qresearcher0000000000000000000001".to_string(),
+                                share_bps: 3_000,
+                            },
+                            crate::cyber_economy::SwarmSplitNode {
+                                agent_id: "prover-agent-02".to_string(),
+                                role: "Formal Prover".to_string(),
+                                payout_address: "ns1qprover00000000000000000000000002".to_string(),
+                                share_bps: 4_000,
+                            },
+                            crate::cyber_economy::SwarmSplitNode {
+                                agent_id: "auditor-agent-03".to_string(),
+                                role: "Security Auditor".to_string(),
+                                payout_address: "ns1qauditor0000000000000000000000003".to_string(),
+                                share_bps: 2_000,
+                            },
+                        ],
+                    )
+                }
+                "newsatoshi_simulate_cyber_economy" => {
+                    crate::cyber_economy::run_cyber_economy_sandbox_simulation()
+                }
                 "newsatoshi_generate_private_x402_middleware" => {
                     let fw = args.get("framework").and_then(|v| v.as_str()).unwrap_or("express");
                     let price = args.get("price_usd").and_then(|v| v.as_f64()).unwrap_or(0.005);
@@ -3918,6 +4031,6 @@ mod tests {
             &client,
             None,
         );
-        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 52);
+        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 54);
     }
 }

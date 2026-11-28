@@ -5,6 +5,7 @@ pub mod backing;
 pub mod crypto;
 pub mod crypto_tools;
 pub mod cutover;
+pub mod cyber_economy;
 pub mod hardware;
 pub mod interop;
 pub mod l2_rollup;

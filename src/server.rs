@@ -103,6 +103,8 @@ struct AppState {
     factory_state_file: PathBuf,
     order_vault: Mutex<crate::proof_of_order::ProofOfOrderVault>,
     order_state_file: PathBuf,
+    cyber_economy: Mutex<crate::cyber_economy::CyberEconomyLedger>,
+    cyber_economy_state_file: PathBuf,
     seed_client: SeedStatusClient,
     mainnet_seed_client: Option<SeedStatusClient>,
     seed_cache: Mutex<Option<CachedSeed>>,
@@ -262,6 +264,9 @@ pub fn spawn_server(config: ServerConfig) -> Result<RunningServer, String> {
     let order_state_file = config.state_file.with_file_name("order-vault.json");
     let order_vault: crate::proof_of_order::ProofOfOrderVault =
         load_json_or_default(&order_state_file);
+    let cyber_economy_state_file = config.state_file.with_file_name("cyber-economy.json");
+    let cyber_economy: crate::cyber_economy::CyberEconomyLedger =
+        load_json_or_default(&cyber_economy_state_file);
     let state = Arc::new(AppState {
         engine: Mutex::new(engine),
         state_file: config.state_file,
@@ -271,6 +276,8 @@ pub fn spawn_server(config: ServerConfig) -> Result<RunningServer, String> {
         factory_state_file,
         order_vault: Mutex::new(order_vault),
         order_state_file,
+        cyber_economy: Mutex::new(cyber_economy),
+        cyber_economy_state_file,
         seed_client: SeedStatusClient::new(config.seed_url, Duration::from_secs(5)),
         mainnet_seed_client,
         seed_cache: Mutex::new(None),
@@ -374,6 +381,9 @@ pub fn run_server_blocking(config: ServerConfig) -> Result<(), String> {
     let order_state_file = config.state_file.with_file_name("order-vault.json");
     let order_vault: crate::proof_of_order::ProofOfOrderVault =
         load_json_or_default(&order_state_file);
+    let cyber_economy_state_file = config.state_file.with_file_name("cyber-economy.json");
+    let cyber_economy: crate::cyber_economy::CyberEconomyLedger =
+        load_json_or_default(&cyber_economy_state_file);
     let state = Arc::new(AppState {
         engine: Mutex::new(engine),
         state_file: config.state_file,
@@ -383,6 +393,8 @@ pub fn run_server_blocking(config: ServerConfig) -> Result<(), String> {
         factory_state_file,
         order_vault: Mutex::new(order_vault),
         order_state_file,
+        cyber_economy: Mutex::new(cyber_economy),
+        cyber_economy_state_file,
         seed_client: SeedStatusClient::new(config.seed_url, Duration::from_secs(5)),
         mainnet_seed_client,
         seed_cache: Mutex::new(None),
@@ -793,6 +805,7 @@ fn handle_request(req: Request, state: &AppState) {
             | "/api/v2/evm/htlc"
             | "/api/v2/interop/payment-uri"
             | "/api/v2/interop/matrix"
+            | "/api/v2/economy/state"
             | "/api/v2/swaps/rfq"
             | "/api/v2/paid/status"
             | "/api/v2/paid/evm-audit-batch"
@@ -1606,6 +1619,123 @@ fn handle_request(req: Request, state: &AppState) {
                 .map(|m| m.tip.as_str())
                 .unwrap_or("00000000ba1cdad4aa8e82d6613b4df536394c41008fc3a0914a47a44604b9c8");
             match crate::interop::run_universal_interop_simulation(&base_url, l1_h, l1_tip) {
+                Ok(v) => respond_json(req, 200, &v),
+                Err(e) => respond_json(req, 500, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Get, "/api/v2/economy/state") => {
+            let summary = {
+                let econ = state
+                    .cyber_economy
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner());
+                econ.summary_json()
+            };
+            let snap = state.get_seed_snapshot(false);
+            respond_json(
+                req,
+                200,
+                &json!({
+                    "ok": true,
+                    "economy": summary,
+                    "live_mainnet_v2_height": snap.mainnet_status.as_ref().map(|m| m.height),
+                    "endpoints": {
+                        "create_sla": "POST /api/v2/economy/sla",
+                        "compile_dag_split": "POST /api/v2/economy/dag-split",
+                        "simulate_sandbox": "POST /api/v2/economy/simulate"
+                    }
+                }),
+            );
+        }
+        (Method::Post, "/api/v2/economy/sla") => {
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let parsed: Value = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(_) => return respond_json(req, 400, &json!({ "ok": false, "error": "invalid json body" })),
+            };
+            let pred_str = parsed
+                .get("predicate")
+                .and_then(|v| v.as_str())
+                .unwrap_or("hash_preimage_delivery");
+            match crate::cyber_economy::VerificationPredicate::parse(pred_str) {
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+                Ok(predicate) => {
+                    let res = {
+                        let mut econ = state
+                            .cyber_economy
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner());
+                        let r = econ.create_sla(crate::cyber_economy::CreateSlaInput {
+                            client_agent_id: parsed.get("client_agent_id").and_then(|v| v.as_str()).unwrap_or(""),
+                            worker_agent_id: parsed.get("worker_agent_id").and_then(|v| v.as_str()).unwrap_or(""),
+                            settlement_asset: parsed.get("settlement_asset").and_then(|v| v.as_str()).unwrap_or("NSUSD"),
+                            budget_units: parsed.get("budget_units").and_then(|v| v.as_u64()).unwrap_or(0),
+                            worker_stake_love_sats: parsed.get("worker_stake_love_sats").and_then(|v| v.as_u64()).unwrap_or(0),
+                            predicate,
+                            expected_digest_hex: parsed.get("expected_digest_hex").and_then(|v| v.as_str()).unwrap_or(""),
+                            max_payword_ticks: parsed.get("max_payword_ticks").and_then(|v| v.as_u64()).unwrap_or(100),
+                            deadline_secs_from_now: parsed.get("deadline_secs_from_now").and_then(|v| v.as_u64()).unwrap_or(3_600),
+                        });
+                        if r.is_ok() {
+                            save_json_atomic(&state.cyber_economy_state_file, &*econ);
+                        }
+                        r
+                    };
+                    match res {
+                        Ok(sla) => respond_json(req, 200, &json!({ "ok": true, "sla": sla })),
+                        Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+                    }
+                }
+            }
+        }
+        (Method::Post, "/api/v2/economy/dag-split") => {
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let parsed: Value = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(_) => return respond_json(req, 400, &json!({ "ok": false, "error": "invalid json body" })),
+            };
+            let swarm_id = parsed.get("swarm_id").and_then(|v| v.as_str()).unwrap_or("autonomous-swarm-01");
+            let coord = parsed
+                .get("coordinator_address")
+                .and_then(|v| v.as_str())
+                .unwrap_or("ns1qorchestrator00000000000000000001");
+            let asset = parsed.get("settlement_asset").and_then(|v| v.as_str()).unwrap_or("NSUSD");
+            let budget = parsed
+                .get("total_budget_units")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(100_000_000);
+            let nodes: Vec<crate::cyber_economy::SwarmSplitNode> = parsed
+                .get("nodes")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_else(|| {
+                    vec![
+                        crate::cyber_economy::SwarmSplitNode {
+                            agent_id: "research-agent-01".to_string(),
+                            role: "Researcher".to_string(),
+                            payout_address: "ns1qresearcher0000000000000000000001".to_string(),
+                            share_bps: 3_000,
+                        },
+                        crate::cyber_economy::SwarmSplitNode {
+                            agent_id: "prover-agent-02".to_string(),
+                            role: "Formal Prover".to_string(),
+                            payout_address: "ns1qprover00000000000000000000000002".to_string(),
+                            share_bps: 4_000,
+                        },
+                        crate::cyber_economy::SwarmSplitNode {
+                            agent_id: "auditor-agent-03".to_string(),
+                            role: "Security Auditor".to_string(),
+                            payout_address: "ns1qauditor0000000000000000000000003".to_string(),
+                            share_bps: 2_000,
+                        },
+                    ]
+                });
+            match crate::cyber_economy::compile_swarm_dag_split(swarm_id, coord, asset, budget, &nodes) {
+                Ok(v) => respond_json(req, 200, &v),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/v2/economy/simulate") => {
+            match crate::cyber_economy::run_cyber_economy_sandbox_simulation() {
                 Ok(v) => respond_json(req, 200, &v),
                 Err(e) => respond_json(req, 500, &json!({ "ok": false, "error": e })),
             }
