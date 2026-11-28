@@ -1528,3 +1528,112 @@ class BasePayWordGate:
                 "payout_raw": steps * int(entry["onchain"]["unit_amount"]),
                 "calldata": encode_base_claim_calldata(cid, steps, preimage),
             }
+
+
+# Live Sourcify exact_match multi-chain EVM PayWordChannel & SHA-256 HTLC deployments
+EVM_PAYWORD_CHAINS: Dict[str, Dict[str, Any]] = {
+    "base": {
+        "chain_id": 8453,
+        "caip2": "eip155:8453",
+        "rpc_url": "https://mainnet.base.org",
+        "payword_channel": "0x971BA814Df91c20DcA3aDd870C2B55d643965C50",
+        "htlc": "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987",
+        "usdc": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "explorer": "https://basescan.org",
+    },
+    "optimism": {
+        "chain_id": 10,
+        "caip2": "eip155:10",
+        "rpc_url": "https://mainnet.optimism.io",
+        "payword_channel": "0x3DeBB6d5ae490e6cF4F966585e000028111CF106",
+        "htlc": "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987",
+        "usdc": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+        "explorer": "https://optimistic.etherscan.io",
+    },
+    "arbitrum": {
+        "chain_id": 42161,
+        "caip2": "eip155:42161",
+        "rpc_url": "https://arb1.arbitrum.io/rpc",
+        "payword_channel": "0x3DeBB6d5ae490e6cF4F966585e000028111CF106",
+        "htlc": "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987",
+        "usdc": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+        "explorer": "https://arbiscan.io",
+    },
+    "polygon": {
+        "chain_id": 137,
+        "caip2": "eip155:137",
+        "rpc_url": "https://polygon-bor-rpc.publicnode.com",
+        "payword_channel": None,
+        "htlc": "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987",
+        "usdc": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+        "explorer": "https://polygonscan.com",
+    },
+}
+
+
+class AutoPaySession:
+    """Zero-dependency HTTP 402 auto-paying client for Python AI agents (LangChain, CrewAI, OpenAI, Anthropic)."""
+
+    def __init__(
+        self,
+        wallet: PayWordWallet,
+        chain: str = "base",
+        channel_id: str = "0x" + ("00" * 32),
+        ticks_per_call: int = 1,
+        timeout: float = 15.0,
+        opener: Optional[Callable[[urllib.request.Request, float], Tuple[int, str]]] = None,
+    ) -> None:
+        self.wallet = wallet
+        self.chain_spec = EVM_PAYWORD_CHAINS.get(chain.lower(), EVM_PAYWORD_CHAINS["base"])
+        self.channel_id = channel_id
+        self.ticks_per_call = ticks_per_call
+        self.timeout = timeout
+        self._opener = opener
+
+    def _exec(self, req: urllib.request.Request) -> Tuple[int, str]:
+        if self._opener is not None:
+            return self._opener(req, self.timeout)
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                return resp.status, resp.read().decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as err:
+            return err.code, err.read().decode("utf-8", errors="replace")
+
+    def request(
+        self,
+        url: str,
+        method: str = "GET",
+        data: Optional[bytes] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> Tuple[int, str]:
+        base_headers = {"User-Agent": "newsatoshi-402-python/0.31.0"}
+        if headers:
+            base_headers.update(headers)
+        req1 = urllib.request.Request(url, data=data, method=method, headers=base_headers)
+        status, body = self._exec(req1)
+        if status != 402:
+            return status, body
+
+        import base64
+
+        pay = self.wallet.next_payment(self.ticks_per_call)
+        sig_payload = json.dumps(
+            {
+                "x402Version": 2,
+                "scheme": "batch-settlement",
+                "binding": "paywords-sha256",
+                "network": self.chain_spec["caip2"],
+                "channelContract": self.chain_spec["payword_channel"],
+                "channelId": self.channel_id,
+                "index": pay["ticks"],
+                "tokenHex": f"0x{pay['token_hex']}",
+                "rootHex": f"0x{pay['tip_hex']}",
+                "maxSteps": self.wallet.max_ticks,
+            },
+            separators=(",", ":"),
+        ).encode("utf-8")
+        paid_headers = dict(base_headers)
+        paid_headers["PAYMENT-SIGNATURE"] = base64.b64encode(sig_payload).decode("ascii")
+        paid_headers["X-Newsatoshi-PayWord"] = f"channel={self.channel_id},{pay['header_value']}"
+        req2 = urllib.request.Request(url, data=data, method=method, headers=paid_headers)
+        return self._exec(req2)

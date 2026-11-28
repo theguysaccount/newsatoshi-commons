@@ -34,6 +34,8 @@ import {
   encodeFairCurveInjectRevenueCalldata,
   decodeBasePayWordChannelWords,
   createBasePayWordGate,
+  EVM_PAYWORD_CHAINS,
+  createAutoPayFetch,
 } from "./newsatoshi-402.mjs";
 import { forwardJsonRpcLine } from "./bin/newsatoshi-mcp.mjs";
 
@@ -602,4 +604,31 @@ test("v0.30.0 Base Mainnet USDC PayWordChannel ABI calldata, O(1) gate, replay p
     encodeBaseClaimCalldata({ channelIdHex: channelId, steps: 25, preimageHex: `0x${lastPayment.tokenHex}` })
   );
   assert.ok(batch.calldata.startsWith("0xe0ab9c6b"));
+});
+
+test("multi-chain EVM_PAYWORD_CHAINS registry & 1-line createAutoPayFetch 402->200 agent loop", async () => {
+  assert.equal(EVM_PAYWORD_CHAINS.base.chainId, 8453);
+  assert.equal(EVM_PAYWORD_CHAINS.optimism.chainId, 10);
+  assert.equal(EVM_PAYWORD_CHAINS.arbitrum.chainId, 42161);
+  assert.equal(EVM_PAYWORD_CHAINS.optimism.paywordChannel, EVM_PAYWORD_CHAINS.arbitrum.paywordChannel);
+
+  const wallet = await generatePayWordChain(10, 1_000);
+  let calls = 0;
+  const mockFetch = async (_url, init = {}) => {
+    calls += 1;
+    const sig = init.headers ? init.headers.get("PAYMENT-SIGNATURE") : null;
+    if (!sig) return { status: 402, json: async () => ({ error: "payment_required" }) };
+    const decoded = JSON.parse(Buffer.from(sig, "base64").toString("utf8"));
+    const check = await verifyPayWordToken(decoded.rootHex, decoded.tokenHex, decoded.index, 1_000);
+    assert.equal(check.valid, true);
+    return { status: 200, json: async () => ({ ok: true, network: decoded.network, step: decoded.index }) };
+  };
+
+  const payFetch = createAutoPayFetch({ wallet, chain: "optimism", fetchImpl: mockFetch });
+  const r = await payFetch("https://commons.newsatoshi.org/api/v2/paywords/try-402", { method: "POST" });
+  assert.equal(r.status, 200);
+  const body = await r.json();
+  assert.equal(body.network, "eip155:10");
+  assert.equal(body.step, 1);
+  assert.equal(calls, 2);
 });

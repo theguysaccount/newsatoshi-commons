@@ -713,6 +713,8 @@ fn handle_request(req: Request, state: &AppState) {
             | "/api/v2/x402/paywall-kit"
             | "/api/v2/paywords/cost-savings"
             | "/api/v2/paywords/channel-kit"
+            | "/api/v2/paywords/try-402"
+            | "/api/v2/crosschain/connectivity"
             | "/api/v2/launchpad/fair-curve"
             | "/api/v2/base/curves"
             | "/api/v2/base/channel"
@@ -972,6 +974,7 @@ fn handle_request(req: Request, state: &AppState) {
         }
         (Method::Get, "/api/v2/paywords/channel-kit") => {
             let base_url = infer_base_url(&req);
+            let chain = query_param(&raw_url, "chain").unwrap_or_else(|| "base".into());
             let fw = query_param(&raw_url, "framework").unwrap_or_else(|| "cloudflare_worker".into());
             let recipient = query_param(&raw_url, "recipient_evm");
             let price = query_param(&raw_url, "price_usd")
@@ -981,7 +984,8 @@ fn handle_request(req: Request, state: &AppState) {
                 .and_then(|v| v.parse::<u32>().ok())
                 .unwrap_or(1_000);
             let route = query_param(&raw_url, "route_path").unwrap_or_else(|| "/api/inference".into());
-            match crate::paywords_launchpad::compile_payword_channel_setup(
+            match crate::paywords_launchpad::compile_payword_channel_setup_for_chain(
+                &chain,
                 &fw,
                 recipient.as_deref(),
                 price,
@@ -997,17 +1001,34 @@ fn handle_request(req: Request, state: &AppState) {
             let base_url = infer_base_url(&req);
             let body = read_body_string(&mut req).unwrap_or_default();
             let p: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+            let chain = p.get("chain").and_then(|v| v.as_str()).unwrap_or("base");
             let fw = p.get("framework").and_then(|v| v.as_str()).unwrap_or("cloudflare_worker");
             let recipient = p.get("recipient_evm").and_then(|v| v.as_str());
             let price = p.get("price_usd").and_then(|v| v.as_f64()).unwrap_or(0.002);
             let steps = p.get("max_steps").and_then(|v| v.as_u64()).unwrap_or(1_000) as u32;
             let route = p.get("route_path").and_then(|v| v.as_str()).unwrap_or("/api/inference");
-            match crate::paywords_launchpad::compile_payword_channel_setup(
-                fw, recipient, price, steps, route, &base_url,
+            match crate::paywords_launchpad::compile_payword_channel_setup_for_chain(
+                chain, fw, recipient, price, steps, route, &base_url,
             ) {
                 Ok(v) => respond_json(req, 200, &v),
                 Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
             }
+        }
+        (Method::Get, "/api/v2/paywords/try-402") | (Method::Post, "/api/v2/paywords/try-402") => {
+            let base_url = infer_base_url(&req);
+            let sig = header_value_ci(&req, "payment-signature");
+            let pw = header_value_ci(&req, "x-newsatoshi-payword");
+            let (status, payload) = crate::paywords_launchpad::evaluate_live_paywords_try_402(
+                sig.as_deref(),
+                pw.as_deref(),
+                &base_url,
+            );
+            respond_json(req, status, &payload);
+        }
+        (Method::Get, "/api/v2/crosschain/connectivity") => {
+            let base_url = infer_base_url(&req);
+            let dir = crate::paywords_launchpad::build_crosschain_connectivity_directory(&base_url);
+            respond_json(req, 200, &dir);
         }
         (Method::Post, "/api/v2/launchpad/fair-curve") => {
             let body = read_body_string(&mut req).unwrap_or_default();

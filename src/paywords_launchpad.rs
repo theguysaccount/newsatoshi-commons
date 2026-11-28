@@ -10,9 +10,15 @@
 use serde_json::{json, Value};
 
 pub const BASE_USDC_ADDRESS: &str = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+pub const OPTIMISM_USDC_ADDRESS: &str = "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85";
+pub const ARBITRUM_USDC_ADDRESS: &str = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
+pub const POLYGON_USDC_ADDRESS: &str = "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359";
 pub const SDK_JS_SOURCE: &str = include_str!("../sdk/js/newsatoshi-402.mjs");
 pub const SDK_PY_SOURCE: &str = include_str!("../sdk/python/newsatoshi_402.py");
 pub const BASE_PAYWORD_CHANNEL_ADDRESS: &str = "0x971BA814Df91c20DcA3aDd870C2B55d643965C50";
+/// Live Sourcify exact_match NewsatoshiPayWordChannel deployed identically at nonce 4 on Optimism (10) & Arbitrum One (42161).
+pub const MULTICHAIN_PAYWORD_CHANNEL_ADDRESS: &str = "0x3DeBB6d5ae490e6cF4F966585e000028111CF106";
+pub const CANONICAL_EVM_HTLC_ADDRESS: &str = "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987";
 pub const BASE_FAIR_CURVE_FACTORY_ADDRESS: &str = "0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933";
 pub const BASE_DEMO_CURVE_POOL_ADDRESS: &str = "0xC3098ba25E39Effa63dE94EbACE6381781ad4cEd";
 pub const BASE_DEMO_CURVE_TOKEN_ADDRESS: &str = "0x406B3484560c89C030720D9a4101500474e5D2d9";
@@ -29,6 +35,18 @@ pub const BASE_PAYWORD_1000_OPEN_PROOF_TX: &str =
     "0x0d975a2b3310473d55d0e7d9e7b77c0174f4098fabbd3ae5e5512ec36de6f216";
 pub const BASE_PAYWORD_1000_CLAIM_PROOF_TX: &str =
     "0xb79a3c01a8edc0bbc0b25714b2a1b7852c0035be2a083c26da81ef31620f6256";
+pub const OPTIMISM_PAYWORD_DEPLOY_TX: &str =
+    "0x3b88845cb29a14cfab1f95d764ae0311a6d22b7c2b92086191179c914e0ad191";
+pub const OPTIMISM_PAYWORD_OPEN_100_TX: &str =
+    "0x4f2f61a4419f53de94d96b717c4ebcd6eb5fa7039e6d0c9ee7a13ed47445cb5e";
+pub const OPTIMISM_PAYWORD_CLAIM_100_TX: &str =
+    "0x05f72b5f3bbff8407b78be11cbc962414a2af573bc9f08466cab060814b8ef6c";
+pub const ARBITRUM_PAYWORD_DEPLOY_TX: &str =
+    "0xeab6dfec32c41e44cb784b0675a468e421725fcc56023f4af738226f5ad76fea";
+pub const OPTIMISM_HTLC_LOCK_PROOF_TX: &str =
+    "0xcb57a76d9d28dcc3c4c0ac601061cd361bef66fd6f3e00d7c22f9c9f4359ffd8";
+pub const OPTIMISM_HTLC_CLAIM_PROOF_TX: &str =
+    "0x88ca2f68dc6e1587ee157bf2f48f6ed5a5044923686a9aac7fda5a9b6be88f0b";
 pub const BASE_CURVE_CREATE_PROOF_TX: &str =
     "0x8da0c06753664c52df3c2e61227035f38fc78b98c11650791b26f5d246308c83";
 pub const BASE_CURVE_BUY_PROOF_TX: &str =
@@ -196,9 +214,30 @@ pub fn estimate_paywords_cost_savings(
     }))
 }
 
-/// Generate an instant, org-ready Base USDC `NewsatoshiPayWordChannel` integration kit
-/// (Cloudflare Worker, Express, Next.js, FastAPI, or Axum) wired to the live Base Mainnet contract.
+/// Generate an instant, org-ready multi-chain USDC `NewsatoshiPayWordChannel` integration kit
+/// (Base, Optimism, or Arbitrum One) for server gates or autonomous AI agent auto-pay clients.
 pub fn compile_payword_channel_setup(
+    framework: &str,
+    recipient_evm: Option<&str>,
+    price_usd: f64,
+    max_steps: u32,
+    route_path: &str,
+    base_url: &str,
+) -> Result<Value, String> {
+    compile_payword_channel_setup_for_chain(
+        "base",
+        framework,
+        recipient_evm,
+        price_usd,
+        max_steps,
+        route_path,
+        base_url,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn compile_payword_channel_setup_for_chain(
+    chain: &str,
     framework: &str,
     recipient_evm: Option<&str>,
     price_usd: f64,
@@ -212,6 +251,38 @@ pub fn compile_payword_channel_setup(
     if max_steps == 0 || max_steps > 1_000_000 {
         return Err("max_steps must be in 1..=1_000_000".into());
     }
+    let (chain_name, chain_id, caip2, rpc_url, usdc_addr, contract_addr) =
+        match chain.trim().to_ascii_lowercase().as_str() {
+            "" | "base" | "8453" | "eip155:8453" => (
+                "base",
+                8453u64,
+                "eip155:8453",
+                "https://mainnet.base.org",
+                BASE_USDC_ADDRESS,
+                BASE_PAYWORD_CHANNEL_ADDRESS,
+            ),
+            "optimism" | "op" | "10" | "eip155:10" => (
+                "optimism",
+                10u64,
+                "eip155:10",
+                "https://mainnet.optimism.io",
+                OPTIMISM_USDC_ADDRESS,
+                MULTICHAIN_PAYWORD_CHANNEL_ADDRESS,
+            ),
+            "arbitrum" | "arb" | "42161" | "eip155:42161" => (
+                "arbitrum",
+                42161u64,
+                "eip155:42161",
+                "https://arb1.arbitrum.io/rpc",
+                ARBITRUM_USDC_ADDRESS,
+                MULTICHAIN_PAYWORD_CHANNEL_ADDRESS,
+            ),
+            other => {
+                return Err(format!(
+                    "unsupported chain '{other}': choose base | optimism | arbitrum"
+                ));
+            }
+        };
     let unit_usdc_raw = (price_usd * 1_000_000.0).round().max(1.0) as u64;
     let total_deposit_usdc_raw = unit_usdc_raw
         .checked_mul(max_steps as u64)
@@ -234,11 +305,11 @@ pub fn compile_payword_channel_setup(
             "src/paywords-worker.ts",
             format!(
                 r#"// Cloudflare Worker — O(1) SHA-256 PayWords HTTP 402 Gate (0% protocol fee, 0 per-call gas)
-// Settles in Base Mainnet USDC via immutable NewsatoshiPayWordChannel: {BASE_PAYWORD_CHANNEL_ADDRESS}
+// Chain: {chain_name} ({caip2}) · Immutable Sourcify-verified NewsatoshiPayWordChannel: {contract_addr}
 // Verify on-chain deposit once per channelId, then verify 1 SHA-256 per request at the edge (~0.013 ms).
 
-const CHANNEL_CONTRACT = "{BASE_PAYWORD_CHANNEL_ADDRESS}";
-const BASE_USDC = "{BASE_USDC_ADDRESS}";
+const CHANNEL_CONTRACT = "{contract_addr}";
+const CHAIN_USDC = "{usdc_addr}";
 const RECIPIENT = "{recipient}";
 const UNIT_USDC_RAW = {unit_usdc_raw}; // ${price_usd:.6} USDC per call
 
@@ -264,8 +335,8 @@ export default {{
           x402Version: 2,
           scheme: "batch-settlement",
           binding: "paywords-sha256",
-          network: "eip155:8453",
-          asset: BASE_USDC,
+          network: "{caip2}",
+          asset: CHAIN_USDC,
           channelContract: CHANNEL_CONTRACT,
           payTo: RECIPIENT,
           unitAmount: String(UNIT_USDC_RAW),
@@ -287,7 +358,7 @@ export default {{
       return Response.json({{ error: "bad_payword_preimage" }}, {{ status: 402 }});
     }}
     channelState.set(channelId, {{ lastIndex: index, lastToken: tokenHex, maxSteps: st.maxSteps }});
-    // Batch settle whenever ready via: cast send {BASE_PAYWORD_CHANNEL_ADDRESS} "claim(bytes32,uint32,bytes32)" <channelId> <steps> <latestToken>
+    // Batch settle whenever ready via: cast send {contract_addr} "claim(bytes32,uint32,bytes32)" <channelId> <steps> <latestToken> --rpc-url {rpc_url}
     return Response.json({{ ok: true, settledOffchainStep: index, unitUsdcRaw: UNIT_USDC_RAW }});
   }},
 }};
@@ -298,12 +369,12 @@ export default {{
             "javascript",
             "paywords-middleware.mjs",
             format!(
-                r#"// Express / Node.js — Zero-Dependency O(1) SHA-256 PayWords Middleware (Base USDC)
-// Live Base Mainnet Channel Contract: {BASE_PAYWORD_CHANNEL_ADDRESS} (Sourcify exact_match)
+                r#"// Express / Node.js — Zero-Dependency O(1) SHA-256 PayWords Middleware ({chain_name} USDC)
+// Live Channel Contract ({caip2}): {contract_addr} (Sourcify exact_match)
 import crypto from "node:crypto";
 
-const CHANNEL_CONTRACT = "{BASE_PAYWORD_CHANNEL_ADDRESS}";
-const BASE_USDC = "{BASE_USDC_ADDRESS}";
+const CHANNEL_CONTRACT = "{contract_addr}";
+const CHAIN_USDC = "{usdc_addr}";
 const RECIPIENT = "{recipient}";
 const UNIT_USDC_RAW = {unit_usdc_raw}; // ${price_usd:.6} USDC/call
 const channels = new Map(); // Persist in Redis/SQLite: channelId -> {{ lastIndex, lastToken, maxSteps }}
@@ -317,8 +388,8 @@ export function paywordsGate(req, res, next) {{
       x402Version: 2,
       scheme: "batch-settlement",
       binding: "paywords-sha256",
-      network: "eip155:8453",
-      asset: BASE_USDC,
+      network: "{caip2}",
+      asset: CHAIN_USDC,
       channelContract: CHANNEL_CONTRACT,
       payTo: RECIPIENT,
       unitAmount: String(UNIT_USDC_RAW),
@@ -343,13 +414,13 @@ export function paywordsGate(req, res, next) {{
             "python",
             "paywords_gate.py",
             format!(
-                r#"# FastAPI / Python — Zero-Dependency O(1) SHA-256 PayWords Gate (Base USDC)
-# Live Base Mainnet Channel Contract: {BASE_PAYWORD_CHANNEL_ADDRESS} (Sourcify exact_match)
+                r#"# FastAPI / Python — Zero-Dependency O(1) SHA-256 PayWords Gate ({chain_name} USDC)
+# Live Channel Contract ({caip2}): {contract_addr} (Sourcify exact_match)
 import base64, hashlib, json
 from fastapi import Header, HTTPException
 
-CHANNEL_CONTRACT = "{BASE_PAYWORD_CHANNEL_ADDRESS}"
-BASE_USDC = "{BASE_USDC_ADDRESS}"
+CHANNEL_CONTRACT = "{contract_addr}"
+CHAIN_USDC = "{usdc_addr}"
 RECIPIENT = "{recipient}"
 UNIT_USDC_RAW = {unit_usdc_raw}  # ${price_usd:.6} USDC/call
 CHANNELS = {{}}  # Store in Redis/Postgres: channel_id -> (last_index, last_token, max_steps)
@@ -358,7 +429,7 @@ def verify_payword(payment_signature: str | None = Header(default=None, alias="P
     if not payment_signature:
         raise HTTPException(status_code=402, detail={{
             "x402Version": 2, "scheme": "batch-settlement", "binding": "paywords-sha256",
-            "network": "eip155:8453", "asset": BASE_USDC, "channelContract": CHANNEL_CONTRACT,
+            "network": "{caip2}", "asset": CHAIN_USDC, "channelContract": CHANNEL_CONTRACT,
             "payTo": RECIPIENT, "unitAmount": str(UNIT_USDC_RAW), "recommendedMaxSteps": {max_steps},
         }})
     p = json.loads(base64.b64decode(payment_signature))
@@ -376,15 +447,58 @@ def verify_payword(payment_signature: str | None = Header(default=None, alias="P
 "#
             ),
         ),
+        "agent_fetch_js" | "openai_agent" | "agent_js" => (
+            "javascript",
+            "agent-autopay.mjs",
+            format!(
+                r#"// Autonomous AI Agent Auto-Pay Client (Node 18+ / OpenAI / Anthropic / Vercel AI SDK)
+// Download zero-dep SDK: curl -fsSL https://newsatoshi.org/sdk/newsatoshi-402.mjs -o newsatoshi-402.mjs
+import {{ generatePayWordChain, createAutoPayFetch, EVM_PAYWORD_CHAINS }} from "./newsatoshi-402.mjs";
+
+const chain = EVM_PAYWORD_CHAINS.{chain_name};
+const wallet = await generatePayWordChain({max_steps}, {unit_usdc_raw});
+// Open channel once on {chain_name} ({contract_addr}) with root `0x${{wallet.tipHex}}`, then auto-pay every HTTP 402 call:
+const payFetch = createAutoPayFetch({{
+  wallet,
+  chain: "{chain_name}",
+  channelId: "0x" + "00".repeat(32), // replace with your live on-chain channelId (or test against try-402 sandbox!)
+}});
+
+// Works on any HTTP 402 PayWords API — test live right now against Commons:
+const res = await payFetch("{base_url}/api/v2/paywords/try-402", {{ method: "POST" }});
+console.log(await res.json());
+"#
+            ),
+        ),
+        "agent_python" | "langchain_python" | "agent_py" => (
+            "python",
+            "agent_autopay.py",
+            format!(
+                r#"# Autonomous AI Agent Auto-Pay Client (Python 3.9+ / LangChain / CrewAI / OpenAI / Anthropic)
+# Download zero-dep SDK: curl -fsSL https://newsatoshi.org/sdk/newsatoshi-402.py -o newsatoshi_402.py
+from newsatoshi_402 import AutoPaySession, EVM_PAYWORD_CHAINS, generate_payword_chain
+
+chain_cfg = EVM_PAYWORD_CHAINS["{chain_name}"]
+wallet = generate_payword_chain({max_steps}, {unit_usdc_raw})
+# Open channel once on {chain_name} ({contract_addr}) with root `0x{{wallet.tip_hex}}`, then auto-pay every HTTP 402 call:
+session = AutoPaySession(wallet=wallet, chain="{chain_name}", channel_id="0x" + "00" * 32)
+
+# Test live HTTP 402 -> O(1) SHA-256 voucher -> 200 OK right now against Commons:
+status, body = session.request("{base_url}/api/v2/paywords/try-402", method="POST")
+print(status, body)
+"#
+            ),
+        ),
         _ => {
             return Err(
-                "unsupported framework: choose cloudflare_worker | express | fastapi".into(),
+                "unsupported framework: choose cloudflare_worker | express | fastapi | agent_fetch_js | agent_python".into(),
             );
         }
     };
 
     Ok(json!({
         "ok": true,
+        "chain": chain_name,
         "framework": fw,
         "language": lang,
         "filename": filename,
@@ -397,6 +511,15 @@ def verify_payword(payment_signature: str | None = Header(default=None, alias="P
             "total_channel_deposit_usd": round6(total_deposit_usd),
             "protocol_fee_bps": 0
         },
+        "target_chain": {
+            "chain": chain_name,
+            "chain_id": chain_id,
+            "caip2": caip2,
+            "rpc_url": rpc_url,
+            "usdc_token": usdc_addr,
+            "payword_channel_contract": contract_addr,
+            "sourcify_url": format!("https://repo.sourcify.dev/{chain_id}/{contract_addr}"),
+        },
         "base_mainnet": {
             "chain_id": 8453,
             "caip2": "eip155:8453",
@@ -404,6 +527,8 @@ def verify_payword(payment_signature: str | None = Header(default=None, alias="P
             "payword_channel_contract": BASE_PAYWORD_CHANNEL_ADDRESS,
             "sourcify_url": format!("https://repo.sourcify.dev/8453/{BASE_PAYWORD_CHANNEL_ADDRESS}"),
             "live_proof_txs": {
+                "claim_1000_open": BASE_PAYWORD_1000_OPEN_PROOF_TX,
+                "claim_1000": BASE_PAYWORD_1000_CLAIM_PROOF_TX,
                 "open_channel": BASE_PAYWORD_OPEN_PROOF_TX,
                 "claim_7_steps": BASE_PAYWORD_CLAIM_PROOF_TX,
                 "close_and_refund": BASE_PAYWORD_CLOSE_PROOF_TX
@@ -411,21 +536,282 @@ def verify_payword(payment_signature: str | None = Header(default=None, alias="P
         },
         "cli_settlement_commands": {
             "step1_approve_usdc": format!(
-                "cast send {BASE_USDC_ADDRESS} \"approve(address,uint256)\" {BASE_PAYWORD_CHANNEL_ADDRESS} {total_deposit_usdc_raw} --rpc-url https://mainnet.base.org --private-key $PAYER_KEY"
+                "cast send {usdc_addr} \"approve(address,uint256)\" {contract_addr} {total_deposit_usdc_raw} --rpc-url {rpc_url} --private-key $PAYER_KEY"
             ),
             "step2_open_channel": format!(
-                "cast send {BASE_PAYWORD_CHANNEL_ADDRESS} \"openChannel(address,address,bytes32,uint256,uint32,uint64)\" {recipient} {BASE_USDC_ADDRESS} <ROOT_W0_HEX32> {unit_usdc_raw} {max_steps} <EXPIRY_UNIX> --rpc-url https://mainnet.base.org --private-key $PAYER_KEY"
+                "cast send {contract_addr} \"openChannel(address,address,bytes32,uint256,uint32,uint64)\" {recipient} {usdc_addr} <ROOT_W0_HEX32> {unit_usdc_raw} {max_steps} <EXPIRY_UNIX> --rpc-url {rpc_url} --private-key $PAYER_KEY"
             ),
             "step3_claim_batch": format!(
-                "cast send {BASE_PAYWORD_CHANNEL_ADDRESS} \"claim(bytes32,uint32,bytes32)\" <CHANNEL_ID> <STEPS_DELTA> <LATEST_PREIMAGE_WK> --rpc-url https://mainnet.base.org --private-key $SERVER_KEY"
+                "cast send {contract_addr} \"claim(bytes32,uint32,bytes32)\" <CHANNEL_ID> <STEPS_DELTA> <LATEST_PREIMAGE_WK> --rpc-url {rpc_url} --private-key $SERVER_KEY"
             ),
             "step4_early_close_refund": format!(
-                "cast send {BASE_PAYWORD_CHANNEL_ADDRESS} \"closeAndRefund(bytes32)\" <CHANNEL_ID> --rpc-url https://mainnet.base.org --private-key $SERVER_KEY"
+                "cast send {contract_addr} \"closeAndRefund(bytes32)\" <CHANNEL_ID> --rpc-url {rpc_url} --private-key $SERVER_KEY"
             )
         },
         "code": snippet,
         "licensing_note": "Core reference code is PolyForm-Noncommercial-1.0.0; wire spec is open (x402-foundation/x402#4494) and direct commercial partner licenses are available via contributors@newsatoshi.org."
     }))
+}
+
+/// Live public HTTP 402 PayWords playground (`GET/POST /api/v2/paywords/try-402`):
+/// - Without a voucher header: emits a real `HTTP 402 Payment Required` (`x402 v2` + `NEWSATOSHI-402/1.0`)
+///   advertising all 3 live Sourcify-verified EVM PayWord chains (Base, Optimism, Arbitrum) + native LOVE L1.
+/// - With `PAYMENT-SIGNATURE` (base64 JSON) or `X-Newsatoshi-PayWord: tip=...,token=...,ticks=...`:
+///   verifies `SHA256^steps(token) == root` in real Rust with measured microsecond latency and returns `200 OK`.
+pub fn evaluate_live_paywords_try_402(
+    payment_signature_b64: Option<&str>,
+    payword_hdr: Option<&str>,
+    base_url: &str,
+) -> (u16, Value) {
+    let challenge = || {
+        json!({
+            "ok": false,
+            "error": "payment_required",
+            "x402Version": 2,
+            "scheme": "batch-settlement",
+            "binding": "paywords-sha256",
+            "protocol": "NEWSATOSHI-402/1.0",
+            "sandbox_notice": "Send either PAYMENT-SIGNATURE (base64 JSON {channelId,index,tokenHex,rootHex,maxSteps}) or X-Newsatoshi-PayWord: tip=<64hex>,token=<64hex>,ticks=<n> to verify a real SHA-256 PayWord voucher live in microseconds.",
+            "live_settlement_chains": [
+                { "chain": "base", "caip2": "eip155:8453", "asset": BASE_USDC_ADDRESS, "channelContract": BASE_PAYWORD_CHANNEL_ADDRESS },
+                { "chain": "optimism", "caip2": "eip155:10", "asset": OPTIMISM_USDC_ADDRESS, "channelContract": MULTICHAIN_PAYWORD_CHANNEL_ADDRESS },
+                { "chain": "arbitrum", "caip2": "eip155:42161", "asset": ARBITRUM_USDC_ADDRESS, "channelContract": MULTICHAIN_PAYWORD_CHANNEL_ADDRESS },
+                { "chain": "newsatoshi-mainnet-v2", "protocol": "RFC-0022", "asset": "LOVE", "seed": "https://newsatoshi.org/mainnet/status" }
+            ],
+            "sdk_downloads": {
+                "js": format!("{base_url}/sdk/newsatoshi-402.mjs"),
+                "python": format!("{base_url}/sdk/newsatoshi-402.py"),
+                "connect_hub": "https://newsatoshi.org/connect/"
+            }
+        })
+    };
+
+    let parsed: Option<(String, String, String, u32)> = if let Some(sig) = payment_signature_b64.filter(|s| !s.trim().is_empty()) {
+        crate::x402::base64_decode(sig.trim())
+            .ok()
+            .and_then(|bytes| String::from_utf8(bytes).ok())
+            .and_then(|txt| serde_json::from_str::<Value>(&txt).ok())
+            .and_then(|v| {
+                let cid = v.get("channelId").and_then(|x| x.as_str()).unwrap_or("sandbox").to_string();
+                let root = v.get("rootHex").or_else(|| v.get("tipHex")).and_then(|x| x.as_str())?.to_string();
+                let tok = v.get("tokenHex").and_then(|x| x.as_str())?.to_string();
+                let idx = v.get("index").or_else(|| v.get("ticks")).and_then(|x| x.as_u64())? as u32;
+                Some((cid, root, tok, idx))
+            })
+    } else if let Some(hdr) = payword_hdr.filter(|s| !s.trim().is_empty()) {
+        let mut tip = None;
+        let mut tok = None;
+        let mut ticks = None;
+        let mut cid = "sandbox".to_string();
+        for part in hdr.split(',') {
+            if let Some((k, v)) = part.split_once('=') {
+                match k.trim().to_ascii_lowercase().as_str() {
+                    "tip" | "root" => tip = Some(v.trim().to_string()),
+                    "token" => tok = Some(v.trim().to_string()),
+                    "ticks" | "index" => ticks = v.trim().parse::<u32>().ok(),
+                    "channel" => cid = v.trim().to_string(),
+                    _ => {}
+                }
+            }
+        }
+        match (tip, tok, ticks) {
+            (Some(r), Some(t), Some(n)) => Some((cid, r, t, n)),
+            _ => None,
+        }
+    } else {
+        return (402, challenge());
+    };
+
+    let Some((channel_id, root_hex, token_hex, steps)) = parsed else {
+        let mut body = challenge();
+        body["error"] = json!("malformed_payword_header");
+        return (402, body);
+    };
+    if steps == 0 || steps > 4_096 {
+        let mut body = challenge();
+        body["error"] = json!("steps must be in 1..=4096 for live sandbox verification");
+        return (402, body);
+    }
+
+    let Ok(root_bytes) = crate::crypto::hash32_from_hex(root_hex.trim().trim_start_matches("0x")) else {
+        let mut body = challenge();
+        body["error"] = json!("invalid 32-byte rootHex / tip");
+        return (402, body);
+    };
+    let Ok(mut cur) = crate::crypto::hash32_from_hex(token_hex.trim().trim_start_matches("0x")) else {
+        let mut body = challenge();
+        body["error"] = json!("invalid 32-byte tokenHex");
+        return (402, body);
+    };
+
+    let started = std::time::Instant::now();
+    for _ in 0..steps {
+        cur = crate::crypto::sha256(&cur);
+    }
+    let elapsed_us = started.elapsed().as_micros() as u64;
+    if cur != root_bytes {
+        let mut body = challenge();
+        body["error"] = json!("bad_payword_preimage: SHA256^steps(token) != root");
+        return (402, body);
+    }
+
+    (
+        200,
+        json!({
+            "ok": true,
+            "status": "payword_verified",
+            "funding_status": "sandbox_proof_only",
+            "channel_id": channel_id,
+            "steps_verified": steps,
+            "hashes_evaluated": steps,
+            "verified_in_us": elapsed_us,
+            "per_call_gas_usd": 0.0,
+            "protocol_fee_bps": 0,
+            "settlement_note": "Production APIs bind channel_id to a funded on-chain NewsatoshiPayWordChannel on Base, Optimism, or Arbitrum (0% fee) or RFC-0022 LOVE L1 channel, verifying each sequential call in 1 SHA-256 hash.",
+            "live_contracts": {
+                "base": BASE_PAYWORD_CHANNEL_ADDRESS,
+                "optimism": MULTICHAIN_PAYWORD_CHANNEL_ADDRESS,
+                "arbitrum": MULTICHAIN_PAYWORD_CHANNEL_ADDRESS
+            }
+        }),
+    )
+}
+
+/// Canonical machine-readable Cross-Chain & Agent Connectivity Directory (`GET /api/v2/crosschain/connectivity`).
+pub fn build_crosschain_connectivity_directory(base_url: &str) -> Value {
+    json!({
+        "ok": true,
+        "protocol": "NEWSATOSHI/2.2",
+        "connect_hub_url": "https://newsatoshi.org/connect/",
+        "paywords_multichain_evm": [
+            {
+                "chain": "base",
+                "chain_id": 8453,
+                "caip2": "eip155:8453",
+                "contract": BASE_PAYWORD_CHANNEL_ADDRESS,
+                "usdc": BASE_USDC_ADDRESS,
+                "protocol_fee_bps": 0,
+                "sourcify": format!("https://repo.sourcify.dev/8453/{BASE_PAYWORD_CHANNEL_ADDRESS}"),
+                "explorer": format!("https://basescan.org/address/{BASE_PAYWORD_CHANNEL_ADDRESS}"),
+                "live_proof": {
+                    "open_1000_tx": BASE_PAYWORD_1000_OPEN_PROOF_TX,
+                    "claim_1000_tx": BASE_PAYWORD_1000_CLAIM_PROOF_TX,
+                    "claim_1000_gas": 770956,
+                    "claim_1000_usd_incl_l1_fee": 0.007709
+                }
+            },
+            {
+                "chain": "optimism",
+                "chain_id": 10,
+                "caip2": "eip155:10",
+                "contract": MULTICHAIN_PAYWORD_CHANNEL_ADDRESS,
+                "usdc": OPTIMISM_USDC_ADDRESS,
+                "protocol_fee_bps": 0,
+                "sourcify": format!("https://repo.sourcify.dev/10/{MULTICHAIN_PAYWORD_CHANNEL_ADDRESS}"),
+                "explorer": format!("https://optimistic.etherscan.io/address/{MULTICHAIN_PAYWORD_CHANNEL_ADDRESS}"),
+                "deploy_tx": OPTIMISM_PAYWORD_DEPLOY_TX,
+                "live_proof": {
+                    "open_100_tx": OPTIMISM_PAYWORD_OPEN_100_TX,
+                    "claim_100_tx": OPTIMISM_PAYWORD_CLAIM_100_TX,
+                    "claim_100_gas": 125250
+                }
+            },
+            {
+                "chain": "arbitrum",
+                "chain_id": 42161,
+                "caip2": "eip155:42161",
+                "contract": MULTICHAIN_PAYWORD_CHANNEL_ADDRESS,
+                "usdc": ARBITRUM_USDC_ADDRESS,
+                "protocol_fee_bps": 0,
+                "sourcify": format!("https://repo.sourcify.dev/42161/{MULTICHAIN_PAYWORD_CHANNEL_ADDRESS}"),
+                "explorer": format!("https://arbiscan.io/address/{MULTICHAIN_PAYWORD_CHANNEL_ADDRESS}"),
+                "deploy_tx": ARBITRUM_PAYWORD_DEPLOY_TX
+            }
+        ],
+        "atomic_swaps_into_love": {
+            "hash_invariant": "SHA256(32-byte preimage) == payment_hash (identical across Bitcoin OP_SHA256, Lightning BOLT-11, EVM sha256 precompile 0x02, Solana sha256, and Newsatoshi L1 lock --hash)",
+            "compile_endpoint": format!("{base_url}/api/swaps/compile"),
+            "verify_endpoint": format!("{base_url}/api/swaps/verify"),
+            "rails": [
+                {
+                    "rail": "btc_onchain",
+                    "description": "BIP-199 SegWit v0 P2WSH (bc1q...) trustless BTC <-> LOVE atomic swaps",
+                    "custody": "zero_custody"
+                },
+                {
+                    "rail": "lightning_bolt11",
+                    "description": "Instant Bitcoin Lightning BOLT-11 <-> LOVE SHA-256 atomic swaps",
+                    "custody": "zero_custody"
+                },
+                {
+                    "rail": "evm_htlc",
+                    "contract": CANONICAL_EVM_HTLC_ADDRESS,
+                    "chains": [
+                        {
+                            "chain": "base",
+                            "chain_id": 8453,
+                            "usdc": BASE_USDC_ADDRESS,
+                            "sourcify": format!("https://repo.sourcify.dev/8453/{CANONICAL_EVM_HTLC_ADDRESS}"),
+                            "live_swap_proof": {
+                                "lock_tx": crate::backing::LIVE_BASE_HTLC_LOCK_TX,
+                                "claim_tx": crate::backing::LIVE_BASE_HTLC_CLAIM_TX
+                            }
+                        },
+                        {
+                            "chain": "optimism",
+                            "chain_id": 10,
+                            "usdc": OPTIMISM_USDC_ADDRESS,
+                            "sourcify": format!("https://repo.sourcify.dev/10/{CANONICAL_EVM_HTLC_ADDRESS}"),
+                            "live_swap_proof": {
+                                "lock_tx": OPTIMISM_HTLC_LOCK_PROOF_TX,
+                                "claim_tx": OPTIMISM_HTLC_CLAIM_PROOF_TX
+                            }
+                        },
+                        {
+                            "chain": "arbitrum",
+                            "chain_id": 42161,
+                            "usdc": ARBITRUM_USDC_ADDRESS,
+                            "sourcify": format!("https://repo.sourcify.dev/42161/{CANONICAL_EVM_HTLC_ADDRESS}")
+                        },
+                        {
+                            "chain": "polygon",
+                            "chain_id": 137,
+                            "usdc": POLYGON_USDC_ADDRESS,
+                            "sourcify": format!("https://repo.sourcify.dev/137/{CANONICAL_EVM_HTLC_ADDRESS}")
+                        }
+                    ]
+                },
+                {
+                    "rail": "solana_htlc",
+                    "description": "Solana PDA SHA-256 HTLC for SOL & SPL-USDC <-> LOVE swaps",
+                    "source": "https://github.com/theguysaccount/newsatoshi-commons/tree/main/bridges/solana"
+                }
+            ]
+        },
+        "miner_and_pool_connectivity": {
+            "auxpow_chainid": 20051,
+            "auxpow_magic": "0xfabe6d6d (Namecoin-compatible Bitcoin merge-mining)",
+            "zero_fee_solo_stratum": "stratum+tcp://pool.newsatoshi.org:3333",
+            "pool_status_url": "https://pool.newsatoshi.org/status",
+            "mine_setup_url": "https://newsatoshi.org/mine/",
+            "supported_hardware": ["Bitaxe / NerdAxe (password: x)", "Antminer S19/S21/S21XP+ (password: d=524288)", "WhatsMiner M30/M50/M60 (password: d=524288)", "MiningRigRentals SHA256 AsicBoost (74-char ns1... worker)"],
+            "dual_btc_love_merge_mining": "python3 auxpow-stratum/stratum_auxpow.py --ns-rpc http://127.0.0.1:19556 --btc-rpc http://127.0.0.1:8332 (earns 50 LOVE/block at $0 extra power alongside BTC)",
+            "pinned_nspq2_seeds": [
+                "newsatoshi-seed-v2.fly.dev:8445@b024aaeafa0e4ca384b99483c28c3bedde45a5461a560063b283766414dfbbcc",
+                "pool.newsatoshi.org:8445@78187a9436dd2d8cc7ed7afff2396b72b56687099d45d93da676b0a90ed8c6b6"
+            ]
+        },
+        "agent_payment_implementation": {
+            "live_402_sandbox": format!("{base_url}/api/v2/paywords/try-402"),
+            "channel_kit_compiler": format!("{base_url}/api/v2/paywords/channel-kit"),
+            "mcp_endpoint": format!("{base_url}/mcp"),
+            "mcp_tools_count": 41,
+            "zero_dep_js_sdk": "https://newsatoshi.org/sdk/newsatoshi-402.mjs",
+            "zero_dep_python_sdk": "https://newsatoshi.org/sdk/newsatoshi-402.py",
+            "frameworks": ["cloudflare_worker", "express", "fastapi", "agent_fetch_js", "agent_python"],
+            "x402_standard_proposal": "https://github.com/x402-foundation/x402/issues/4494"
+        }
+    })
 }
 
 /// Exact integer simulation & deployment compiler matching live Base Mainnet
@@ -1028,6 +1414,66 @@ mod tests {
         assert_eq!(decoded["remaining_amount_raw"], "93000");
         assert_eq!(decoded["closed"], false);
         assert!(SDK_JS_SOURCE.contains("createBasePayWordGate"));
+        assert!(SDK_JS_SOURCE.contains("createAutoPayFetch"));
+        assert!(SDK_JS_SOURCE.contains("EVM_PAYWORD_CHAINS"));
         assert!(SDK_PY_SOURCE.contains("class BasePayWordGate"));
+        assert!(SDK_PY_SOURCE.contains("class AutoPaySession"));
+        assert!(SDK_PY_SOURCE.contains("EVM_PAYWORD_CHAINS"));
+
+        // Multi-chain PayWords setup (Optimism + Arbitrum + AI Agent Auto-Pay clients)
+        let op_kit = compile_payword_channel_setup_for_chain(
+            "optimism",
+            "agent_fetch_js",
+            None,
+            0.001,
+            1_000,
+            "/api/inference",
+            "https://commons.newsatoshi.org",
+        )
+        .unwrap();
+        assert_eq!(op_kit["target_chain"]["chain_id"], 10);
+        assert_eq!(
+            op_kit["target_chain"]["payword_channel_contract"],
+            MULTICHAIN_PAYWORD_CHANNEL_ADDRESS
+        );
+        assert!(op_kit["code"].as_str().unwrap().contains("createAutoPayFetch"));
+
+        let arb_kit = compile_payword_channel_setup_for_chain(
+            "arbitrum",
+            "agent_python",
+            None,
+            0.001,
+            1_000,
+            "/api/inference",
+            "https://commons.newsatoshi.org",
+        )
+        .unwrap();
+        assert_eq!(arb_kit["target_chain"]["chain_id"], 42161);
+        assert!(arb_kit["code"].as_str().unwrap().contains("AutoPaySession"));
+
+        // Live HTTP 402 playground: missing header => 402, valid SHA-256 voucher => 200, forged => 402
+        let (st402, _) = evaluate_live_paywords_try_402(None, None, "https://commons.newsatoshi.org");
+        assert_eq!(st402, 402);
+
+        let token = [0x42u8; 32];
+        let step1 = crate::crypto::sha256(&token);
+        let root = crate::crypto::sha256(&step1);
+        let hdr = format!("tip={},token={},ticks=2", hex::encode(root), hex::encode(token));
+        let (st200, body200) =
+            evaluate_live_paywords_try_402(None, Some(&hdr), "https://commons.newsatoshi.org");
+        assert_eq!(st200, 200);
+        assert_eq!(body200["ok"], true);
+        assert_eq!(body200["steps_verified"], 2);
+
+        let bad_hdr = format!("tip={},token={},ticks=2", hex::encode(root), "ff".repeat(32));
+        let (st_bad, _) =
+            evaluate_live_paywords_try_402(None, Some(&bad_hdr), "https://commons.newsatoshi.org");
+        assert_eq!(st_bad, 402);
+
+        // Cross-chain connectivity directory
+        let dir = build_crosschain_connectivity_directory("https://commons.newsatoshi.org");
+        assert_eq!(dir["ok"], true);
+        assert_eq!(dir["paywords_multichain_evm"].as_array().unwrap().len(), 3);
+        assert_eq!(dir["agent_payment_implementation"]["mcp_tools_count"], 41);
     }
 }

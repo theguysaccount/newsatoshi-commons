@@ -879,7 +879,8 @@ pub fn render_mcp_server_card_json(base_url: &str) -> Value {
             "newsatoshi_compile_payword_channel_setup",
             "newsatoshi_simulate_fair_curve_launch",
             "newsatoshi_list_base_fair_curves",
-            "newsatoshi_inspect_base_payword_channel"
+            "newsatoshi_inspect_base_payword_channel",
+            "newsatoshi_get_crosschain_connectivity"
         ],
         "resources": [
             "newsatoshi://llms.txt",
@@ -959,7 +960,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 - Commons Treasury Balance: `{bal} LOVE` (`nonce={nonce}`, `parcels={parcels}`, `kwh={kwh}`, `starks={starks}`)
 
 ## Agent Interfaces (Zero Auth Required for All Reads, Compilers & Verifiers)
-- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **40 live tools** (including Base Mainnet `O(1)` SHA-256 PayWordChannel cost-savings & Cloudflare/Express/FastAPI setup kit, dilution-proof Fair Bonding-Curve Launchpad simulator, 60-second private `x402`/`nsUSD` paywall middleware generator, live Base USDC vault escrow verifier, `nsUSD` Dual-Tier stablecoin engine + stress suite, L2 Perfection Layer STARK batch benchmark, 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.5` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
+- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **41 live tools** (including live 3-chain Base/Optimism/Arbitrum `O(1)` SHA-256 PayWordChannel cost-savings & Cloudflare/Express/FastAPI/AI-Agent setup kit, Cross-Chain Connectivity Directory, dilution-proof Fair Bonding-Curve Launchpad simulator, 60-second private `x402`/`nsUSD` paywall middleware generator, live Base USDC vault escrow verifier, `nsUSD` Dual-Tier stablecoin engine + stress suite, L2 Perfection Layer STARK batch benchmark, 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.5` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
 - **Zero-Install Stdio MCP Bridge & CLI (Node 18+, Zero Dependencies):** `npx -y github:theguysaccount/newsatoshi-commons` (`inspect`, `btc-fees`, `decode-bolt11`, `quote-base`, `verify-tx`, `payword-demo`, or stdio MCP `serve`).
 - [Native LOVE PayWord & x402 v2 Discovery]({base_url}/.well-known/x402): 4 live monetized endpoints settling primarily in **native `LOVE`** (`<1ms` zero-gas SHA-256 PayWords / `PriorLock`), with Base/Arbitrum/Polygon USDC (`x402 v2`, `$0.001`) supported as outer bridge on-ramps (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).
 - [MCP Server Card]({base_url}/.well-known/mcp/server-card.json) & [MCP Registry Manifest]({base_url}/server.json): Standard MCP discovery cards (`org.newsatoshi.commons/newsatoshi-commons`).
@@ -1023,7 +1024,7 @@ Add to Claude Desktop, Cursor, Codex, Antigravity, or any Streamable HTTP MCP ho
   }}
 }}
 ```
-Available MCP tools (40 live tools — zero API keys required):
+Available MCP tools (41 live tools — zero API keys required):
 - `crypto_inspect_evm_contract` — Live multi-chain EVM smart contract security audit (bytecode, EIP-1967 proxy/admin slots, `owner()` admin risk, ERC-20 metadata, Sourcify v2 exact-match verification across Ethereum, Base, Arbitrum, Optimism & Polygon)
 - `crypto_bitcoin_mempool_oracle` — Live Bitcoin chain tip, recommended sat/vB fee tiers (`fastest`, `30m`, `60m`, `economy`), and mempool backlog
 - `crypto_decode_bolt11_invoice` — Pure-Rust BOLT-11 Lightning invoice decoder (network, sats/msats, payment hash, expiry, description)
@@ -1064,6 +1065,7 @@ Available MCP tools (40 live tools — zero API keys required):
 - `newsatoshi_simulate_fair_curve_launch` — Simulate exact integer constant-product USDC bonding-curve math + dilution-proof `injectRevenue()` PayWords dividends (Lean 4 Theorems 10–11, 0% premine, 0% platform cut) and emit 1-command deploy CLI for live Base Mainnet `NewsatoshiFairCurveFactory` (`0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933`)
 - `newsatoshi_list_base_fair_curves` — Read every live Fair Bonding Curve deployed on Base Mainnet `NewsatoshiFairCurveFactory` (`0xF6bE782819a8eD0D1556A8f5DC3223f9eb13a933`) directly from Base JSON-RPC (live USDC reserves, spot price, circulating supply, and injected PayWords revenue — zero fake data)
 - `newsatoshi_inspect_base_payword_channel` — Inspect any live Base Mainnet `NewsatoshiPayWordChannel` (`0x971BA814Df91c20DcA3aDd870C2B55d643965C50`) by `channel_id` directly from Base JSON-RPC (payer, recipient, token, current root, claimed/remaining steps & USDC balance)
+- `newsatoshi_get_crosschain_connectivity` — Live Cross-Chain & Agent Connectivity Directory: 3-chain Sourcify-verified `NewsatoshiPayWordChannel` (`Base`, `Optimism`, `Arbitrum`), 4-chain SHA-256 `NewsatoshiHtlc` atomic swaps + BTC/Lightning/Solana swap compilers, Bitcoin AuxPoW merge-mining & 0%-fee Stratum pool endpoints, and zero-dep JS/Python AI Agent auto-pay SDKs + live HTTP 402 sandbox
 
 Stdio MCP Bridge (for stdio-only hosts such as Claude Desktop, Cursor, Cline, or shell scripts):
 ```json
@@ -2196,14 +2198,15 @@ pub fn mcp_tools_list() -> Value {
             },
             {
                 "name": "newsatoshi_compile_payword_channel_setup",
-                "description": "Generate an org-ready Base Mainnet USDC O(1) SHA-256 PayWords HTTP 402 server gate (Cloudflare Worker, Express, or FastAPI) + cast CLI settlement commands wired to live Sourcify-verified NewsatoshiPayWordChannel (0x971BA814Df91c20DcA3aDd870C2B55d643965C50).",
+                "description": "Generate an org-ready multi-chain USDC O(1) SHA-256 PayWords HTTP 402 server gate (Cloudflare Worker, Express, FastAPI) or AI Agent Auto-Pay client (agent_fetch_js, agent_python) + cast CLI settlement commands wired to live Sourcify-verified NewsatoshiPayWordChannel on Base (0x971BA8...), Optimism (0x3DeBB6...), or Arbitrum One (0x3DeBB6...).",
                 "inputSchema": {
                     "type": "object",
                     "required": ["framework"],
                     "properties": {
-                        "framework": { "type": "string", "enum": ["cloudflare_worker", "express", "fastapi"], "description": "Target edge or API framework" },
-                        "recipient_evm": { "type": "string", "description": "Optional 0x... Base treasury address receiving USDC settlements" },
-                        "price_usd": { "type": "number", "default": 0.002, "description": "USD price per API call in Base USDC" },
+                        "chain": { "type": "string", "enum": ["base", "optimism", "arbitrum"], "default": "base", "description": "Target EVM chain where NewsatoshiPayWordChannel is live & Sourcify-verified" },
+                        "framework": { "type": "string", "enum": ["cloudflare_worker", "express", "fastapi", "agent_fetch_js", "agent_python"], "description": "Target server gate or autonomous AI agent client framework" },
+                        "recipient_evm": { "type": "string", "description": "Optional 0x... treasury address receiving USDC settlements" },
+                        "price_usd": { "type": "number", "default": 0.002, "description": "USD price per API call in USDC" },
                         "max_steps": { "type": "integer", "minimum": 1, "default": 1000, "description": "PayWord channel step depth N (e.g. 1000 calls)" },
                         "route_path": { "type": "string", "default": "/api/inference", "description": "Route path to gate" }
                     }
@@ -2246,6 +2249,14 @@ pub fn mcp_tools_list() -> Value {
                     "properties": {
                         "channel_id": { "type": "string", "description": "0x-prefixed 32-byte PayWord channel ID" }
                     }
+                }
+            },
+            {
+                "name": "newsatoshi_get_crosschain_connectivity",
+                "description": "Return the complete live cross-chain connectivity directory: 3-chain Sourcify-verified NewsatoshiPayWordChannel (Base, Optimism, Arbitrum), 4-chain SHA-256 HTLC atomic swaps (Base, Optimism, Arbitrum, Polygon) + BTC/Lightning/Solana swap compilers, Bitcoin AuxPoW merge-mining & 0%-fee Stratum pool endpoints, and zero-dependency AI Agent auto-pay SDKs + live HTTP 402 sandbox.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {}
                 }
             }
         ]
@@ -2871,13 +2882,14 @@ pub fn handle_mcp_jsonrpc(
                     crate::paywords_launchpad::estimate_paywords_cost_savings(calls, price, batch)
                 }
                 "newsatoshi_compile_payword_channel_setup" => {
+                    let chain = args.get("chain").and_then(|v| v.as_str()).unwrap_or("base");
                     let fw = args.get("framework").and_then(|v| v.as_str()).unwrap_or("cloudflare_worker");
                     let rec = args.get("recipient_evm").and_then(|v| v.as_str());
                     let price = args.get("price_usd").and_then(|v| v.as_f64()).unwrap_or(0.002);
                     let steps = args.get("max_steps").and_then(|v| v.as_u64()).unwrap_or(1_000) as u32;
                     let route = args.get("route_path").and_then(|v| v.as_str()).unwrap_or("/api/inference");
-                    crate::paywords_launchpad::compile_payword_channel_setup(
-                        fw, rec, price, steps, route, base_url,
+                    crate::paywords_launchpad::compile_payword_channel_setup_for_chain(
+                        chain, fw, rec, price, steps, route, base_url,
                     )
                 }
                 "newsatoshi_simulate_fair_curve_launch" => {
@@ -2904,6 +2916,9 @@ pub fn handle_mcp_jsonrpc(
                         .ok_or_else(|| "missing required 'channel_id'".to_string());
                     cid.and_then(crate::paywords_launchpad::inspect_live_base_payword_channel)
                 }
+                "newsatoshi_get_crosschain_connectivity" => Ok(
+                    crate::paywords_launchpad::build_crosschain_connectivity_directory(base_url),
+                ),
                 other => Err(format!("unknown MCP tool '{other}'")),
             };
 
@@ -3009,6 +3024,6 @@ mod tests {
             &client,
             None,
         );
-        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 40);
+        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 41);
     }
 }

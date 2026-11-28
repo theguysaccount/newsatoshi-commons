@@ -2038,7 +2038,19 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 40);
+    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 41);
+
+    let cx_dir: Value = serde_json::from_str(
+        &ureq::get(&format!("{base}/api/v2/crosschain/connectivity"))
+            .call()
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(cx_dir["ok"], true);
+    assert_eq!(cx_dir["paywords_multichain_evm"].as_array().unwrap().len(), 3);
 
     // Live nsUSD Dual-Tier Engine + Adversarial Stress Test + L2 Perfection Layer STARK Benchmark
     let nsusd_state: Value = serde_json::from_str(
@@ -2236,7 +2248,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 40);
+    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 41);
 
     // Honest v2 cutover readiness gate & Bonded P2P Desk smoke tests
     let cutover: Value = serde_json::from_str(

@@ -404,6 +404,35 @@ class Newsatoshi402PythonSdkTests(unittest.TestCase):
         self.assertEqual(batch["payout_raw"], 25_000)
         self.assertTrue(batch["calldata"].startswith("0xe0ab9c6b"))
 
+    def test_multichain_registry_and_autopay_session_402_to_200(self) -> None:
+        self.assertEqual(ns402.EVM_PAYWORD_CHAINS["base"]["chain_id"], 8453)
+        self.assertEqual(ns402.EVM_PAYWORD_CHAINS["optimism"]["chain_id"], 10)
+        self.assertEqual(ns402.EVM_PAYWORD_CHAINS["arbitrum"]["chain_id"], 42161)
+        self.assertEqual(
+            ns402.EVM_PAYWORD_CHAINS["optimism"]["payword_channel"],
+            ns402.EVM_PAYWORD_CHAINS["arbitrum"]["payword_channel"],
+        )
+
+        wallet = ns402.generate_payword_chain(10, 1_000)
+        calls = []
+
+        def fake_opener(req, _timeout):
+            calls.append(req.get_method())
+            sig = req.get_header("Payment-signature")
+            if not sig:
+                return 402, '{"error":"payment_required"}'
+            import base64, json
+            p = json.loads(base64.b64decode(sig).decode("utf-8"))
+            v = ns402.verify_payword_token(p["rootHex"], p["tokenHex"], p["index"], 1_000)
+            self.assertTrue(v["valid"])
+            return 200, json.dumps({"ok": True, "network": p["network"], "step": p["index"]})
+
+        sess = ns402.AutoPaySession(wallet=wallet, chain="arbitrum", opener=fake_opener)
+        status, body = sess.request("https://commons.newsatoshi.org/api/v2/paywords/try-402", method="POST")
+        self.assertEqual(status, 200)
+        self.assertIn("eip155:42161", body)
+        self.assertEqual(len(calls), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2179,3 +2179,100 @@ export function createBasePayWordGate({
     getActiveChannels: () => Array.from(state.keys()),
   };
 }
+
+/**
+ * Live Sourcify exact_match multi-chain EVM PayWordChannel & SHA-256 HTLC deployments.
+ * Use these constants to settle O(1) PayWords or execute trustless cross-chain atomic swaps
+ * across Base (8453), Optimism (10), Arbitrum One (42161), and Polygon (137).
+ */
+export const EVM_PAYWORD_CHAINS = Object.freeze({
+  base: Object.freeze({
+    chainId: 8453,
+    caip2: "eip155:8453",
+    rpcUrl: "https://mainnet.base.org",
+    paywordChannel: "0x971BA814Df91c20DcA3aDd870C2B55d643965C50",
+    htlc: "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987",
+    usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    explorer: "https://basescan.org",
+  }),
+  optimism: Object.freeze({
+    chainId: 10,
+    caip2: "eip155:10",
+    rpcUrl: "https://mainnet.optimism.io",
+    paywordChannel: "0x3DeBB6d5ae490e6cF4F966585e000028111CF106",
+    htlc: "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987",
+    usdc: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+    explorer: "https://optimistic.etherscan.io",
+  }),
+  arbitrum: Object.freeze({
+    chainId: 42161,
+    caip2: "eip155:42161",
+    rpcUrl: "https://arb1.arbitrum.io/rpc",
+    paywordChannel: "0x3DeBB6d5ae490e6cF4F966585e000028111CF106",
+    htlc: "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987",
+    usdc: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+    explorer: "https://arbiscan.io",
+  }),
+  polygon: Object.freeze({
+    chainId: 137,
+    caip2: "eip155:137",
+    rpcUrl: "https://polygon-bor-rpc.publicnode.com",
+    paywordChannel: null,
+    htlc: "0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987",
+    usdc: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+    explorer: "https://polygonscan.com",
+  }),
+});
+
+/**
+ * Drop-in 1-line HTTP 402 auto-paying `fetch()` wrapper for autonomous AI agents
+ * (OpenAI Agents, Claude MCP clients, Vercel AI SDK, LangChain JS, Node 18+, Cloudflare Workers).
+ *
+ * When a paid API responds with `HTTP 402`, automatically pops the next O(1) SHA-256 PayWord
+ * voucher from `wallet`, attaches both `PAYMENT-SIGNATURE` (base64 x402 v2 batch-settlement)
+ * and `X-Newsatoshi-PayWord`, and retries once transparently.
+ */
+export function createAutoPayFetch({
+  wallet,
+  channelId = "0x" + "00".repeat(32),
+  chain = "base",
+  ticksPerCall = 1,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  if (!wallet || typeof wallet.nextPaymentAsync !== "function") {
+    throw new Error("createAutoPayFetch requires a wallet from generatePayWordChain()");
+  }
+  if (typeof fetchImpl !== "function") {
+    throw new Error("createAutoPayFetch requires fetchImpl (or globalThis.fetch)");
+  }
+  const chainSpec = EVM_PAYWORD_CHAINS[String(chain).toLowerCase()] || EVM_PAYWORD_CHAINS.base;
+
+  return async function autoPayFetch(url, init = {}) {
+    const first = await fetchImpl(url, init);
+    if (first.status !== 402) return first;
+
+    const payment = await wallet.nextPaymentAsync(ticksPerCall);
+    const sigObj = {
+      x402Version: 2,
+      scheme: "batch-settlement",
+      binding: "paywords-sha256",
+      network: chainSpec.caip2,
+      channelContract: chainSpec.paywordChannel,
+      channelId,
+      index: payment.ticks,
+      tokenHex: `0x${payment.tokenHex}`,
+      rootHex: `0x${payment.tipHex}`,
+      maxSteps: wallet.maxTicks,
+    };
+    const jsonStr = JSON.stringify(sigObj);
+    const b64 =
+      typeof Buffer !== "undefined"
+        ? Buffer.from(jsonStr, "utf8").toString("base64")
+        : globalThis.btoa(jsonStr);
+
+    const headers = new Headers(init.headers || {});
+    headers.set("PAYMENT-SIGNATURE", b64);
+    headers.set("X-Newsatoshi-PayWord", `channel=${channelId},${payment.headerValue}`);
+    return fetchImpl(url, { ...init, headers });
+  };
+}
