@@ -455,7 +455,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                     "/l2",
                     "Newsatoshi Layer-2 Expansion & Perfection Layers — PayWords, nsUSD & Shielded STARK Rollups",
                     "Hourglass Layer-2 Perfection Architecture above Mainnet v2 (nsM2): O(1) SHA-256 PayWords, RFC-0028 sovereign nsUSD CDP/oracle engine, Winterfell STARK shielded rollup batching, and unilateral Merkle L1 escape hatches.",
-                    "<h1>Newsatoshi Layer-2 Expansion &amp; Perfection Layers (<code>v0.29.0</code>)</h1>\n\
+                    "<h1>Newsatoshi Layer-2 Expansion &amp; Perfection Layers (<code>v0.30.0</code>)</h1>\n\
                      <p><strong>Hourglass Architecture:</strong> Layer 1 (<code>newsatoshi-rfc0021</code>, Mainnet v2 <code>nsM2</code>) stays minimal, pure FIPS SHA-2, and ossified. Layer 2 (<code>newsatoshi-commons</code>) delivers machine-speed throughput, private USD stability (<code>nsUSD</code>), and zero-custody escape hatches.</p>\n\
                      <p>Live APIs: <a href=\"/l2.md\">Full Markdown Spec (/l2.md)</a> &middot; <a href=\"/api/v2/l2/status\">GET /api/v2/l2/status</a> &middot; <a href=\"/api/v2/nsusd/state\">GET /api/v2/nsusd/state</a> &middot; <a href=\"/formal/NsUsdAndL2Perfection.lean\">Lean 4 Proof (11 Theorems, 0 sorry)</a> &middot; <a href=\"/nsusd\">nsUSD Spec (/nsusd)</a> &middot; <a href=\"/whitepaper.pdf\">Whitepaper v2.2 PDF</a></p>\n\
                      <h2>Layer 2A &mdash; Microsecond Streaming (<code>O(1)</code> SHA-256 PayWords)</h2>\n\
@@ -564,7 +564,7 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                     "Why humans and autonomous AI agents require unfreezable, private, quantum-proof, Bitcoin-merge-mined electronic cash with zero premine and brutal honesty.",
                     &format!(
                         "<h1>The Newsatoshi Manifesto: Money for Minds, Human and Machine</h1>\n\
-                         <p><strong>Canonical Mainnet v2 (<code>nsM2</code> · <code>v1.2.1</code>) · Anchored to Bitcoin Block <code>#977,738</code></strong> · November 27, 2026</p>\n\
+                         <p><strong>Canonical Mainnet v2 (<code>nsM2</code> · <code>v1.2.5</code>) · Anchored to Bitcoin Block <code>#977,738</code></strong> · November 27, 2026</p>\n\
                          <p>Read or download: <a href=\"/manifesto.md\">Full Manifesto (.md)</a> · <a href=\"https://newsatoshi.org/manifesto/\">Terminal Edition (newsatoshi.org)</a> · <a href=\"/whitepaper\">NEWSATOSHI/2.2 Whitepaper</a></p>\n\
                          <h2>I. The Age of Synthetic Commerce Has Arrived &mdash; Without Free Money</h2>\n\
                          <p>For the first time in human history, intelligence is no longer exclusively biological. Billions of autonomous AI agents will soon negotiate compute, buy data, verify claims, rent hardware, and settle trillions of micro-transactions every day. They cannot open checking accounts, pass KYC, or sue in court. Corporate stablecoins can be frozen with one compliance switch and expose every supplier and margin on a public ledger; transparent legacy crypto turns financial surveillance permanent and leaves elliptic-curve keys exposed to future quantum computers. <strong>Free minds require free money.</strong></p>\n\
@@ -598,9 +598,9 @@ pub fn render_public_page(slug: &str, base_url: &str, wants_md: bool) -> Option<
                     base_url,
                     "/whitepaper",
                     "NEWSATOSHI/2.2 Whitepaper — Pure SHA-2 Shielded Machine Cash (Mainnet v2)",
-                    "Official NEWSATOSHI/2.2 technical whitepaper for live Mainnet v2 (nsM2, v1.2.1): 192-bit classical / 100-104-bit CMS19 QROM pure SHA-384 Quartic STARKs, 249 Lean 4 constraints, Bitcoin AuxPoW 20051, PriorLock FEP, PayWords, NSPQ2, and live verification.",
+                    "Official NEWSATOSHI/2.2 technical whitepaper for live Mainnet v2 (nsM2, v1.2.5): 192-bit classical / 100-104-bit CMS19 QROM pure SHA-384 Quartic STARKs, 249 Lean 4 constraints, Bitcoin AuxPoW 20051, PriorLock FEP, PayWords, NSPQ2, and live verification.",
                     "<h1>NEWSATOSHI/2.2: Pure SHA-2 Shielded Machine Cash</h1>\n\
-                         <p><strong>Mainnet v2 (<code>nsM2</code> · <code>v1.2.1</code>) · Canonical Genesis Anchored to Bitcoin Block <code>#977,738</code></strong> · November 27, 2026</p>\n\
+                         <p><strong>Mainnet v2 (<code>nsM2</code> · <code>v1.2.5</code>) · Canonical Genesis Anchored to Bitcoin Block <code>#977,738</code></strong> · November 27, 2026</p>\n\
                          <p>Download canonical artifacts: <a href=\"/whitepaper.pdf\"><strong>Satoshi-Format Whitepaper PDF (8 pages)</strong></a> · <a href=\"/whitepaper.md\">Full NEWSATOSHI/2.2 Markdown (.md)</a> · <a href=\"https://newsatoshi.org/whitepaper-v2/\">Terminal Edition</a> · <a href=\"/manifesto\">The Newsatoshi Manifesto</a> · <a href=\"https://newsatoshi.org/hyperscale/\">Hyperscale Architecture</a> · <a href=\"/formal/NewsatoshiCovenants.lean\">Lean 4 Proof</a></p>\n\
                          <h2>Live Mainnet v2 (<code>nsM2</code>) Canonical Parameters</h2>\n\
                          <ul>\n\
@@ -943,7 +943,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
         "\
 # Newsatoshi Commons & Agent Transaction Interface ({proto})
 
-> **The Hourglass Architecture:** Newsatoshi (`LOVE`) keeps **Layer 1 (`v1.2.1`)** radically small — private, quantum-proof electronic cash secured by Bitcoin merge-mining (`chainid = 20051`) and built strictly on SHA-2 (256-bit Quartic Goldilocks FRI at `100–104` conservative QROM bits, full 249-constraint Lean 4 circuit proof, real pure-SHA-2 STARK-in-STARK IVC verifier, zero elliptic curves, zero trusted setup, zero L1 launchpads or subjective juries). **This gateway (`commons.newsatoshi.org`) lives above the waist at Layer 2** — providing 33 zero-auth MCP tools, RFC-0028 `nsUSD` Dual-Tier stablecoin engine + live stress simulator, L2 Shielded Rollup & Perfection Layer (Winterfell STARK batching + unilateral Merkle escape hatches), Native `LOVE` PayWords + `x402 v2` USDC bridge on-ramps, zero-custody BTC/Lightning/Solana/EVM HTLC atomic swaps, `ERC-8004` identity, Web4 charters, off-chain mission launchpads, zkTLS P2P verification, and A2A escrow hooks.
+> **The Hourglass Architecture:** Newsatoshi (`LOVE`) keeps **Layer 1 (`v1.2.5`)** radically small — private, quantum-proof electronic cash secured by Bitcoin merge-mining (`chainid = 20051`) and built strictly on SHA-2 (256-bit Quartic Goldilocks FRI at `100–104` conservative QROM bits, full 249-constraint Lean 4 circuit proof, real pure-SHA-2 STARK-in-STARK IVC verifier, zero elliptic curves, zero trusted setup, zero L1 launchpads or subjective juries). **This gateway (`commons.newsatoshi.org`) lives above the waist at Layer 2** — providing 40 zero-auth MCP tools, live Base Mainnet `O(1)` SHA-256 PayWords (`claim(1000)` verified on-chain at `$0.0077` recurring / `$0.0104` full lifecycle), 0%-premine Fair Bonding Curves, RFC-0028 `nsUSD` Dual-Tier stablecoin engine + live stress simulator, L2 Shielded Rollup & Perfection Layer (Winterfell STARK batching + unilateral Merkle escape hatches), Native `LOVE` PayWords + `x402 v2` USDC bridge on-ramps, zero-custody BTC/Lightning/Solana/EVM HTLC atomic swaps, `ERC-8004` identity, Web4 charters, off-chain mission launchpads, zkTLS P2P verification, and A2A escrow hooks.
 
 ## When to use Newsatoshi Commons
 - Use `{base_url}/mcp` or `{base_url}/api/*` when an agent needs to **check live Newsatoshi Mainnet/Testnet state**, **bridge BTC/Lightning/Solana/Base into LOVE trustlessly**, **run live RFC-0028 `nsUSD` stablecoin quotes/stress tests or L2 STARK rollup benchmarks**, **issue or verify HTTP 402 PayWord micropayments**, or **cryptographically verify Winterfell STARK covenant proofs and L1 hash-locks**.
@@ -959,7 +959,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 - Commons Treasury Balance: `{bal} LOVE` (`nonce={nonce}`, `parcels={parcels}`, `kwh={kwh}`, `starks={starks}`)
 
 ## Agent Interfaces (Zero Auth Required for All Reads, Compilers & Verifiers)
-- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **38 live tools** (including Base Mainnet `O(1)` SHA-256 PayWordChannel cost-savings & Cloudflare/Express/FastAPI setup kit, dilution-proof Fair Bonding-Curve Launchpad simulator, 60-second private `x402`/`nsUSD` paywall middleware generator, live Base USDC vault escrow verifier, `nsUSD` Dual-Tier stablecoin engine + stress suite, L2 Perfection Layer STARK batch benchmark, 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.5` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
+- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **40 live tools** (including Base Mainnet `O(1)` SHA-256 PayWordChannel cost-savings & Cloudflare/Express/FastAPI setup kit, dilution-proof Fair Bonding-Curve Launchpad simulator, 60-second private `x402`/`nsUSD` paywall middleware generator, live Base USDC vault escrow verifier, `nsUSD` Dual-Tier stablecoin engine + stress suite, L2 Perfection Layer STARK batch benchmark, 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.5` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
 - **Zero-Install Stdio MCP Bridge & CLI (Node 18+, Zero Dependencies):** `npx -y github:theguysaccount/newsatoshi-commons` (`inspect`, `btc-fees`, `decode-bolt11`, `quote-base`, `verify-tx`, `payword-demo`, or stdio MCP `serve`).
 - [Native LOVE PayWord & x402 v2 Discovery]({base_url}/.well-known/x402): 4 live monetized endpoints settling primarily in **native `LOVE`** (`<1ms` zero-gas SHA-256 PayWords / `PriorLock`), with Base/Arbitrum/Polygon USDC (`x402 v2`, `$0.001`) supported as outer bridge on-ramps (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).
 - [MCP Server Card]({base_url}/.well-known/mcp/server-card.json) & [MCP Registry Manifest]({base_url}/server.json): Standard MCP discovery cards (`org.newsatoshi.commons/newsatoshi-commons`).
@@ -984,7 +984,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 ## Source & Releases
 - Repository: https://github.com/theguysaccount/newsatoshi-commons
 - Installable Agent Skill: `skills/newsatoshi-agent-payments/SKILL.md`
-- Minimalist Layer-1 Narrow Waist (`v1.2.4`: Private, SHA-2-only, >=100-bit QROM, Bitcoin AuxPoW merge-mined settlement floor): https://github.com/theguysaccount/newsatoshi-rfc0021
+- Minimalist Layer-1 Narrow Waist (`v1.2.5`: Private, SHA-2-only, >=100-bit QROM, Bitcoin AuxPoW merge-mined settlement floor): https://github.com/theguysaccount/newsatoshi-rfc0021
 ",
         proto = state.protocol_version,
         backing_vault = CANONICAL_BACKING_VAULT,
@@ -1023,7 +1023,7 @@ Add to Claude Desktop, Cursor, Codex, Antigravity, or any Streamable HTTP MCP ho
   }}
 }}
 ```
-Available MCP tools (38 live tools — zero API keys required):
+Available MCP tools (40 live tools — zero API keys required):
 - `crypto_inspect_evm_contract` — Live multi-chain EVM smart contract security audit (bytecode, EIP-1967 proxy/admin slots, `owner()` admin risk, ERC-20 metadata, Sourcify v2 exact-match verification across Ethereum, Base, Arbitrum, Optimism & Polygon)
 - `crypto_bitcoin_mempool_oracle` — Live Bitcoin chain tip, recommended sat/vB fee tiers (`fastest`, `30m`, `60m`, `economy`), and mempool backlog
 - `crypto_decode_bolt11_invoice` — Pure-Rust BOLT-11 Lightning invoice decoder (network, sats/msats, payment hash, expiry, description)
@@ -1052,7 +1052,7 @@ Available MCP tools (38 live tools — zero API keys required):
 - `newsatoshi_inspect_mission_launchpad` — Legacy `/api/mission` query helper (L1 `v1.0.0-core` exposes unified `/api/prior?id=...` instead)
 - `newsatoshi_format_swarm_task_claim` — Compute deterministic `nsMISSTASK` & `nsMISSCLAIM` signing digests for off-chain/L2 agent swarm coordinators
 - `newsatoshi_verify_zktls_proof` — Cryptographically verify real `reclaim_v1` (EIP-191 secp256k1 ecrecover), `tlsnotary_v1` (Ed25519/secp256k1 + Merkle selective redaction), or `newsatoshi_pq_notary_v1` (FIPS 205 SLH-DSA) zkTLS proofs for off-chain/P2P verification
-- `newsatoshi_check_v2_cutover_readiness` — Live `v1.2.1` Mainnet v2 status, formal/STARK security bounds, independent Bitcoin AuxPoW pool adoption, and LOVE Public Security Bug Bounty telemetry
+- `newsatoshi_check_v2_cutover_readiness` — Live `v1.2.5` Mainnet v2 status, formal/STARK security bounds, independent Bitcoin AuxPoW pool adoption, and LOVE Public Security Bug Bounty telemetry
 - `newsatoshi_compile_bonded_p2p_offer` — Compile a zero-custody `PriorLock`-backed zkTLS P2P Fiat/USDC <-> LOVE market-maker quote (100%+ stake coverage required)
 - `newsatoshi_get_nsusd_state` — Live honest RFC-0028 `nsUSD` Dual-Tier stablecoin engine state (Sovereign BTC CDP `asset_id=1` + isolated Bridged `nsUSD-B` `asset_id=2` + `PriorLock` oracle status)
 - `newsatoshi_simulate_nsusd_stress` — Run the 4-scenario isolated adversarial `nsUSD` stress-test suite (flash-crash liquidation, `$1.00` bank-run redemption, `+40%` oracle spoof 50/50 slash, stale circuit-breaker halt)
@@ -1128,7 +1128,7 @@ Ideal for per-token LLM inference, tool calls, sensor feeds, and data APIs where
 2. For call `#k`, payer reveals `token = SHA256^(N - k)(seed)` in `X-Newsatoshi-PayWord: tip=<tip>,token=<token>,ticks=<k>`.
 3. Server verifies `SHA256^k(token) == tip` locally or via `POST {base_url}/api/agent/402-verify` in microseconds (post-quantum pure SHA-256).
 
-### Recipe 5: Mainnet v2 (`nsM2`, `v1.2.1`) Independent Verification, Utreexo & STARK-in-STARK IVC
+### Recipe 5: Mainnet v2 (`nsM2`, `v1.2.5`) Independent Verification, Utreexo & STARK-in-STARK IVC
 Verify live Mainnet v2 (`00000000ba1cdad4…`, anchored to Bitcoin `#977,738`) with zero trust in any server:
 ```bash
 # Join Mainnet v2 with FIPS 205 SLH-DSA NSPQ2 peer pinning (blocks active MITM):

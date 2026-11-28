@@ -1,5 +1,5 @@
-# Single-container public Newsatoshi Mainnet v2 (nsM2, v1.2.0) AuxPoW Solo-Mining Pool + IPv4 P2P Seed (Fly.io)
-# Runs canonical v1.2.0 Mainnet v2 node + zero-fee per-miner direct-payout Stratum v1 server.
+# Single-container public Newsatoshi Mainnet v2 (nsM2, v1.2.5) AuxPoW Solo-Mining Pool + IPv4 P2P Seed (Fly.io)
+# Runs canonical v1.2.5 Mainnet v2 node + zero-fee per-miner direct-payout Stratum v1 server.
 
 FROM rust:bookworm AS node-builder
 
@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends git ca-certific
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
-ARG NS_REF=v1.2.0
+ARG NS_REF=v1.2.5
 RUN git clone --depth 1 --branch "${NS_REF}" https://github.com/theguysaccount/newsatoshi-rfc0021.git . \
     && cd node \
     && cargo build --release --bin newsatoshi

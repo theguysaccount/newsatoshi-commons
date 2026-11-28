@@ -275,6 +275,233 @@ class AuxPowStratumTests(unittest.TestCase):
 
         asyncio.run(run_diff_flow())
 
+    def test_no_clean_jobs_churn_on_same_height_ntime_bump(self) -> None:
+        """Regression test for WhatsMiner 0.00 H/s bug: nTime/aux_hash changes at same height must NOT churn jobs."""
+        easy_target_int = 0x7FFFFF << (8 * 29)
+        fake_rpc = FakeAuxRpc(easy_target_int.to_bytes(32, "little").hex())
+        srv = sa.AuxPowStratumServer(ns_rpc=fake_rpc, poll_interval=60.0)
+
+        job1 = srv.refresh_template_sync()
+        self.assertIsNotNone(job1)
+        self.assertTrue(job1.clean_jobs)
+
+        # Simulate createauxblock returning a different aux_hash (nTime bumped) at the SAME height & bits
+        fake_rpc.aux_hash = "cc" * 32
+        job_suppressed = srv.refresh_template_sync()
+        self.assertIsNone(job_suppressed, "Same-height nTime bump within 30s must NOT broadcast a new job")
+
+        # Simulate 31s keepalive expiry at SAME height -> refresh happens with clean_jobs=False
+        job1.created_at -= 31.0
+        job_keepalive = srv.refresh_template_sync()
+        self.assertIsNotNone(job_keepalive)
+        self.assertFalse(job_keepalive.clean_jobs, "Keepalive refresh at same height must use clean_jobs=False")
+
+        # Simulate real new block height -> MUST fire immediately with clean_jobs=True
+        fake_rpc.height += 1
+        fake_rpc.aux_hash = "dd" * 32
+        job_new_tip = srv.refresh_template_sync()
+        self.assertIsNotNone(job_new_tip)
+        self.assertTrue(job_new_tip.clean_jobs, "New chain tip height must trigger clean_jobs=True immediately")
+
+    def test_canonical_coinbase_and_merkle_branch_for_asic_compat(self) -> None:
+        """Regression test for WhatsMiner/Antminer S21 ASIC Stratum parsing (CKPool-canonical wire format)."""
+        self.assertEqual(sa.EXTRANONCE2_SIZE, 8)
+        easy_target_int = 0x7FFFFF << (8 * 29)
+        fake_rpc = FakeAuxRpc(easy_target_int.to_bytes(32, "little").hex())
+        srv = sa.AuxPowStratumServer(ns_rpc=fake_rpc, poll_interval=60.0)
+        job = srv.refresh_template_sync()
+        self.assertIsNotNone(job)
+
+        # Compact coinb1 (< 64 bytes) avoids midstate split bugs on strict ASIC firmwares; nVersion == 1
+        self.assertLess(len(job.coinb1), 64)
+        self.assertEqual(struct.unpack("<I", job.coinb1[:4])[0], 1)
+        # Namecoin AuxPoW magic commitment lives cleanly in coinb2
+        self.assertIn(sa.MERGED_MINING_MAGIC, job.coinb2)
+        # Canonical Bitcoin nbits, non-zero prevhash, and non-empty 1-sibling merkle_branch
+        self.assertEqual(job.parent_nbits, 0x1701F0A3)
+        self.assertEqual(len(job.merkle_branch_internal), 1)
+        prev_display = sa.stratum_prevhash_to_internal(job.parent_prevhash_stratum)[::-1].hex()
+        self.assertTrue(prev_display.startswith("00000000000000000001"))
+
+    def test_mrr_handshake_fixed_diff_overrides_suggest_and_low_aux_diff(self) -> None:
+        """Regression test: explicit password d=524288 must beat suggest_difficulty AND low launch aux_diff."""
+        async def run_mrr() -> None:
+            # Very low network diff (~1.0) to prove fixed_diff=524288 is NOT clamped down to aux_diff
+            low_target_int = sa.difficulty_to_target(1.0)
+            fake_rpc = FakeAuxRpc(low_target_int.to_bytes(32, "little").hex())
+            srv = sa.AuxPowStratumServer(ns_rpc=fake_rpc, poll_interval=60.0)
+            srv.refresh_template_sync()
+            tcp_server = await asyncio.start_server(srv.handle_stratum_client, "127.0.0.1", 0)
+            port = tcp_server.sockets[0].getsockname()[1]
+            try:
+                reader, writer = await asyncio.open_connection("127.0.0.1", port)
+
+                async def send(obj):
+                    writer.write((json.dumps(obj) + "\n").encode("utf-8"))
+                    await writer.drain()
+
+                async def recv():
+                    line = await asyncio.wait_for(reader.readline(), timeout=5.0)
+                    return json.loads(line.decode("utf-8"))
+
+                await send({"id": 1, "method": "mining.subscribe", "params": ["MiningRigRentals/Test/1.0"]})
+                sub = await recv()
+                self.assertEqual(sub["id"], 1)
+                self.assertEqual(sub["result"][2], 8)
+
+                await send({"id": 2, "method": "mining.extranonce.subscribe", "params": []})
+                ex = await recv()
+                self.assertEqual(ex["id"], 2)
+                self.assertTrue(ex["result"])
+
+                await send({"id": 3, "method": "mining.authorize", "params": ["ns1testworker.s21", "d=524288"]})
+                auth = await recv()
+                self.assertTrue(auth["result"])
+                diff_msg = await recv()
+                self.assertEqual(diff_msg["method"], "mining.set_difficulty")
+                self.assertEqual(diff_msg["params"][0], 524288)
+                self.assertIsInstance(diff_msg["params"][0], int)
+                notify = await recv()
+                self.assertEqual(notify["method"], "mining.notify")
+
+                # Subsequent suggest_difficulty(16384) must NOT downgrade explicit password d=524288
+                await send({"id": 4, "method": "mining.suggest_difficulty", "params": [16384]})
+                sug = await recv()
+                self.assertEqual(sug["id"], 4)
+                self.assertTrue(sug["result"])
+                client = next(iter(srv.clients.values()))
+                self.assertEqual(client["difficulty"], 524288.0)
+
+                writer.close()
+                await writer.wait_closed()
+            finally:
+                tcp_server.close()
+                await tcp_server.wait_closed()
+
+        asyncio.run(run_mrr())
+
+    def test_suggest_difficulty_sends_followup_notify_and_grace_window(self) -> None:
+        """Regression test: post-auth suggest_difficulty sends set_difficulty + notify(clean=False) + grace window."""
+        async def run_sug() -> None:
+            hard_target_int = sa.difficulty_to_target(250_000.0)
+            fake_rpc = FakeAuxRpc(hard_target_int.to_bytes(32, "little").hex())
+            srv = sa.AuxPowStratumServer(ns_rpc=fake_rpc, poll_interval=60.0)
+            srv.refresh_template_sync()
+            tcp_server = await asyncio.start_server(srv.handle_stratum_client, "127.0.0.1", 0)
+            port = tcp_server.sockets[0].getsockname()[1]
+            try:
+                reader, writer = await asyncio.open_connection("127.0.0.1", port)
+
+                async def send(obj):
+                    writer.write((json.dumps(obj) + "\n").encode("utf-8"))
+                    await writer.drain()
+
+                async def recv():
+                    line = await asyncio.wait_for(reader.readline(), timeout=5.0)
+                    return json.loads(line.decode("utf-8"))
+
+                await send({"id": 1, "method": "mining.subscribe", "params": ["whatsminer/v1.1"]})
+                _ = await recv()
+                await send({"id": 2, "method": "mining.authorize", "params": ["rig.wm", "x"]})
+                _ = await recv()  # auth
+                _ = await recv()  # initial set_difficulty
+                _ = await recv()  # initial notify
+
+                await send({"id": 3, "method": "mining.suggest_difficulty", "params": [65536]})
+                m1 = await recv()
+                m2 = await recv()
+                m3 = await recv()
+                methods = [m.get("method") for m in (m1, m2, m3) if "method" in m]
+                self.assertIn("mining.set_difficulty", methods)
+                self.assertIn("mining.notify", methods)
+                notify_msg = next(m for m in (m1, m2, m3) if m.get("method") == "mining.notify")
+                self.assertFalse(notify_msg["params"][8], "Follow-up notify after suggest_difficulty must have clean_jobs=False")
+                client = next(iter(srv.clients.values()))
+                self.assertEqual(client["difficulty"], 65536.0)
+                self.assertIsNotNone(client.get("prev_difficulty"))
+
+                writer.close()
+                await writer.wait_closed()
+            finally:
+                tcp_server.close()
+                await tcp_server.wait_closed()
+
+        asyncio.run(run_sug())
+
+    def test_block_acceptance_broadcasts_clean_jobs_to_all_payout_keys(self) -> None:
+        """Regression test: when Worker A wins a block, Worker B on a different payout key gets clean_jobs=True immediately."""
+        async def run_multi() -> None:
+            easy_target_int = 0x7FFFFF << (8 * 29)
+            fake_rpc = FakeAuxRpc(easy_target_int.to_bytes(32, "little").hex())
+            srv = sa.AuxPowStratumServer(ns_rpc=fake_rpc, poll_interval=60.0)
+            srv.refresh_template_sync()
+            tcp_server = await asyncio.start_server(srv.handle_stratum_client, "127.0.0.1", 0)
+            port = tcp_server.sockets[0].getsockname()[1]
+            addr_a = "ns1" + ("a" * 71)
+            addr_b = "ns1" + ("b" * 71)
+            try:
+                r_a, w_a = await asyncio.open_connection("127.0.0.1", port)
+                r_b, w_b = await asyncio.open_connection("127.0.0.1", port)
+
+                async def send(w, obj):
+                    w.write((json.dumps(obj) + "\n").encode("utf-8"))
+                    await w.drain()
+
+                async def recv(r):
+                    line = await asyncio.wait_for(r.readline(), timeout=5.0)
+                    return json.loads(line.decode("utf-8"))
+
+                await send(w_a, {"id": 1, "method": "mining.subscribe", "params": ["minerA"]})
+                sub_a = await recv(r_a)
+                en1_a = sub_a["result"][1]
+                await send(w_a, {"id": 2, "method": "mining.authorize", "params": [f"{addr_a}.rigA", "x"]})
+                _ = await recv(r_a)
+                _ = await recv(r_a)
+                notify_a = await recv(r_a)
+
+                await send(w_b, {"id": 1, "method": "mining.subscribe", "params": ["minerB"]})
+                _ = await recv(r_b)
+                await send(w_b, {"id": 2, "method": "mining.authorize", "params": [f"{addr_b}.rigB", "x"]})
+                _ = await recv(r_b)
+                _ = await recv(r_b)
+                _ = await recv(r_b)
+
+                job_id, prevhash, coinb1_hex, coinb2_hex, branch_hex, ver_hex, nbits_hex, ntime_hex, _ = notify_a["params"]
+                en2_hex = "00" * (sa.EXTRANONCE2_SIZE - 1) + "01"
+                coinbase = bytes.fromhex(coinb1_hex + en1_a + en2_hex + coinb2_hex)
+                merkle_root = sa.fold_merkle_root(sa.sha256d(coinbase), [bytes.fromhex(h) for h in branch_hex])
+                prev_internal = sa.stratum_prevhash_to_internal(prevhash)
+                ver_u32, nbits_u32, ntime_u32 = int(ver_hex, 16), int(nbits_hex, 16), int(ntime_hex, 16)
+
+                found_nonce = None
+                for nonce in range(100_000):
+                    hdr = struct.pack("<I", ver_u32) + prev_internal + merkle_root + struct.pack("<III", ntime_u32, nbits_u32, nonce)
+                    if int.from_bytes(sa.sha256d(hdr), "little") <= easy_target_int:
+                        found_nonce = nonce
+                        break
+                self.assertIsNotNone(found_nonce)
+
+                await send(w_a, {"id": 3, "method": "mining.submit", "params": [f"{addr_a}.rigA", job_id, en2_hex, ntime_hex, f"{found_nonce:08x}"]})
+                # Worker B MUST immediately receive clean_jobs=True for height 2 (possibly preceded by set_difficulty)!
+                b_notify = None
+                for _ in range(3):
+                    msg = await recv(r_b)
+                    if msg.get("method") == "mining.notify":
+                        b_notify = msg
+                        break
+                self.assertIsNotNone(b_notify)
+                self.assertTrue(b_notify["params"][8], "Other payout workers must immediately receive clean_jobs=True on block win")
+
+                w_a.close()
+                w_b.close()
+                await w_a.wait_closed()
+                await w_b.wait_closed()
+            finally:
+                tcp_server.close()
+                await tcp_server.wait_closed()
+
+        asyncio.run(run_multi())
+
 
 if __name__ == "__main__":
     unittest.main()

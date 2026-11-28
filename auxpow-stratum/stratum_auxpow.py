@@ -1014,11 +1014,15 @@ class AuxPowStratumServer:
                         f"hash={job.aux_hash[:16]}... worker={worker}",
                         flush=True,
                     )
-                    # Immediately fetch next template for workers
-                    pkey = client.get("payout_address")
-                    new_job = await asyncio.to_thread(self.refresh_template_sync, pkey)
-                    if new_job is not None:
-                        await self._broadcast_job(new_job, clean_jobs=True, payout_filter=pkey)
+                    # Immediately refresh & broadcast new tip to ALL active payout keys
+                    # so every connected miner pivots off the solved height with zero wasted hashes.
+                    active_pkeys = {None, client.get("payout_address")} | {
+                        c.get("payout_address") for c in self.clients.values() if c.get("subscribed")
+                    }
+                    for pkey in active_pkeys:
+                        new_job = await asyncio.to_thread(self.refresh_template_sync, pkey)
+                        if new_job is not None:
+                            await self._broadcast_job(new_job, clean_jobs=True, payout_filter=pkey)
                 else:
                     print(
                         f"[auxpow-stratum] Newsatoshi node rejected aux block {job.aux_hash[:16]}...",

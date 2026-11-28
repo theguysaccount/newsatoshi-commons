@@ -113,7 +113,7 @@ struct L1LockListResponse {
     locks: Vec<L1LockRecord>,
 }
 
-/// Verified Newsatoshi Mainnet v2 (nsM2, v1.2.1) genesis metadata (dynamically refreshed when live mainnet status responds).
+/// Verified Newsatoshi Mainnet v2 (nsM2, v1.2.5) genesis metadata (dynamically refreshed when live mainnet status responds).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MainnetInfo {
     pub network: String,
@@ -134,13 +134,13 @@ impl MainnetInfo {
             auxpow_chainid: AUXPOW_CHAIN_ID,
             block_reward_love: MAINNET_BLOCK_REWARD_LOVE,
             p2p_port: MAINNET_P2P_PORT,
-            note: "Newsatoshi v1.2.0 Mainnet v2 (nsM2) canonical genesis anchored to Bitcoin #977,738 (50 LOVE/block, AuxPoW chainid 20051, bits 1d00ffff, zero premine; seeds do not self-mine).".to_string(),
+            note: "Newsatoshi v1.2.5 Mainnet v2 (nsM2) canonical genesis anchored to Bitcoin #977,738 (50 LOVE/block, AuxPoW chainid 20051, bits 1d00ffff, zero premine; seeds do not self-mine).".to_string(),
         }
     }
 
     pub fn from_live_status(s: &SeedStatus) -> Self {
         let note = if s.height == 0 {
-            "Live Newsatoshi v1.2.0 Mainnet v2 (nsM2) online at canonical Bitcoin #977,738 genesis height 0 (zero premine; awaiting external SHA-256 / Bitcoin AuxPoW miners on chainid 20051).".to_string()
+            "Live Newsatoshi v1.2.5 Mainnet v2 (nsM2) online at canonical Bitcoin #977,738 genesis (zero premine; AuxPoW chainid 20051).".to_string()
         } else {
             format!(
                 "Live Newsatoshi v{} Mainnet v2 active at height #{} (AuxPoW chainid {}, {} peers, {} locks).",

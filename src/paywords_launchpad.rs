@@ -23,6 +23,12 @@ pub const BASE_PAYWORD_CLAIM_PROOF_TX: &str =
     "0x122885e1b36aa5b8a62f97f4b4bfb3b235bdebe0055a8cd3a4ed7c52393a5356";
 pub const BASE_PAYWORD_CLOSE_PROOF_TX: &str =
     "0x3a826c82fdaffdbbdb8049db7793a342524e3a74742c9504ef8baad1380c4c0d";
+pub const BASE_PAYWORD_1000_APPROVE_PROOF_TX: &str =
+    "0x74f3b4115f021df288ca04c42eef2a326dfdb38992fd2e73cbc25dc35232eb3e";
+pub const BASE_PAYWORD_1000_OPEN_PROOF_TX: &str =
+    "0x0d975a2b3310473d55d0e7d9e7b77c0174f4098fabbd3ae5e5512ec36de6f216";
+pub const BASE_PAYWORD_1000_CLAIM_PROOF_TX: &str =
+    "0xb79a3c01a8edc0bbc0b25714b2a1b7852c0035be2a083c26da81ef31620f6256";
 pub const BASE_CURVE_CREATE_PROOF_TX: &str =
     "0x8da0c06753664c52df3c2e61227035f38fc78b98c11650791b26f5d246308c83";
 pub const BASE_CURVE_BUY_PROOF_TX: &str =
@@ -78,10 +84,10 @@ pub fn estimate_paywords_cost_savings(
     };
 
     // Newsatoshi O(1) SHA-256 PayWords settled via NewsatoshiPayWordChannel on Base Mainnet:
-    // Empirically measured execution gas on Base: ~65,000 fixed + ~720 gas per SHA-256 step
-    // (live BaseScan claim(7) = 96,449 gas; Foundry claim(1000) = 783,140 gas).
-    // One-time channel open (~115,000 gas) + Base variable L1 data fee (~<$0.002/tx) are also reported explicitly.
-    let gas_per_claim: u64 = 65_000 + 720 * batch;
+    // Empirically measured execution gas on Base Mainnet: ~65,000 fixed + ~706 gas per SHA-256 step
+    // (live BaseScan claim(7) = 96,449 gas; live BaseScan claim(1000) = 770,956 gas @ 0.006 gwei = $0.0077 incl. L1 fee).
+    // Calculator prices stress gas conservatively at 0.01 gwei / $2,500 ETH + $0.001 L1 data fee.
+    let gas_per_claim: u64 = 65_000 + 706 * batch;
     let eth_price_usd = 2_500.0_f64;
     let base_gas_gwei = 0.01_f64;
     let usd_per_settlement_tx = (gas_per_claim as f64) * (base_gas_gwei * 1e-9) * eth_price_usd;
@@ -174,6 +180,13 @@ pub fn estimate_paywords_cost_savings(
             "chain": "base (eip155:8453)",
             "contract": BASE_PAYWORD_CHANNEL_ADDRESS,
             "sourcify_exact_match": format!("https://repo.sourcify.dev/8453/{BASE_PAYWORD_CHANNEL_ADDRESS}"),
+            "claim_1000_approve_tx": BASE_PAYWORD_1000_APPROVE_PROOF_TX,
+            "claim_1000_open_channel_tx": BASE_PAYWORD_1000_OPEN_PROOF_TX,
+            "claim_1000_steps_tx": BASE_PAYWORD_1000_CLAIM_PROOF_TX,
+            "claim_1000_steps_gas_used": 770956,
+            "claim_1000_measured_recurring_usd_incl_l1_fee": 0.007709,
+            "claim_1000_measured_full_lifecycle_usd_incl_l1_fee": 0.010418,
+            "claim_1000_vs_batched_1usd_stripe_savings_pct": "96.8%–97.7%",
             "open_channel_tx": BASE_PAYWORD_OPEN_PROOF_TX,
             "claim_7_steps_tx": BASE_PAYWORD_CLAIM_PROOF_TX,
             "claim_7_steps_gas_used": 96449,

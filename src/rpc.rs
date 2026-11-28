@@ -11,7 +11,7 @@ pub const OP_VERIFY_COVENANT_STARK_HEX: &str = "b4";
 /// Placeholder shielded Newsatoshi address template for copy-pasteable L1 CLI commands.
 pub const DEFAULT_ANCHOR_ADDRESS_PLACEHOLDER: &str = "<COMMONS_NS1_ADDRESS>";
 
-/// Builds ready-to-run real `newsatoshi` v1.2.1 CLI commands for anchoring `anchor_hash` on L1.
+/// Builds ready-to-run real `newsatoshi` v1.2.5 CLI commands for anchoring `anchor_hash` on L1.
 pub fn format_newsatoshi_cli_commands(network: &str, anchor_hash: &str) -> (String, String) {
     let net_flag = if network == "mainnet" {
         String::new()
