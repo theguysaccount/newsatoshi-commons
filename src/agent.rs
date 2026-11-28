@@ -887,7 +887,11 @@ pub fn render_mcp_server_card_json(base_url: &str) -> Value {
             "newsatoshi_compile_reserve_price_rfq",
             "newsatoshi_get_paid_api_catalog",
             "newsatoshi_simulate_sovereign_factory",
-            "newsatoshi_simulate_proof_of_order_vault"
+            "newsatoshi_simulate_proof_of_order_vault",
+            "newsatoshi_compile_erc7683_intent",
+            "newsatoshi_compile_universal_htlc",
+            "newsatoshi_compile_iso20022_stablecoin_bridge",
+            "newsatoshi_simulate_universal_interop"
         ],
         "resources": [
             "newsatoshi://llms.txt",
@@ -967,7 +971,7 @@ pub fn render_llms_txt(base_url: &str, state: &ApiStateView, seed: &SeedSnapshot
 - Commons Treasury Balance: `{bal} LOVE` (`nonce={nonce}`, `parcels={parcels}`, `kwh={kwh}`, `starks={starks}`)
 
 ## Agent Interfaces (Zero Auth Required for All Reads, Compilers & Verifiers)
-- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **48 live tools** (including Permissionless Branded Stablecoin & Sovereign STARK L2 Factory + Proof-of-Order Good-Deed Mining Covenant Vault simulators, live production PayWords-gated paid agent micro-API `/api/v2/paid/evm-audit-batch`, Universal Multi-Chain Payment URIs, Reserve-Price RFQ HTLC swaps, live 3-chain Base/Optimism/Arbitrum `O(1)` SHA-256 PayWordChannel + 4-chain EVM SHA-256 HTLC live RPC inspectors, cost-savings & Cloudflare/Express/FastAPI/AI-Agent setup kit, Cross-Chain Connectivity Directory, dilution-proof Fair Bonding-Curve Launchpad simulator, 60-second private `x402`/`nsUSD` paywall middleware generator, live Base USDC vault escrow verifier, `nsUSD` Dual-Tier stablecoin engine + stress suite, L2 Perfection Layer STARK batch benchmark, 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.5` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
+- [Streamable HTTP MCP Server]({base_url}/mcp): JSON-RPC 2.0 MCP endpoint (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`) with **52 live tools** (including Universal Interoperability Layer — ERC-7683 cross-chain intents, 11-rail SHA-256 atomic bridges across EVMs/Bitcoin/Lightning/Nostr/Solana/Cosmos IBC/Sui/Aptos, ISO 20022 `pacs.008` bank-to-stablecoin settlement, MCP/A2A/x402/ERC-8004/Nostr DVM agent envelopes — plus Permissionless Branded Stablecoin & Sovereign STARK L2 Factory, Proof-of-Order Good-Deed Mining Covenant Vault, live production PayWords-gated paid agent micro-API `/api/v2/paid/evm-audit-batch`, Universal Multi-Chain Payment URIs, Reserve-Price RFQ HTLC swaps, live 3-chain Base/Optimism/Arbitrum `O(1)` SHA-256 PayWordChannel + 4-chain EVM SHA-256 HTLC live RPC inspectors, cost-savings & Cloudflare/Express/FastAPI/AI-Agent setup kit, Cross-Chain Connectivity Directory, dilution-proof Fair Bonding-Curve Launchpad simulator, 60-second private `x402`/`nsUSD` paywall middleware generator, live Base USDC vault escrow verifier, `nsUSD` Dual-Tier stablecoin engine + stress suite, L2 Perfection Layer STARK batch benchmark, 5 everyday zero-API-key EVM/BTC/Lightning/Uniswap tools, `v1.2.5` Mainnet v2 cutover readiness gate, client-side mission/charter/zkTLS coordination compilers, and Bonded P2P Desk tools).
 - **Zero-Install Stdio MCP Bridge & CLI (Node 18+, Zero Dependencies):** `npx -y github:theguysaccount/newsatoshi-commons` (`inspect`, `btc-fees`, `decode-bolt11`, `quote-base`, `verify-tx`, `payword-demo`, or stdio MCP `serve`).
 - [Native LOVE PayWord & x402 v2 Discovery]({base_url}/.well-known/x402): 4 live monetized endpoints settling primarily in **native `LOVE`** (`<1ms` zero-gas SHA-256 PayWords / `PriorLock`), with Base/Arbitrum/Polygon USDC (`x402 v2`, `$0.001`) supported as outer bridge on-ramps (`POST /api/x402/evm-security-scan`, `GET /api/x402/bridge-quote`, `POST /api/x402/compile-htlc`, `POST /api/x402/verify-payword`).
 - [MCP Server Card]({base_url}/.well-known/mcp/server-card.json) & [MCP Registry Manifest]({base_url}/server.json): Standard MCP discovery cards (`org.newsatoshi.commons/newsatoshi-commons`).
@@ -1031,7 +1035,7 @@ Add to Claude Desktop, Cursor, Codex, Antigravity, or any Streamable HTTP MCP ho
   }}
 }}
 ```
-Available MCP tools (48 live tools — zero API keys required):
+Available MCP tools (52 live tools — zero API keys required):
 - `crypto_inspect_evm_contract` — Live multi-chain EVM smart contract security audit (bytecode, EIP-1967 proxy/admin slots, `owner()` admin risk, ERC-20 metadata, Sourcify v2 exact-match verification across Ethereum, Base, Arbitrum, Optimism & Polygon)
 - `crypto_bitcoin_mempool_oracle` — Live Bitcoin chain tip, recommended sat/vB fee tiers (`fastest`, `30m`, `60m`, `economy`), and mempool backlog
 - `crypto_decode_bolt11_invoice` — Pure-Rust BOLT-11 Lightning invoice decoder (network, sats/msats, payment hash, expiry, description)
@@ -1080,6 +1084,10 @@ Available MCP tools (48 live tools — zero API keys required):
 - `newsatoshi_get_paid_api_catalog` — Return live production PayWords-gated agent micro-API catalog (`/api/v2/paid/evm-audit-batch`, `$0.001` USDC per batch audit across Base/Optimism/Arbitrum) and honest live verified funded-channel telemetry
 - `newsatoshi_simulate_sovereign_factory` — Run an isolated Winterfell 0.13 STARK + unilateral Escape-Hatch simulation for launching a custom branded stablecoin (`asset_id >= 100`, 0% protocol fee) and Sovereign STARK L2 anchored to Mainnet v2 without mutating live state
 - `newsatoshi_simulate_proof_of_order_vault` — Run an isolated 4-step Proof-of-Order Good-Deed Mining Covenant Vault simulation (Bitcoin AuxPoW voluntary pledge -> honest zkTLS deed payout -> adversarial Sybil 50% challenger / 50% burn slash -> Winterfell STARK conservation proof) without mutating live vault state
+- `newsatoshi_compile_erc7683_intent` — Compile a canonical ERC-7683 `GaslessCrossChainOrder` with authentic Keccak-256 EIP-712 `domainSeparator`, `structHash`, and signing digest bound atomically to a SHA-256 `payment_hash` for zero-custody EVM <-> Newsatoshi settlement
+- `newsatoshi_compile_universal_htlc` — Compile native two-leg SHA-256 atomic bridge payloads across 11 ecosystems (`ethereum`, `base`, `optimism`, `arbitrum`, `polygon`, `bitcoin`, `lightning/nostr_zap`, `solana`, `cosmos_ibc`, `sui_move`, `aptos_move`, `newsatoshi_l1`) sharing one 32-byte SHA-256 preimage
+- `newsatoshi_compile_iso20022_stablecoin_bridge` — Compile a schema-accurate ISO 20022 `pacs.008.001.08` (FedNow / SWIFT / SEPA Instant) bank wire XML bound deterministically to an RFC-0028 regulated stablecoin (`nsUSD` or custom `asset_id >= 100`) reserve mint commitment
+- `newsatoshi_simulate_universal_interop` — Run the isolated 4-domain end-to-end Universal Interoperability sandbox (ISO 20022 bank wire -> ERC-7683 EIP-712 intent -> 11-rail SHA-256 atomic preimage verification -> Winterfell 0.13 STARK conservation + Escape-Hatch proof)
 
 Stdio MCP Bridge (for stdio-only hosts such as Claude Desktop, Cursor, Cline, or shell scripts):
 ```json
@@ -2192,6 +2200,112 @@ pub fn render_openapi_json(base_url: &str) -> Value {
                     }
                 }
             },
+            "/api/v2/interop/matrix": {
+                "get": {
+                    "operationId": "getLiveInteropMatrix",
+                    "summary": "Live 11-rail interoperability matrix probing Ethereum, Base, Optimism, Arbitrum, Polygon & Newsatoshi Mainnet v2",
+                    "description": "Probes live EVM JSON-RPC block tips in parallel alongside Newsatoshi Mainnet v2 height and lists all 11 supported interoperability rails.",
+                    "parameters": [api_ver_param.clone()],
+                    "responses": {
+                        "200": json_ok("Live interoperability matrix", "#/components/schemas/GenericApiResponse")
+                    }
+                }
+            },
+            "/api/v2/interop/erc7683-intent": {
+                "post": {
+                    "operationId": "compileErc7683Intent",
+                    "summary": "Compile canonical ERC-7683 GaslessCrossChainOrder with Keccak-256 EIP-712 digest",
+                    "description": "Generates authentic EIP-712 domainSeparator, structHash, and signing digest bound atomically to a SHA-256 NewsatoshiHtlc payment_hash.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Compiled ERC-7683 cross-chain intent", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
+            },
+            "/api/v2/interop/universal-htlc": {
+                "post": {
+                    "operationId": "compileUniversalHtlc",
+                    "summary": "Compile native two-leg SHA-256 atomic bridge payloads across 11 ecosystems",
+                    "description": "Supports Ethereum, Base, Optimism, Arbitrum, Polygon, Bitcoin BIP-199, Lightning/Nostr NIP-57, Solana PDA, Cosmos IBC CosmWasm, Sui Move, Aptos Move, and Newsatoshi L1.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Compiled universal two-leg HTLC bundle", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
+            },
+            "/api/v2/interop/iso20022-bridge": {
+                "post": {
+                    "operationId": "compileIso20022Bridge",
+                    "summary": "Compile ISO 20022 pacs.008.001.08 bank wire XML bound to RFC-0028 branded stablecoin mint",
+                    "description": "Generates schema-accurate FedNow/SWIFT/SEPA pacs.008 XML embedding deterministic SHA-256 RFC-0028 stablecoin reserve commitment.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Compiled ISO 20022 pacs.008 stablecoin bridge", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
+            },
+            "/api/v2/interop/agent-envelope": {
+                "post": {
+                    "operationId": "compileAgentInteropEnvelope",
+                    "summary": "Compile unified AI agent settlement envelope across MCP, Google A2A, x402 v2, ERC-8004, and Nostr NIP-90 DVM",
+                    "description": "Outputs one deterministic settlement and identity commitment simultaneously valid across all five AI agent protocols.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Compiled cross-protocol agent envelope", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
+            },
+            "/api/v2/interop/verify-atomic-bundle": {
+                "post": {
+                    "operationId": "verifyAtomicPreimageBundle",
+                    "summary": "Cryptographically verify SHA-256 preimage match across multi-rail HTLC legs (+ optional live EVM RPC inspection)",
+                    "description": "Verifies SHA256(preimage) == expected_payment_hash across all rails and optionally queries live NewsatoshiHtlc on Base/Optimism/Arbitrum/Polygon.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Atomic bundle verification result", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone()
+                    }
+                }
+            },
+            "/api/v2/interop/simulate": {
+                "post": {
+                    "operationId": "simulateUniversalInterop",
+                    "summary": "Run isolated 4-domain end-to-end Universal Interoperability + Winterfell 0.13 STARK sandbox",
+                    "description": "Verifies ISO 20022 bank wire -> ERC-7683 EIP-712 intent -> 11-rail SHA-256 preimage atomicity -> Winterfell STARK conservation + Escape Hatch proof with zero live mutation.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": false,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("4-domain universal interop sandbox report", "#/components/schemas/GenericApiResponse")
+                    }
+                }
+            },
             "/api/v2/base/curves": {
                 "get": {
                     "operationId": "getBaseFairCurves",
@@ -2688,6 +2802,60 @@ pub fn mcp_tools_list() -> Value {
             {
                 "name": "newsatoshi_simulate_proof_of_order_vault",
                 "description": "Run a full isolated Proof-of-Order / Good-Deed Mining Covenant Vault simulation: Bitcoin AuxPoW miner pledge -> honest zkTLS civic good-deed payout -> adversarial Sybil fake-deed 50/50 PriorLock slash & burn -> live Winterfell STARK conservation proof.",
+                "inputSchema": { "type": "object", "properties": {} }
+            },
+            {
+                "name": "newsatoshi_compile_erc7683_intent",
+                "description": "Compile a canonical ERC-7683 GaslessCrossChainOrder with authentic Keccak-256 EIP-712 domainSeparator, structHash, and signing digest bound atomically to a SHA-256 payment_hash for zero-custody EVM (Ethereum/Base/Optimism/Arbitrum/Polygon) <-> Newsatoshi settlement.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["origin_chain", "user_evm_address", "destination_ns1"],
+                    "properties": {
+                        "origin_chain": { "type": "string", "enum": ["ethereum", "base", "optimism", "arbitrum", "polygon"], "default": "base" },
+                        "user_evm_address": { "type": "string", "description": "0x-prefixed 20-byte EVM user address" },
+                        "input_token": { "type": "string", "default": "USDC" },
+                        "input_amount_units": { "type": "integer", "default": 100000000 },
+                        "output_asset": { "type": "string", "default": "LOVE" },
+                        "output_amount_sats": { "type": "integer", "default": 100000000 },
+                        "destination_ns1": { "type": "string", "description": "Recipient shielded ns1.../nsd1... address" },
+                        "payment_hash_hex": { "type": "string", "description": "Optional 64-hex SHA-256 payment hash" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_compile_universal_htlc",
+                "description": "Compile native two-leg SHA-256 atomic bridge payloads across 11 ecosystems (ethereum, base, optimism, arbitrum, polygon, bitcoin, lightning, solana, cosmos_ibc, sui_move, aptos_move, newsatoshi_l1) sharing one 32-byte SHA-256 preimage with anti-race timelock ordering.",
+                "inputSchema": {
+                    "type": "object",
+                    "required": ["source_rail", "dest_rail"],
+                    "properties": {
+                        "source_rail": { "type": "string", "default": "cosmos_ibc" },
+                        "dest_rail": { "type": "string", "default": "newsatoshi_l1" },
+                        "payment_hash_hex": { "type": "string" },
+                        "amount_display": { "type": "string", "default": "100 USDC" },
+                        "recipient": { "type": "string", "default": "ns1qrecipient00000000000000000001" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_compile_iso20022_stablecoin_bridge",
+                "description": "Compile a schema-accurate ISO 20022 pacs.008.001.08 (FedNow / SWIFT / SEPA Instant) bank wire XML deterministically bound to an RFC-0028 branded stablecoin (nsUSD or custom asset_id >= 100) reserve mint commitment.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "uetr": { "type": "string", "default": "97ed4827-7b6f-4491-a06f-b548d5a7512d" },
+                        "debtor_bic": { "type": "string", "default": "CHASUS33XXX" },
+                        "creditor_bic": { "type": "string", "default": "FRBKUS44XXX" },
+                        "currency": { "type": "string", "default": "USD" },
+                        "amount_decimal": { "type": "string", "default": "250000.00" },
+                        "stablecoin_ticker": { "type": "string", "default": "BANKUSD" },
+                        "recipient_ns1": { "type": "string", "default": "ns1qbanktreasury0000000000000000001" }
+                    }
+                }
+            },
+            {
+                "name": "newsatoshi_simulate_universal_interop",
+                "description": "Execute the isolated 4-domain end-to-end Universal Interoperability sandbox: ISO 20022 bank wire -> ERC-7683 EIP-712 intent -> 11-rail SHA-256 atomic preimage verification -> Winterfell 0.13 STARK conservation + unilateral Escape-Hatch proof.",
                 "inputSchema": { "type": "object", "properties": {} }
             },
             {
@@ -3473,6 +3641,63 @@ pub fn handle_mcp_jsonrpc(
                 "newsatoshi_simulate_proof_of_order_vault" => {
                     crate::proof_of_order::run_order_sandbox_simulation()
                 }
+                "newsatoshi_compile_erc7683_intent" => {
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(1_800_000_000);
+                    let hash_fallback = hex::encode(crate::crypto::sha256(b"newsatoshi-mcp-erc7683-hashlock"));
+                    crate::interop::compile_erc7683_intent(crate::interop::Erc7683IntentInput {
+                        origin_chain: args.get("origin_chain").and_then(|v| v.as_str()).unwrap_or("base"),
+                        user_evm_address: args.get("user_evm_address").and_then(|v| v.as_str()).unwrap_or("0x1111222233334444555566667777888899990000"),
+                        input_token: args.get("input_token").and_then(|v| v.as_str()).unwrap_or("USDC"),
+                        input_amount_units: args.get("input_amount_units").and_then(|v| v.as_u64()).unwrap_or(100_000_000) as u128,
+                        output_asset: args.get("output_asset").and_then(|v| v.as_str()).unwrap_or("LOVE"),
+                        output_amount_sats: args.get("output_amount_sats").and_then(|v| v.as_u64()).unwrap_or(100_000_000),
+                        destination_ns1: args.get("destination_ns1").and_then(|v| v.as_str()).unwrap_or("ns1qagentdestination000000000000001"),
+                        payment_hash_hex: args.get("payment_hash_hex").and_then(|v| v.as_str()).unwrap_or(&hash_fallback),
+                        nonce: args.get("nonce").and_then(|v| v.as_u64()).unwrap_or(1),
+                        open_deadline_unix: now + 1_800,
+                        fill_deadline_unix: now + 9_000,
+                    })
+                }
+                "newsatoshi_compile_universal_htlc" => {
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(1_800_000_000);
+                    let hash_fallback = hex::encode(crate::crypto::sha256(b"newsatoshi-mcp-universal-htlc"));
+                    crate::interop::compile_universal_htlc_bundle(
+                        args.get("source_rail").and_then(|v| v.as_str()).unwrap_or("cosmos_ibc"),
+                        args.get("dest_rail").and_then(|v| v.as_str()).unwrap_or("newsatoshi_l1"),
+                        args.get("payment_hash_hex").and_then(|v| v.as_str()).unwrap_or(&hash_fallback),
+                        args.get("amount_display").and_then(|v| v.as_str()).unwrap_or("100 USDC"),
+                        args.get("recipient").and_then(|v| v.as_str()).unwrap_or("ns1qrecipient00000000000000000001"),
+                        now + 14_400,
+                    )
+                }
+                "newsatoshi_compile_iso20022_stablecoin_bridge" => {
+                    crate::interop::compile_iso20022_stablecoin_bridge(crate::interop::Iso20022BridgeInput {
+                        uetr: args.get("uetr").and_then(|v| v.as_str()).unwrap_or("97ed4827-7b6f-4491-a06f-b548d5a7512d"),
+                        debtor_bic: args.get("debtor_bic").and_then(|v| v.as_str()).unwrap_or("CHASUS33XXX"),
+                        creditor_bic: args.get("creditor_bic").and_then(|v| v.as_str()).unwrap_or("FRBKUS44XXX"),
+                        currency: args.get("currency").and_then(|v| v.as_str()).unwrap_or("USD"),
+                        amount_decimal: args.get("amount_decimal").and_then(|v| v.as_str()).unwrap_or("250000.00"),
+                        stablecoin_ticker: args.get("stablecoin_ticker").and_then(|v| v.as_str()).unwrap_or("BANKUSD"),
+                        issuer_pubkey_hex: args.get("issuer_pubkey_hex").and_then(|v| v.as_str()).unwrap_or("0x1111222233334444555566667777888899990000"),
+                        recipient_ns1: args.get("recipient_ns1").and_then(|v| v.as_str()).unwrap_or("ns1qbanktreasury0000000000000000001"),
+                        viewing_key_enabled: true,
+                    })
+                }
+                "newsatoshi_simulate_universal_interop" => {
+                    let l1_h = seed_snapshot.mainnet_status.as_ref().map(|s| s.height).unwrap_or(0);
+                    let l1_tip = seed_snapshot
+                        .mainnet_status
+                        .as_ref()
+                        .map(|s| s.tip.as_str())
+                        .unwrap_or("00000000ba1cdad4aa8e82d6613b4df536394c41008fc3a0914a47a44604b9c8");
+                    crate::interop::run_universal_interop_simulation(base_url, l1_h, l1_tip)
+                }
                 "newsatoshi_generate_private_x402_middleware" => {
                     let fw = args.get("framework").and_then(|v| v.as_str()).unwrap_or("express");
                     let price = args.get("price_usd").and_then(|v| v.as_f64()).unwrap_or(0.005);
@@ -3691,6 +3916,6 @@ mod tests {
             &client,
             None,
         );
-        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 48);
+        assert_eq!(list.unwrap()["result"]["tools"].as_array().unwrap().len(), 52);
     }
 }

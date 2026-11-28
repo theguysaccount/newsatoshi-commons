@@ -2038,7 +2038,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 48);
+    assert_eq!(mcp_card["tools"].as_array().unwrap().len(), 52);
 
     let cx_dir: Value = serde_json::from_str(
         &ureq::get(&format!("{base}/api/v2/crosschain/connectivity"))
@@ -2248,7 +2248,7 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 48);
+    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 52);
 
     // Permissionless Stablecoin + Sovereign L2 Factory & Proof-of-Order Good-Deed Vault smoke tests
     let factory_state: Value = serde_json::from_str(
@@ -2306,6 +2306,59 @@ fn http_api_agent_discovery_mcp_and_http_402_payword_end_to_end() {
     assert_eq!(order_sim["ok"], true);
     assert_eq!(order_sim["sandbox"], true);
     assert_eq!(order_sim["step_4_stark_covenant_proof"]["valid"], true);
+
+    // Universal Interoperability Layer (ERC-7683, 11-Rail SHA-256 HTLC, ISO 20022 pacs.008, Agent Envelope, 4-Domain STARK Sandbox)
+    let interop_matrix: Value = serde_json::from_str(
+        &ureq::get(&format!("{base}/api/v2/interop/matrix?live=false"))
+            .call()
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(interop_matrix["ok"], true);
+    assert_eq!(interop_matrix["evm_rails"].as_array().unwrap().len(), 5);
+
+    let erc7683: Value = serde_json::from_str(
+        &ureq::post(&format!("{base}/api/v2/interop/erc7683-intent"))
+            .header("Content-Type", "application/json")
+            .send(r#"{"origin_chain":"base","user_evm_address":"0x1111222233334444555566667777888899990000","destination_ns1":"ns1qtestinterop000000000000000001"}"#)
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(erc7683["ok"], true);
+    assert_eq!(erc7683["origin_chain_id"], 8453);
+
+    let iso: Value = serde_json::from_str(
+        &ureq::post(&format!("{base}/api/v2/interop/iso20022-bridge"))
+            .header("Content-Type", "application/json")
+            .send(r#"{"stablecoin_ticker":"BANKUSD","amount_decimal":"250000.00"}"#)
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(iso["ok"], true);
+    assert_eq!(iso["roundtrip_verified"], true);
+
+    let interop_sim: Value = serde_json::from_str(
+        &ureq::post(&format!("{base}/api/v2/interop/simulate"))
+            .header("Content-Type", "application/json")
+            .send(r#"{}"#)
+            .unwrap()
+            .body_mut()
+            .read_to_string()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(interop_sim["ok"], true);
+    assert_eq!(interop_sim["sandbox"], true);
+    assert_eq!(interop_sim["domain_4_ai_agent_and_stark_finality"]["stark_valid"], true);
 
     // Honest v2 cutover readiness gate & Bonded P2P Desk smoke tests
     let cutover: Value = serde_json::from_str(

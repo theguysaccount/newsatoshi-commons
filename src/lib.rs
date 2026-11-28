@@ -6,6 +6,7 @@ pub mod crypto;
 pub mod crypto_tools;
 pub mod cutover;
 pub mod hardware;
+pub mod interop;
 pub mod l2_rollup;
 pub mod launchpad;
 pub mod nsusd;

@@ -791,6 +791,7 @@ fn handle_request(req: Request, state: &AppState) {
             | "/api/v2/evm/channel"
             | "/api/v2/evm/htlc"
             | "/api/v2/interop/payment-uri"
+            | "/api/v2/interop/matrix"
             | "/api/v2/swaps/rfq"
             | "/api/v2/paid/status"
             | "/api/v2/paid/evm-audit-batch"
@@ -1400,6 +1401,211 @@ fn handle_request(req: Request, state: &AppState) {
         (Method::Post, "/api/v2/order/simulate") => {
             match crate::proof_of_order::run_order_sandbox_simulation() {
                 Ok(report) => respond_json(req, 200, &report),
+                Err(e) => respond_json(req, 500, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Get, "/api/v2/interop/matrix") => {
+            let base_url = infer_base_url(&req);
+            let snap = state.get_seed_snapshot(false);
+            let probe_live = query_param(&raw_url, "live")
+                .map(|v| v != "false" && v != "0")
+                .unwrap_or(true);
+            let matrix = crate::interop::build_live_interop_matrix(&base_url, &snap, probe_live);
+            respond_json(req, 200, &matrix);
+        }
+        (Method::Post, "/api/v2/interop/erc7683-intent") => {
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let parsed: Value = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(_) => return respond_json(req, 400, &json!({ "ok": false, "error": "invalid json body" })),
+            };
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(1_800_000_000);
+            let open_dl = parsed
+                .get("open_deadline_unix")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(now + 1_800);
+            let fill_dl = parsed
+                .get("fill_deadline_unix")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(open_dl + 7_200);
+            let amt_units = parsed
+                .get("input_amount_units")
+                .and_then(|v| v.as_u64())
+                .map(|n| n as u128)
+                .or_else(|| {
+                    parsed
+                        .get("input_amount_units")
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| s.parse::<u128>().ok())
+                })
+                .unwrap_or(100_000_000);
+            let out_sats = parsed
+                .get("output_amount_sats")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(100_000_000);
+            let hash_fallback = hex::encode(crate::crypto::sha256(b"newsatoshi-erc7683-default-hashlock"));
+            let input = crate::interop::Erc7683IntentInput {
+                origin_chain: parsed.get("origin_chain").and_then(|v| v.as_str()).unwrap_or("base"),
+                user_evm_address: parsed
+                    .get("user_evm_address")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(""),
+                input_token: parsed.get("input_token").and_then(|v| v.as_str()).unwrap_or("USDC"),
+                input_amount_units: amt_units,
+                output_asset: parsed.get("output_asset").and_then(|v| v.as_str()).unwrap_or("LOVE"),
+                output_amount_sats: out_sats,
+                destination_ns1: parsed
+                    .get("destination_ns1")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(""),
+                payment_hash_hex: parsed
+                    .get("payment_hash_hex")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(&hash_fallback),
+                nonce: parsed.get("nonce").and_then(|v| v.as_u64()).unwrap_or(1),
+                open_deadline_unix: open_dl,
+                fill_deadline_unix: fill_dl,
+            };
+            match crate::interop::compile_erc7683_intent(input) {
+                Ok(v) => respond_json(req, 200, &v),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/v2/interop/universal-htlc") => {
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let parsed: Value = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(_) => return respond_json(req, 400, &json!({ "ok": false, "error": "invalid json body" })),
+            };
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(1_800_000_000);
+            let src = parsed.get("source_rail").and_then(|v| v.as_str()).unwrap_or("cosmos_ibc");
+            let dst = parsed.get("dest_rail").and_then(|v| v.as_str()).unwrap_or("newsatoshi_l1");
+            let hash_fallback = hex::encode(crate::crypto::sha256(b"newsatoshi-universal-htlc-default"));
+            let phash = parsed
+                .get("payment_hash_hex")
+                .and_then(|v| v.as_str())
+                .unwrap_or(&hash_fallback);
+            let amt = parsed.get("amount_display").and_then(|v| v.as_str()).unwrap_or("100 USDC");
+            let rec = parsed
+                .get("recipient")
+                .and_then(|v| v.as_str())
+                .unwrap_or("ns1qrecipient00000000000000000001");
+            let tl = parsed.get("timelock_unix").and_then(|v| v.as_u64()).unwrap_or(now + 14_400);
+            match crate::interop::compile_universal_htlc_bundle(src, dst, phash, amt, rec, tl) {
+                Ok(v) => respond_json(req, 200, &v),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/v2/interop/iso20022-bridge") => {
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let parsed: Value = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(_) => return respond_json(req, 400, &json!({ "ok": false, "error": "invalid json body" })),
+            };
+            let input = crate::interop::Iso20022BridgeInput {
+                uetr: parsed
+                    .get("uetr")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("97ed4827-7b6f-4491-a06f-b548d5a7512d"),
+                debtor_bic: parsed.get("debtor_bic").and_then(|v| v.as_str()).unwrap_or("CHASUS33XXX"),
+                creditor_bic: parsed.get("creditor_bic").and_then(|v| v.as_str()).unwrap_or("FRBKUS44XXX"),
+                currency: parsed.get("currency").and_then(|v| v.as_str()).unwrap_or("USD"),
+                amount_decimal: parsed.get("amount_decimal").and_then(|v| v.as_str()).unwrap_or("250000.00"),
+                stablecoin_ticker: parsed.get("stablecoin_ticker").and_then(|v| v.as_str()).unwrap_or("BANKUSD"),
+                issuer_pubkey_hex: parsed
+                    .get("issuer_pubkey_hex")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("0x1111222233334444555566667777888899990000"),
+                recipient_ns1: parsed
+                    .get("recipient_ns1")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("ns1qbanktreasury0000000000000000001"),
+                viewing_key_enabled: parsed
+                    .get("viewing_key_enabled")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true),
+            };
+            match crate::interop::compile_iso20022_stablecoin_bridge(input) {
+                Ok(v) => respond_json(req, 200, &v),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/v2/interop/agent-envelope") => {
+            let base_url = infer_base_url(&req);
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let parsed: Value = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(_) => return respond_json(req, 400, &json!({ "ok": false, "error": "invalid json body" })),
+            };
+            let aid = parsed.get("agent_id").and_then(|v| v.as_str()).unwrap_or("autonomous-agent-01");
+            let skill = parsed
+                .get("tool_or_skill")
+                .and_then(|v| v.as_str())
+                .unwrap_or("newsatoshi_compile_erc7683_intent");
+            let price = parsed.get("price_usd").and_then(|v| v.as_f64()).unwrap_or(0.001);
+            let rec_ns1 = parsed
+                .get("recipient_ns1")
+                .and_then(|v| v.as_str())
+                .unwrap_or("ns1qagentrecipient00000000000000001");
+            let evm = parsed
+                .get("pay_to_evm")
+                .and_then(|v| v.as_str())
+                .unwrap_or("0x1744535521EB420be9700475400455a4Ad0EBEa2");
+            match crate::interop::compile_agent_interop_envelope(&base_url, aid, skill, price, rec_ns1, evm) {
+                Ok(v) => respond_json(req, 200, &v),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/v2/interop/verify-atomic-bundle") => {
+            let body = read_body_string(&mut req).unwrap_or_default();
+            let parsed: Value = match serde_json::from_str(&body) {
+                Ok(v) => v,
+                Err(_) => return respond_json(req, 400, &json!({ "ok": false, "error": "invalid json body" })),
+            };
+            let preimage = parsed.get("preimage_hex").and_then(|v| v.as_str()).unwrap_or("");
+            let expected = parsed
+                .get("expected_payment_hash_hex")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let rails: Vec<String> = parsed
+                .get("rails")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|x| x.as_str().map(str::to_string))
+                        .collect()
+                })
+                .unwrap_or_default();
+            let evm_chain = parsed.get("evm_chain").and_then(|v| v.as_str());
+            let evm_swap_id = parsed.get("evm_swap_id").and_then(|v| v.as_str());
+            match crate::interop::verify_atomic_preimage_bundle(
+                preimage,
+                expected,
+                &rails,
+                evm_chain,
+                evm_swap_id,
+            ) {
+                Ok(v) => respond_json(req, 200, &v),
+                Err(e) => respond_json(req, 400, &json!({ "ok": false, "error": e })),
+            }
+        }
+        (Method::Post, "/api/v2/interop/simulate") => {
+            let base_url = infer_base_url(&req);
+            let snap = state.get_seed_snapshot(false);
+            let l1_h = snap.mainnet_status.as_ref().map(|m| m.height).unwrap_or(0);
+            let l1_tip = snap
+                .mainnet_status
+                .as_ref()
+                .map(|m| m.tip.as_str())
+                .unwrap_or("00000000ba1cdad4aa8e82d6613b4df536394c41008fc3a0914a47a44604b9c8");
+            match crate::interop::run_universal_interop_simulation(&base_url, l1_h, l1_tip) {
+                Ok(v) => respond_json(req, 200, &v),
                 Err(e) => respond_json(req, 500, &json!({ "ok": false, "error": e })),
             }
         }
