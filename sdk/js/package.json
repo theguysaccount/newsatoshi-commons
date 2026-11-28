@@ -1,7 +1,7 @@
 {
   "name": "@newsatoshi/402",
-  "version": "0.35.0",
-  "description": "Zero-dependency multi-chain HTTP 402 PayWord SDK (Base, Optimism, Arbitrum + Newsatoshi L1), 1-line AI Agent createAutoPayFetch, Universal Payment URIs, stdio MCP bridge, and zero-API-key crypto tools.",
+  "version": "0.36.0",
+  "description": "Zero-dependency multi-chain HTTP 402 PayWord SDK (Base, Optimism, Arbitrum + Newsatoshi L1), 10-second zero-code PayWords reverse proxy (newsatoshi-paywall), 1-line AI Agent createAutoPayFetch, Universal Payment URIs, and stdio MCP bridge.",
   "type": "module",
   "main": "./newsatoshi-402.mjs",
   "types": "./newsatoshi-402.d.ts",
@@ -13,10 +13,11 @@
   },
   "bin": {
     "newsatoshi-mcp": "./bin/newsatoshi-mcp.mjs",
-    "newsatoshi-402": "./bin/newsatoshi-mcp.mjs"
+    "newsatoshi-402": "./bin/newsatoshi-mcp.mjs",
+    "newsatoshi-paywall": "./bin/newsatoshi-paywall.mjs"
   },
   "scripts": {
-    "test": "node --test test_newsatoshi_402.mjs"
+    "test": "node --test test_newsatoshi_402.mjs test_newsatoshi_paywall.mjs"
   },
   "keywords": [
     "newsatoshi",

@@ -97,6 +97,8 @@ struct CachedBacking {
 struct AppState {
     engine: Mutex<CommonsEngine>,
     state_file: PathBuf,
+    nsusd_engine: Mutex<crate::nsusd::NsUsdEngine>,
+    nsusd_state_file: PathBuf,
     seed_client: SeedStatusClient,
     mainnet_seed_client: Option<SeedStatusClient>,
     seed_cache: Mutex<Option<CachedSeed>>,
@@ -107,6 +109,25 @@ struct AppState {
     external_public_keys: Option<ExternalPublicKeysConfig>,
     ops_hub: OpsHubManager,
     started_at: Instant,
+}
+
+fn load_nsusd_state(path: &Path) -> crate::nsusd::NsUsdEngine {
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str::<crate::nsusd::NsUsdEngine>(&s).ok())
+        .unwrap_or_default()
+}
+
+fn save_nsusd_state(path: &Path, engine: &crate::nsusd::NsUsdEngine) {
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    if let Ok(json_str) = serde_json::to_string_pretty(engine) {
+        let tmp = path.with_extension("json.tmp");
+        if fs::write(&tmp, json_str).is_ok() {
+            let _ = fs::rename(&tmp, path);
+        }
+    }
 }
 
 impl AppState {
@@ -221,9 +242,13 @@ pub fn spawn_server(config: ServerConfig) -> Result<RunningServer, String> {
         .map(|u| SeedStatusClient::new(u, Duration::from_secs(5)));
     let verify_only = engine.verify_only || config.verify_only;
     let ops_hub = OpsHubManager::init(&config.state_file);
+    let nsusd_state_file = config.state_file.with_file_name("nsusd-ledger.json");
+    let nsusd_engine = load_nsusd_state(&nsusd_state_file);
     let state = Arc::new(AppState {
         engine: Mutex::new(engine),
         state_file: config.state_file,
+        nsusd_engine: Mutex::new(nsusd_engine),
+        nsusd_state_file,
         seed_client: SeedStatusClient::new(config.seed_url, Duration::from_secs(5)),
         mainnet_seed_client,
         seed_cache: Mutex::new(None),
@@ -319,9 +344,13 @@ pub fn run_server_blocking(config: ServerConfig) -> Result<(), String> {
         .map(|u| SeedStatusClient::new(u, Duration::from_secs(5)));
     let verify_only = engine.verify_only || config.verify_only;
     let ops_hub = OpsHubManager::init(&config.state_file);
+    let nsusd_state_file = config.state_file.with_file_name("nsusd-ledger.json");
+    let nsusd_engine = load_nsusd_state(&nsusd_state_file);
     let state = Arc::new(AppState {
         engine: Mutex::new(engine),
         state_file: config.state_file,
+        nsusd_engine: Mutex::new(nsusd_engine),
+        nsusd_state_file,
         seed_client: SeedStatusClient::new(config.seed_url, Duration::from_secs(5)),
         mainnet_seed_client,
         seed_cache: Mutex::new(None),
@@ -844,7 +873,28 @@ fn handle_request(req: Request, state: &AppState) {
                 .duration_since(UNIX_EPOCH)
                 .map(|d| d.as_secs())
                 .unwrap_or(0);
-            let eng = crate::nsusd::NsUsdEngine::new();
+            let (eng_summary, verified_escrows) = {
+                let eng = state
+                    .nsusd_engine
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner());
+                let escrows: Vec<Value> = eng
+                    .bridged_escrows
+                    .values()
+                    .map(|r| {
+                        json!({
+                            "tx_hash": r.receipt_id,
+                            "asset_id": r.asset_id as u32,
+                            "backing_token": r.backing_token,
+                            "chain": r.chain,
+                            "amount_micro": r.amount_micro,
+                            "amount_formatted": format!("{:.6}", (r.amount_micro as f64) / 1_000_000.0),
+                            "basescan_url": format!("https://basescan.org/tx/{}", r.receipt_id)
+                        })
+                    })
+                    .collect();
+                (eng.summary_json(now_unix), escrows)
+            };
             let seed = state.get_seed_snapshot(false);
             let backing = state.get_backing_summary(false);
             respond_json(
@@ -852,8 +902,9 @@ fn handle_request(req: Request, state: &AppState) {
                 200,
                 &json!({
                     "ok": true,
-                    "honest_initial_state": true,
-                    "engine": eng.summary_json(now_unix),
+                    "honest_initial_state": verified_escrows.is_empty(),
+                    "engine": eng_summary,
+                    "verified_nsusd_b_escrows": verified_escrows,
                     "live_mainnet_v2": {
                         "height": seed.mainnet_status.as_ref().map(|s| s.height),
                         "difficulty": seed.mainnet_status.as_ref().map(|s| s.difficulty),
@@ -904,7 +955,52 @@ fn handle_request(req: Request, state: &AppState) {
                 );
             } else {
                 match crate::backing::verify_base_usdc_escrow_tx(tx_hash) {
-                    Ok(receipt) => respond_json(req, 200, &receipt),
+                    Ok(mut receipt) => {
+                        let norm_tx = receipt
+                            .get("tx_hash")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let usdc_micro = receipt
+                            .get("verified_usdc_micro")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0);
+                        let (newly_recorded, total_escrowed, escrow_count, solvency_root_hex) = {
+                            let mut eng = state
+                                .nsusd_engine
+                                .lock()
+                                .unwrap_or_else(|e| e.into_inner());
+                            let rec_ok = if !norm_tx.is_empty() && usdc_micro > 0 {
+                                match eng.record_bridged_nsusd_b(&norm_tx, "USDC", "base", usdc_micro) {
+                                    Ok(_) => {
+                                        save_nsusd_state(&state.nsusd_state_file, &eng);
+                                        true
+                                    }
+                                    Err(_) => false, // already recorded idempotently
+                                }
+                            } else {
+                                false
+                            };
+                            (
+                                rec_ok,
+                                eng.total_bridged_nsusd_b_micro,
+                                eng.bridged_escrows.len(),
+                                hex::encode(eng.solvency_root()),
+                            )
+                        };
+                        if let Some(obj) = receipt.as_object_mut() {
+                            obj.insert("recorded_in_live_ledger".to_string(), json!(newly_recorded));
+                            obj.insert("already_recorded".to_string(), json!(!newly_recorded));
+                            obj.insert("live_nsusd_b_total_micro".to_string(), json!(total_escrowed));
+                            obj.insert(
+                                "live_nsusd_b_total_formatted".to_string(),
+                                json!(format!("{:.6}", (total_escrowed as f64) / 1_000_000.0)),
+                            );
+                            obj.insert("live_nsusd_b_escrow_count".to_string(), json!(escrow_count));
+                            obj.insert("solvency_root_hex".to_string(), json!(solvency_root_hex));
+                        }
+                        respond_json(req, 200, &receipt);
+                    }
                     Err(e) => respond_json(req, 422, &json!({ "ok": false, "error": e })),
                 }
             }

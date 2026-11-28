@@ -1,15 +1,17 @@
-# `newsatoshi-commons` — Multi-Chain `O(1)` SHA-256 PayWords, Atomic Swaps & Post-Quantum L2 Gateway (`v0.35.0`)
+# `newsatoshi-commons` — Multi-Chain `O(1)` SHA-256 PayWords, 10-Sec Zero-Code Paywall Proxy, Atomic Swaps & Post-Quantum L2 Gateway (`v0.36.0`)
 
 [![CI](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml/badge.svg)](https://github.com/theguysaccount/newsatoshi-commons/actions/workflows/ci.yml)
 [![Mainnet v2](https://img.shields.io/badge/Mainnet%20v2-LIVE%20%C2%B7%20v1.2.5%20%C2%B7%20BTC%20%23977%2C738-10b981)](https://newsatoshi.org)
 [![MCP](https://img.shields.io/badge/MCP-46%20Zero--Auth%20Tools-38bdf8)](https://commons.newsatoshi.org/mcp)
+[![Glama MCP](https://glama.ai/mcp/connectors/org.newsatoshi.commons/newsatoshi-commons/badges/score.svg)](https://glama.ai/mcp/connectors/org.newsatoshi.commons/newsatoshi-commons)
 [![PayWords](https://img.shields.io/badge/PayWords-Base%20%C2%B7%20Optimism%20%C2%B7%20Arbitrum%20(0%25%20Fee)-f59e0b)](https://newsatoshi.org/paywords/)
 [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-amber)](LICENSE)
 
 **Zero-custody, zero-protocol-fee cross-chain payment & settlement infrastructure for autonomous AI agents, metered APIs, Bitcoin merge-miners, and post-quantum Newsatoshi (`LOVE`) Mainnet v2.**
 
-- **Cross-Chain Connectivity Hub:** [newsatoshi.org/connect](https://newsatoshi.org/connect/) · **PayWords Studio:** [newsatoshi.org/paywords](https://newsatoshi.org/paywords/) · **Fair Launchpad:** [newsatoshi.org/launchpad](https://newsatoshi.org/launchpad/)
-- **Live Verify-Only Gateway (0 Server Private Keys):** [commons.newsatoshi.org](https://commons.newsatoshi.org) · **Official MCP Registry:** `org.newsatoshi.commons/newsatoshi-commons` (`46` zero-auth tools)
+- **Cross-Chain Connectivity Hub:** [newsatoshi.org/connect](https://newsatoshi.org/connect/) · **PayWords Studio:** [newsatoshi.org/paywords](https://newsatoshi.org/paywords/) · **Fair Launchpad:** [newsatoshi.org/launchpad](https://newsatoshi.org/launchpad/) · **nsUSD:** [newsatoshi.org/nsusd](https://newsatoshi.org/nsusd/)
+- **Live Verify-Only Gateway (0 Server Private Keys):** [commons.newsatoshi.org](https://commons.newsatoshi.org) · **Official MCP Registry:** `org.newsatoshi.commons/newsatoshi-commons` (`46` zero-auth tools) · **Glama Directory:** [glama.ai/mcp/servers](https://glama.ai/mcp/servers)
+- **Install AI Agent Skills (Claude Code / Cursor / Codex / Antigravity):** `npx skills add theguysaccount/newsatoshi-commons`
 - **Wire Protocol Spec (`x402#4494`):** [docs/X402-BATCH-SETTLEMENT-PAYWORDS-SPEC.md](docs/X402-BATCH-SETTLEMENT-PAYWORDS-SPEC.md)
 - **External Security Audit Scope & Reproduction Brief:** [docs/EXTERNAL_AUDIT_BRIEF.md](docs/EXTERNAL_AUDIT_BRIEF.md)
 - **Layer-1 Consensus Repo (`v1.2.5`):** [theguysaccount/newsatoshi-rfc0021](https://github.com/theguysaccount/newsatoshi-rfc0021) (Pure FIPS SHA-2/384 Winterfell STARKs + FIPS 205 SLH-DSA + `9,349`-line Lean 4.36.0 zero-sorry AIR proof)
@@ -48,7 +50,18 @@ npx -y github:theguysaccount/newsatoshi-commons inspect-channel 0x91fbe151d270ed
 npx -y github:theguysaccount/newsatoshi-commons pay-uri 0x1744535521EB420be9700475400455a4Ad0EBEa2 10 --rail all
 ```
 
-### 2. Install Zero-Dependency AI Agent Auto-Pay SDKs (JS/TypeScript + Python)
+### 2. Monetize ANY Existing API, LLM Server, or MCP Server in 10 Seconds (Zero Code Edits)
+Put `newsatoshi-paywall` in front of any HTTP server — live Base/Optimism/Arbitrum channel verification, microsecond `O(1)` SHA-256 verification, restart-safe replay guard, and ready-to-run `claim()` + optional `FairCurvePool.injectRevenue()` commands:
+```bash
+npx --yes -p github:theguysaccount/newsatoshi-commons newsatoshi-paywall \
+  --upstream http://127.0.0.1:8000 \
+  --pay-to 0xYOUR_EVM_ADDRESS \
+  --chain base \
+  --price-usdc 0.001 \
+  --port 4020
+```
+
+### 3. Install Zero-Dependency AI Agent Auto-Pay SDKs (JS/TypeScript + Python)
 ```bash
 # JavaScript / TypeScript (includes full TypeScript newsatoshi-402.d.ts definitions)
 npm install github:theguysaccount/newsatoshi-commons
@@ -69,18 +82,19 @@ const res = await payFetch("https://commons.newsatoshi.org/api/v2/paywords/try-4
   - `POST https://commons.newsatoshi.org/api/v2/paid/defi-quote-bundle`
   - Live telemetry: `GET https://commons.newsatoshi.org/api/v2/paid/status` · Discovery: `GET https://commons.newsatoshi.org/.well-known/x402`
 
-### 3. Dual-Mine Bitcoin + Mainnet v2 `LOVE` (`AuxPoW chainid=20051`, `$0` Extra Electricity)
+### 4. Dual-Mine Bitcoin + Mainnet v2 `LOVE` (`AuxPoW chainid=20051`, `$0` Extra Electricity)
 - **0%-Fee Solo Pool (Bitaxe / Antminer / WhatsMiner / MRR):** `stratum+tcp://pool.newsatoshi.org:3333` (`<74char_ns1_address>.rig1`, pass `x` or `d=65536`/`d=524288`)
 - **1-Click Umbrel Community App Store:** `https://github.com/theguysaccount/newsatoshi-umbrel-store`
+- **Prebuilt Multi-Arch GHCR Docker Images (`linux/amd64` + `linux/arm64`):** `ghcr.io/theguysaccount/newsatoshi-node:v1.2.5` · `ghcr.io/theguysaccount/newsatoshi-auxpow-stratum:v1.2.5`
 - **1-Command Docker / Start9 / Public Pool / CKPool Dual Merge-Mining Kits:** [`auxpow-stratum/`](auxpow-stratum/) (`docker-compose.merge-mine.yml`, `umbrel/`, `start9/`, `public-pool-bridge/`, `ckpool-sidecar.env.example`).
 
 ---
 
-## Build & Verify All 81 Automated Tests Locally
+## Build & Verify All 82 Automated Tests Locally
 
 ```bash
 cargo test && cargo clippy --all-targets -- -D warnings       # 52 Rust unit + integration tests
-node --test sdk/js/test_newsatoshi_402.mjs                    # 9 JS SDK tests (incl. 1M-tick benchmark)
+npm test                                                      # 10 JS SDK + newsatoshi-paywall proxy tests
 python3 -m unittest discover -s sdk/python -p "test_*.py"     # 9 Python SDK tests
 python3 -m unittest discover -s auxpow-stratum -p "test_*.py" # 11 Stratum AuxPoW ASIC tests
 ```

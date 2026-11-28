@@ -1,7 +1,7 @@
 {
   "name": "newsatoshi-mcp",
-  "version": "0.35.0",
-  "description": "Zero-dependency MCP stdio bridge (45 tools), multi-chain Base/Optimism/Arbitrum O(1) SHA-256 PayWords AI Agent Auto-Pay SDK, Universal Payment URI compiler, and post-quantum Newsatoshi (LOVE) cross-chain toolkit.",
+  "version": "0.36.0",
+  "description": "Zero-dependency MCP stdio bridge (46 tools), 10-second zero-code PayWords HTTP 402 reverse proxy (newsatoshi-paywall), multi-chain Base/Optimism/Arbitrum O(1) SHA-256 PayWords AI Agent Auto-Pay SDK, Universal Payment URI compiler, and post-quantum Newsatoshi (LOVE) toolkit.",
   "type": "module",
   "main": "./sdk/js/newsatoshi-402.mjs",
   "types": "./sdk/js/newsatoshi-402.d.ts",
@@ -13,7 +13,8 @@
   },
   "bin": {
     "newsatoshi-mcp": "./sdk/js/bin/newsatoshi-mcp.mjs",
-    "newsatoshi-402": "./sdk/js/bin/newsatoshi-mcp.mjs"
+    "newsatoshi-402": "./sdk/js/bin/newsatoshi-mcp.mjs",
+    "newsatoshi-paywall": "./sdk/js/bin/newsatoshi-paywall.mjs"
   },
   "files": [
     "sdk/js/**",
@@ -21,7 +22,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node --test sdk/js/test_newsatoshi_402.mjs"
+    "test": "node --test sdk/js/test_newsatoshi_402.mjs sdk/js/test_newsatoshi_paywall.mjs"
   },
   "keywords": [
     "mcp",

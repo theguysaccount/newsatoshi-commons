@@ -2014,6 +2014,53 @@ pub fn render_openapi_json(base_url: &str) -> Value {
                     }
                 }
             },
+            "/api/v2/nsusd/verify-base-escrow": {
+                "post": {
+                    "operationId": "verifyBaseNsUsdEscrow",
+                    "summary": "Verify a live Base Mainnet USDC deposit to NewsatoshiBackingVault and record an RFC-0028 nsUSD-B escrow receipt",
+                    "description": "Fetches the live Base Mainnet transaction receipt, verifies ERC-20 USDC Transfer into immutable ownerless NewsatoshiBackingVault (0x37Ed94525DBE408fA72cDd156409875666679265), idempotently records asset_id=2 nsUSD-B escrow accounting, and returns a deterministic SHA-256 commitment receipt.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Verified & recorded nsUSD-B escrow receipt", "#/components/schemas/GenericApiResponse"),
+                        "400": err_ref.clone(),
+                        "422": err_ref.clone()
+                    }
+                }
+            },
+            "/api/v2/nsusd/simulate-stress": {
+                "post": {
+                    "operationId": "simulateNsUsdStress",
+                    "summary": "Run the 4-scenario Rust adversarial -50% BTC crash stress suite (isolated sandbox)",
+                    "description": "Tests flash-crash liquidation conservation, $1.00 redemption floor, 50/50 PriorLock oracle slashing, and stale-oracle circuit breakers with zero live state mutation.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": false,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("Adversarial stress suite report", "#/components/schemas/GenericApiResponse")
+                    }
+                }
+            },
+            "/api/v2/l2/benchmark": {
+                "post": {
+                    "operationId": "benchmarkL2PerfectionBatch",
+                    "summary": "Run live Winterfell STARK L2 rollup + PayWord batch conservation benchmark",
+                    "description": "Executes live-measured SHA-256 PayWord + nsUSD transfers in an isolated sandbox and proves conservation with Winterfell 0.13 STARK.",
+                    "parameters": [api_ver_param.clone()],
+                    "requestBody": {
+                        "required": false,
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericApiResponse" } } }
+                    },
+                    "responses": {
+                        "200": json_ok("L2 STARK benchmark report", "#/components/schemas/GenericApiResponse")
+                    }
+                }
+            },
             "/api/v2/l2/status": {
                 "get": {
                     "operationId": "getL2Status",

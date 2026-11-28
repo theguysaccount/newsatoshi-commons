@@ -3,11 +3,12 @@ name: newsatoshi-agent-payments
 description: Use when an AI agent needs multi-chain O(1) SHA-256 PayWord HTTP 402 micropayments (Base, Optimism, Arbitrum — 0% protocol fee), trustless cross-chain atomic swaps into post-quantum Newsatoshi (LOVE) from BTC/Lightning/Solana/Base/Optimism/Arbitrum/Polygon, Bitcoin AuxPoW merge-mining setup, or zero-API-key EVM security audits, Bitcoin mempool fees, Lightning BOLT-11 decoding, and Base Uniswap V3 quotes.
 ---
 
-# Newsatoshi Commons — Multi-Chain PayWords, Atomic Swaps & Zero-API-Key Crypto MCP (`v0.35.0`)
+# Newsatoshi Commons — Multi-Chain PayWords, 10-Sec Zero-Code Paywall Proxy, Atomic Swaps & Crypto MCP (`v0.36.0`)
 
 ## When to use this skill
 
-Connect to `https://commons.newsatoshi.org/mcp` (46 zero-auth tools) or install directly (`npm i github:theguysaccount/newsatoshi-commons` / `pip install "git+https://github.com/theguysaccount/newsatoshi-commons.git#subdirectory=sdk/python"`) whenever an AI agent or developer needs:
+Install this skill pack via `npx skills add theguysaccount/newsatoshi-commons`, connect to `https://commons.newsatoshi.org/mcp` (46 zero-auth tools), or run `npx --yes -p github:theguysaccount/newsatoshi-commons newsatoshi-paywall` whenever an AI agent or developer needs:
+- **10-Second Zero-Code HTTP 402 Paywall Reverse Proxy (`newsatoshi-paywall`):** Put in front of ANY existing REST API, Ollama/vLLM LLM endpoint, or Streamable HTTP MCP server with zero code edits (`0%` fee, live Base/OP/Arb on-chain channel funding verification, replay protection, and `/_paywall/claim-commands` + optional FairCurve `injectRevenue()` dividend piping).
 - **Lowest-cost multi-chain HTTP 402 agent billing (0% protocol fee, `$0` per-call gas):** O(1) SHA-256 PayWord hash-chains settled on live Sourcify-verified **`NewsatoshiPayWordChannel`** across **Base (`8453`: `0x971BA814Df91c20DcA3aDd870C2B55d643965C50`)**, **Optimism (`10`: `0x3DeBB6d5ae490e6cF4F966585e000028111CF106`)**, and **Arbitrum One (`42161`: `0x3DeBB6d5ae490e6cF4F966585e000028111CF106`)** — live Base Mainnet `claim(1000)` receipt verified at `$0.0077` recurring / `$0.0104` full lifecycle (`96.8%–97.7%` cheaper than a batched `$1.00` Stripe charge).
 - **1-Line Autonomous Agent Auto-Pay (`createAutoPayFetch` / `AutoPaySession`):** Automatically intercepts `HTTP 402`, pops the next O(1) SHA-256 voucher, attaches `PAYMENT-SIGNATURE` + `X-Newsatoshi-PayWord`, and retries transparently. Test live against `POST https://commons.newsatoshi.org/api/v2/paywords/try-402`.
 - **Trustless Cross-Chain Atomic Swaps into Post-Quantum `LOVE`:** Identical `SHA256(preimage) == payment_hash` invariant across **Bitcoin On-Chain (BIP-199 P2WSH)**, **Bitcoin Lightning (BOLT-11)**, **Solana PDA HTLC**, and 4-chain Sourcify-verified **`NewsatoshiHtlc`** (`0xF564A8F600B02981Bc02aC62a2B7d0C8dC638987` on Base, Optimism, Arbitrum, Polygon).
