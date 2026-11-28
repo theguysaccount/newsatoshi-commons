@@ -1,0 +1,51 @@
+name: Build & Publish Multi-Arch newsatoshi-paywall Docker Image (GHCR)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "sdk/js/bin/newsatoshi-paywall.mjs"
+      - "Dockerfile.paywall"
+      - ".github/workflows/paywall-docker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (arm64 + amd64)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push multi-arch newsatoshi-paywall (amd64 + arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.paywall
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/theguysaccount/newsatoshi-paywall:v0.36.1
+            ghcr.io/theguysaccount/newsatoshi-paywall:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/theguysaccount/newsatoshi-commons
+            org.opencontainers.image.description=10-second zero-code HTTP 402 O(1) SHA-256 PayWords reverse proxy for Base, Optimism, and Arbitrum One
+            org.opencontainers.image.licenses=PolyForm-Noncommercial-1.0.0
+          cache-from: type=gha,scope=paywall
+          cache-to: type=gha,mode=max,scope=paywall

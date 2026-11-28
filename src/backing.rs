@@ -297,15 +297,29 @@ fn eth_call_erc20_balance_of(
         .map_err(|e| format!("failed parsing balanceOf u128: {e}"))
 }
 
-/// Pure receipt parser verifying real Base Mainnet USDC `Transfer` logs into `CANONICAL_BACKING_VAULT`
-/// (`0x37Ed94525DBE408fA72cDd156409875666679265`) for RFC-0028 Tier-1B `nsUSD-B` 1:1 escrow receipts.
-pub fn parse_base_usdc_escrow_receipt(tx_hash: &str, receipt: &Value) -> Result<Value, String> {
+/// Pure receipt parser verifying real Base, Optimism, Arbitrum One, or Polygon PoS USDC `Transfer`
+/// logs into `CANONICAL_BACKING_VAULT` (`0x37Ed94525DBE408fA72cDd156409875666679265`) for
+/// RFC-0028 Tier-1B `nsUSD-B` 1:1 escrow receipts.
+pub fn parse_evm_usdc_escrow_receipt(
+    chain_slug: &str,
+    tx_hash: &str,
+    receipt: &Value,
+) -> Result<Value, String> {
+    let spec = LIVE_VAULT_CHAINS
+        .iter()
+        .find(|c| c.name.eq_ignore_ascii_case(chain_slug))
+        .ok_or_else(|| {
+            format!("unsupported chain '{chain_slug}': use base, optimism, arbitrum, or polygon")
+        })?;
     if receipt.is_null() {
-        return Err("transaction receipt not found on Base Mainnet (tx pending or unknown)".to_string());
+        return Err(format!(
+            "transaction receipt not found on {} Mainnet (tx pending or unknown)",
+            spec.name
+        ));
     }
     let status_hex = receipt.get("status").and_then(|v| v.as_str()).unwrap_or("");
     if !status_hex.eq_ignore_ascii_case("0x1") {
-        return Err(format!("Base transaction did not succeed (status={status_hex})"));
+        return Err(format!("{} transaction did not succeed (status={status_hex})", spec.name));
     }
     let block_hex = receipt.get("blockNumber").and_then(|v| v.as_str()).unwrap_or("0x0");
     let block_number = u64::from_str_radix(block_hex.trim_start_matches("0x"), 16).unwrap_or(0);
@@ -329,7 +343,7 @@ pub fn parse_base_usdc_escrow_receipt(tx_hash: &str, receipt: &Value) -> Result<
         if addr.eq_ignore_ascii_case(CANONICAL_BACKING_VAULT) {
             has_vault_event = true;
         }
-        if !addr.eq_ignore_ascii_case(BASE_USDC_ADDRESS) {
+        if !addr.eq_ignore_ascii_case(spec.usdc_address) {
             continue;
         }
         let topics = match log.get("topics").and_then(|v| v.as_array()) {
@@ -370,25 +384,31 @@ pub fn parse_base_usdc_escrow_receipt(tx_hash: &str, receipt: &Value) -> Result<
 
     if total_usdc_micro == 0 {
         return Err(format!(
-            "no Base Mainnet USDC Transfer to immutable NewsatoshiBackingVault ({CANONICAL_BACKING_VAULT}) found in tx {tx_hash}"
+            "no {} Mainnet USDC Transfer to immutable NewsatoshiBackingVault ({CANONICAL_BACKING_VAULT}) found in tx {tx_hash}",
+            spec.name
         ));
     }
 
     let norm_tx = tx_hash.trim().to_ascii_lowercase();
-    let commitment_input = format!("nsUSD-B:base:8453:{norm_tx}:{block_number}:{total_usdc_micro}");
+    let explorer_tx_url = format!("{}{norm_tx}", spec.explorer_base.replace("/address/", "/tx/"));
+    let commitment_input = format!(
+        "nsUSD-B:{}:{}:{norm_tx}:{block_number}:{total_usdc_micro}",
+        spec.name, spec.chain_id
+    );
     let receipt_commitment = hex::encode(crate::crypto::sha256(commitment_input.as_bytes()));
 
     Ok(json!({
         "ok": true,
         "verified_onchain": true,
-        "chain": "base",
-        "chain_id": 8453,
+        "chain": spec.name,
+        "chain_id": spec.chain_id,
         "tx_hash": norm_tx,
-        "basescan_url": format!("https://basescan.org/tx/{norm_tx}"),
+        "explorer_url": explorer_tx_url,
+        "basescan_url": explorer_tx_url,
         "block_number": block_number,
         "tx_sender": tx_from,
         "vault_address": CANONICAL_BACKING_VAULT,
-        "usdc_token": BASE_USDC_ADDRESS,
+        "usdc_token": spec.usdc_address,
         "deposit_path": if has_vault_event { "depositErc20_indexed_vault_event" } else { "direct_erc20_transfer_to_immutable_vault" },
         "verified_usdc_micro": total_usdc_micro,
         "verified_usdc_formatted": format_usdc_6(total_usdc_micro),
@@ -402,9 +422,19 @@ pub fn parse_base_usdc_escrow_receipt(tx_hash: &str, receipt: &Value) -> Result<
     }))
 }
 
-/// Verifies a real Base Mainnet USDC deposit tx hash live against Base JSON-RPC and returns
-/// an auditable RFC-0028 Tier-1B `nsUSD-B` 1:1 escrow verification receipt (zero fake data).
-pub fn verify_base_usdc_escrow_tx(tx_hash_hex: &str) -> Result<Value, String> {
+pub fn parse_base_usdc_escrow_receipt(tx_hash: &str, receipt: &Value) -> Result<Value, String> {
+    parse_evm_usdc_escrow_receipt("base", tx_hash, receipt)
+}
+
+/// Verifies a real Base, Optimism, Arbitrum One, or Polygon PoS USDC deposit tx hash live
+/// against mainnet JSON-RPC and returns an auditable RFC-0028 Tier-1B `nsUSD-B` 1:1 escrow receipt.
+pub fn verify_evm_usdc_escrow_tx(chain_slug: &str, tx_hash_hex: &str) -> Result<Value, String> {
+    let spec = LIVE_VAULT_CHAINS
+        .iter()
+        .find(|c| c.name.eq_ignore_ascii_case(chain_slug))
+        .ok_or_else(|| {
+            format!("unsupported chain '{chain_slug}': use base, optimism, arbitrum, or polygon")
+        })?;
     let trimmed = tx_hash_hex.trim();
     let hex_part = trimmed
         .strip_prefix("0x")
@@ -424,9 +454,18 @@ pub fn verify_base_usdc_escrow_tx(tx_hash_hex: &str) -> Result<Value, String> {
         "method": "eth_getTransactionReceipt",
         "params": [norm_tx]
     });
-    let receipt = eth_json_rpc_call(&agent, "https://base-rpc.publicnode.com", &payload)
-        .or_else(|_| eth_json_rpc_call(&agent, "https://mainnet.base.org", &payload))?;
-    parse_base_usdc_escrow_receipt(&norm_tx, &receipt)
+    let mut res = eth_json_rpc_call(&agent, spec.rpc_url, &payload);
+    if res.is_err() {
+        if let Some(fb) = spec.fallback_rpc_url {
+            res = eth_json_rpc_call(&agent, fb, &payload);
+        }
+    }
+    let receipt = res?;
+    parse_evm_usdc_escrow_receipt(spec.name, &norm_tx, &receipt)
+}
+
+pub fn verify_base_usdc_escrow_tx(tx_hash_hex: &str) -> Result<Value, String> {
+    verify_evm_usdc_escrow_tx("base", tx_hash_hex)
 }
 
 /// Polls live on-chain reserve balances across all 4 EVM mainnets and aggregates them with

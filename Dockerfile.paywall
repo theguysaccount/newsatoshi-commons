@@ -1,0 +1,17 @@
+# Tiny multi-arch (linux/amd64 + linux/arm64) 10-Second Zero-Code HTTP 402 PayWords Reverse Proxy
+FROM node:22-alpine
+
+WORKDIR /app
+COPY sdk/js/bin/newsatoshi-paywall.mjs /app/newsatoshi-paywall.mjs
+RUN chmod +x /app/newsatoshi-paywall.mjs && mkdir -p /data
+
+ENV PAYWALL_HOST=0.0.0.0 \
+    PAYWALL_PORT=4020 \
+    PAYWALL_CHAIN=base \
+    PAYWALL_PRICE_USDC=0.001 \
+    PAYWALL_STATE_FILE=/data/paywall-state.json
+
+VOLUME ["/data"]
+EXPOSE 4020
+
+ENTRYPOINT ["node", "/app/newsatoshi-paywall.mjs"]

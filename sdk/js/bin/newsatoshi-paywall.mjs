@@ -15,6 +15,7 @@
  *     --port 4020
  */
 import crypto from "node:crypto";
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import https from "node:https";
@@ -212,7 +213,59 @@ export function createPaywallServer(options) {
   const freePaths = new Set((options.freePaths || ["/health", "/.well-known/x402"]).map((p) => p.trim()));
   const stateFile = options.stateFile || null;
   const rpcUrl = options.rpcUrl || chain.rpc;
+  const autoClaimThreshold = Number(options.autoClaimThreshold || 0);
+  const autoClaimCmd = options.autoClaimCmd || "";
+  const onAutoClaim = typeof options.onAutoClaim === "function" ? options.onAutoClaim : null;
+  const inFlightClaims = new Set();
   const state = loadState(stateFile);
+
+  function maybeTriggerAutoClaim(channelId, rec) {
+    if (autoClaimThreshold <= 0) return;
+    const settled = Number(rec.lastAutoClaimedIndex || 0);
+    if (rec.lastIndex - settled < autoClaimThreshold) return;
+    if (inFlightClaims.has(channelId)) return;
+    const snapSteps = rec.lastIndex;
+    const snapToken = rec.lastToken;
+    const grossRaw = snapSteps * rec.unitRaw;
+    const claimEvent = {
+      chain: chain.slug,
+      channelContract: chain.contract,
+      channelId: "0x" + channelId,
+      steps: snapSteps,
+      latestPreimage: "0x" + snapToken,
+      earnedUsdcRaw: grossRaw,
+      rpcUrl,
+      fairCurvePool,
+    };
+    inFlightClaims.add(channelId);
+    rec.lastAutoClaimedIndex = snapSteps;
+    persistState(stateFile, state);
+    if (onAutoClaim) {
+      Promise.resolve(onAutoClaim(claimEvent)).finally(() => inFlightClaims.delete(channelId));
+      return;
+    }
+    if (autoClaimCmd) {
+      const child = spawn(autoClaimCmd, {
+        shell: true,
+        stdio: "inherit",
+        env: {
+          ...process.env,
+          PAYWALL_CHAIN: chain.slug,
+          PAYWALL_CONTRACT: chain.contract,
+          PAYWALL_RPC_URL: rpcUrl,
+          PAYWALL_CHANNEL_ID: "0x" + channelId,
+          PAYWALL_STEPS: String(snapSteps),
+          PAYWALL_PREIMAGE: "0x" + snapToken,
+          PAYWALL_EARNED_USDC_RAW: String(grossRaw),
+          PAYWALL_FAIR_CURVE: fairCurvePool || "",
+        },
+      });
+      child.on("exit", () => inFlightClaims.delete(channelId));
+      child.on("error", () => inFlightClaims.delete(channelId));
+    } else {
+      inFlightClaims.delete(channelId);
+    }
+  }
 
   function challengePayload(reqPath) {
     return {
@@ -435,6 +488,7 @@ export function createPaywallServer(options) {
     state.totalVerifiedCalls += 1;
     state.totalEarnedUsdcRaw += delta * rec.unitRaw;
     persistState(stateFile, state);
+    maybeTriggerAutoClaim(channelId, rec);
 
     const receipt = {
       x402Version: 2,
@@ -467,6 +521,8 @@ function parseArgs(argv) {
     stateFile: process.env.PAYWALL_STATE_FILE || "./paywall-state.json",
     fairCurve: process.env.PAYWALL_FAIR_CURVE || "",
     rpcUrl: process.env.PAYWALL_RPC_URL || "",
+    autoClaimThreshold: Number(process.env.PAYWALL_AUTO_CLAIM_THRESHOLD || 0),
+    autoClaimCmd: process.env.PAYWALL_AUTO_CLAIM_CMD || "",
     sandbox: process.env.PAYWALL_SANDBOX === "1",
     freePaths: ["/health", "/.well-known/x402"],
     help: false,
@@ -485,6 +541,8 @@ function parseArgs(argv) {
     else if (a === "--state") opts.stateFile = argv[++i];
     else if (a === "--fair-curve") opts.fairCurve = argv[++i];
     else if (a === "--rpc-url") opts.rpcUrl = argv[++i];
+    else if (a === "--auto-claim-threshold") opts.autoClaimThreshold = Number(argv[++i]);
+    else if (a === "--auto-claim-cmd") opts.autoClaimCmd = argv[++i];
     else if (a === "--free-paths") opts.freePaths = argv[++i].split(",").filter(Boolean);
   }
   return opts;

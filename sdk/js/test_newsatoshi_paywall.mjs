@@ -23,6 +23,7 @@ test("newsatoshi-paywall gates any upstream API via HTTP 402 PayWords, blocks re
   const payTo = "0x9f4b3214536f326b150e236c0f731b0e18a95e7b";
   const fairCurve = "0xC3098ba25E39Effa63dE94EbACE6381781ad4cEd";
 
+  const autoClaimEvents = [];
   const { server: pw1 } = createPaywallServer({
     upstream: `http://127.0.0.1:${upPort}`,
     payTo,
@@ -31,6 +32,8 @@ test("newsatoshi-paywall gates any upstream API via HTTP 402 PayWords, blocks re
     sandbox: true,
     stateFile,
     fairCurve,
+    autoClaimThreshold: 3,
+    onAutoClaim: (evt) => autoClaimEvents.push(evt),
   });
   const pwPort = await listen(pw1);
   const baseUrl = `http://127.0.0.1:${pwPort}`;
@@ -111,6 +114,9 @@ test("newsatoshi-paywall gates any upstream API via HTTP 402 PayWords, blocks re
     assert.equal(claims.claims.length, 1);
     assert.match(claims.claims[0].claimCommand, /claim\(bytes32,uint32,bytes32\)" 0xabab/);
     assert.match(claims.claims[0].injectRevenueCommands[1], /injectRevenue\(uint256\)" 3000/);
+    assert.equal(autoClaimEvents.length, 1);
+    assert.equal(autoClaimEvents[0].steps, 3);
+    assert.equal(autoClaimEvents[0].earnedUsdcRaw, 3000);
 
     // 7. Restart proxy loading persisted stateFile -> replay of step #3 STILL rejected, step #4 succeeds!
     pw1.close();

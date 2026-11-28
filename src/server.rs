@@ -939,6 +939,12 @@ fn handle_request(req: Request, state: &AppState) {
         (Method::Post, "/api/v2/nsusd/verify-base-escrow") => {
             let body = read_body_string(&mut req).unwrap_or_default();
             let parsed: Value = serde_json::from_str(&body).unwrap_or_else(|_| json!({}));
+            let chain = parsed
+                .get("chain")
+                .and_then(|v| v.as_str())
+                .unwrap_or("base")
+                .trim()
+                .to_ascii_lowercase();
             let tx_hash = parsed
                 .get("tx_hash")
                 .and_then(|v| v.as_str())
@@ -949,17 +955,23 @@ fn handle_request(req: Request, state: &AppState) {
                     400,
                     &json!({
                         "ok": false,
-                        "error": "missing required 'tx_hash' (Base Mainnet 0x... USDC deposit tx hash)",
+                        "error": "missing required 'tx_hash' (Base/Optimism/Arbitrum/Polygon Mainnet 0x... USDC deposit tx hash)",
+                        "supported_chains": ["base", "optimism", "arbitrum", "polygon"],
                         "example_tx_hash": crate::backing::LIVE_BASE_DIRECT_USDC_TX
                     }),
                 );
             } else {
-                match crate::backing::verify_base_usdc_escrow_tx(tx_hash) {
+                match crate::backing::verify_evm_usdc_escrow_tx(&chain, tx_hash) {
                     Ok(mut receipt) => {
                         let norm_tx = receipt
                             .get("tx_hash")
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
+                            .to_string();
+                        let verified_chain = receipt
+                            .get("chain")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or(&chain)
                             .to_string();
                         let usdc_micro = receipt
                             .get("verified_usdc_micro")
@@ -971,7 +983,7 @@ fn handle_request(req: Request, state: &AppState) {
                                 .lock()
                                 .unwrap_or_else(|e| e.into_inner());
                             let rec_ok = if !norm_tx.is_empty() && usdc_micro > 0 {
-                                match eng.record_bridged_nsusd_b(&norm_tx, "USDC", "base", usdc_micro) {
+                                match eng.record_bridged_nsusd_b(&norm_tx, "USDC", &verified_chain, usdc_micro) {
                                     Ok(_) => {
                                         save_nsusd_state(&state.nsusd_state_file, &eng);
                                         true
